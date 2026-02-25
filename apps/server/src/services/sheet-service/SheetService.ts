@@ -10,12 +10,16 @@ import { ImportMap, getErrorMessage } from 'ontime-utils';
 import { sheets, type sheets_v4 } from '@googleapis/sheets';
 import { Credentials, OAuth2Client } from 'google-auth-library';
 import got from 'got';
+import { Low } from 'lowdb';
+import { JSONFile } from 'lowdb/node';
 
 import { parseExcel } from '../../utils/parser.js';
 import { logger } from '../../classes/Logger.js';
 import { parseRundown } from '../../utils/parserFunctions.js';
 import { getRundown } from '../rundown-service/rundownUtils.js';
 import { getCustomFields } from '../rundown-service/rundownCache.js';
+import { publicDir, publicFiles } from '../../setup/index.js';
+import { ensureDirectory } from '../../utils/fileManagement.js';
 
 import { cellRequestFromEvent, type ClientSecret, getA1Notation, validateClientSecret } from './sheetUtils.js';
 
@@ -23,6 +27,26 @@ const sheetScope = 'https://www.googleapis.com/auth/spreadsheets';
 const codesUrl = 'https://oauth2.googleapis.com/device/code';
 const tokenUrl = 'https://oauth2.googleapis.com/token';
 const grantType = 'urn:ietf:params:oauth:grant-type:device_code';
+
+type PersistedCredentials = Pick<
+  Credentials,
+  'access_token' | 'refresh_token' | 'expiry_date' | 'scope' | 'token_type'
+>;
+
+type PersistedSheetsState = {
+  clientSecret: ClientSecret | null;
+  sheetId: MaybeString;
+  credentials: PersistedCredentials | null;
+};
+
+const defaultState: PersistedSheetsState = {
+  clientSecret: null,
+  sheetId: null,
+  credentials: null,
+};
+
+const adapter = new JSONFile<PersistedSheetsState>(publicFiles.sheetsState);
+const storage = new Low<PersistedSheetsState>(adapter, defaultState);
 
 let currentAuthClient: OAuth2Client | null = null;
 let currentClientSecret: ClientSecret | null = null;
@@ -34,36 +58,133 @@ let currentSheetId: MaybeString = null;
 let pollInterval: NodeJS.Timeout | null = null;
 let cleanupTimeout: NodeJS.Timeout | null = null;
 
-function reset() {
-  currentAuthClient = null;
-  currentClientSecret = null;
-  currentAuthUrl = null;
-  currentAuthCode = null;
-
-  currentSheetId = null;
-
+function clearActiveTimers() {
   if (pollInterval) {
     clearInterval(pollInterval);
     pollInterval = null;
   }
+
   if (cleanupTimeout) {
     clearTimeout(cleanupTimeout);
     cleanupTimeout = null;
   }
 }
 
+function resetMemoryState() {
+  currentAuthClient = null;
+  currentClientSecret = null;
+  currentAuthUrl = null;
+  currentAuthCode = null;
+  currentSheetId = null;
+
+  clearActiveTimers();
+}
+
+async function readPersistedState(): Promise<PersistedSheetsState> {
+  await storage.read();
+  return {
+    ...defaultState,
+    ...storage.data,
+  };
+}
+
+async function writePersistedState(patch: Partial<PersistedSheetsState>) {
+  const existing = await readPersistedState();
+  storage.data = {
+    ...existing,
+    ...patch,
+  };
+  await storage.write();
+}
+
+function getPersistedCredentials(client: OAuth2Client): PersistedCredentials {
+  return {
+    access_token: client.credentials.access_token,
+    refresh_token: client.credentials.refresh_token,
+    expiry_date: client.credentials.expiry_date,
+    scope: client.credentials.scope,
+    token_type: client.credentials.token_type,
+  };
+}
+
+async function persistCurrentState() {
+  await writePersistedState({
+    clientSecret: currentClientSecret,
+    sheetId: currentSheetId,
+    credentials: currentAuthClient ? getPersistedCredentials(currentAuthClient) : null,
+  });
+}
+
+async function persistCurrentStateSafe() {
+  try {
+    await persistCurrentState();
+  } catch (error) {
+    logger.warning(LogOrigin.Server, `Could not persist Google Sheets auth state: ${getErrorMessage(error)}`);
+  }
+}
+
+function attachTokenUpdates(client: OAuth2Client) {
+  client.on('tokens', async (tokens) => {
+    // only persist updates from the active client
+    if (currentAuthClient !== client) {
+      return;
+    }
+
+    client.setCredentials({
+      ...client.credentials,
+      ...tokens,
+      // refresh tokens are generally only returned on the first grant,
+      // so keep the existing value on refresh events
+      refresh_token: tokens.refresh_token ?? client.credentials.refresh_token,
+    });
+
+    await persistCurrentStateSafe();
+  });
+}
+
 /**
  * Initialise module
  */
-export function init() {
-  reset();
+export async function init() {
+  resetMemoryState();
+  ensureDirectory(publicDir.sheetsDir);
+
+  try {
+    const persistedState = await readPersistedState();
+    currentClientSecret = persistedState.clientSecret;
+    currentSheetId = persistedState.sheetId;
+
+    if (!persistedState.clientSecret || !persistedState.credentials) {
+      return;
+    }
+
+    const client = new OAuth2Client({
+      clientId: persistedState.clientSecret.installed.client_id,
+      clientSecret: persistedState.clientSecret.installed.client_secret,
+    });
+
+    client.setCredentials(persistedState.credentials);
+    attachTokenUpdates(client);
+
+    // triggers refresh when needed and validates persisted credentials
+    await client.getAccessToken();
+
+    currentAuthClient = client;
+    await persistCurrentStateSafe();
+    logger.info(LogOrigin.Server, 'Google Sheets authentication restored from disk');
+  } catch (error) {
+    logger.warning(LogOrigin.Server, `Google Sheets re-authentication failed: ${getErrorMessage(error)}`);
+    currentAuthClient = null;
+    await persistCurrentStateSafe();
+  }
 }
 
 /**
  * Resets all state related to an eventual connection
  */
-export function revoke(): ReturnType<typeof hasAuth> {
-  reset();
+export async function revoke(): Promise<ReturnType<typeof hasAuth>> {
+  resetMemoryState();
+  await writePersistedState(defaultState);
   return hasAuth();
 }
 
@@ -161,23 +282,18 @@ function verifyConnection(
       client.setCredentials({
         refresh_token: auth.refresh_token,
         access_token: auth.access_token,
+        expiry_date: auth.expiry_date,
         scope: auth.scope,
         token_type: auth.token_type,
       });
+      attachTokenUpdates(client);
 
       // save client and cancel tasks
       currentAuthClient = client;
 
-      if (cleanupTimeout) {
-        clearTimeout(cleanupTimeout);
-        cleanupTimeout = null;
-      }
+      clearActiveTimers();
 
-      if (pollInterval) {
-        clearInterval(pollInterval);
-        pollInterval = null;
-      }
-
+      await persistCurrentStateSafe();
       await postAction();
     } catch (_error) {
       /** we do not handle failure */
@@ -187,9 +303,9 @@ function verifyConnection(
 
 export function hasAuth(): { authenticated: AuthenticationStatus; sheetId: string } {
   if (cleanupTimeout) {
-    return { authenticated: 'pending', sheetId: currentSheetId };
+    return { authenticated: 'pending', sheetId: currentSheetId ?? '' };
   }
-  return { authenticated: currentAuthClient ? 'authenticated' : 'not_authenticated', sheetId: currentSheetId };
+  return { authenticated: currentAuthClient ? 'authenticated' : 'not_authenticated', sheetId: currentSheetId ?? '' };
 }
 
 async function verifySheet(
@@ -234,6 +350,7 @@ export async function handleInitialConnection(
   currentAuthUrl = verification_url;
   currentAuthCode = user_code;
   currentSheetId = sheetId;
+  await persistCurrentStateSafe();
 
   // schedule verifying token and the existence of the sheetID
   verifyConnection(currentClientSecret, device_code, interval, expires_in, verifySheet);
@@ -250,11 +367,15 @@ export async function getWorksheetOptions(sheetId: string): ReturnType<typeof ve
     throw new Error('Not authenticated');
   }
   currentSheetId = sheetId;
+  await persistCurrentStateSafe();
 
   return verifySheet(sheetId);
 }
 
 async function verifyWorksheet(sheetId: string, worksheet: string): Promise<{ worksheetId: number; range: string }> {
+  currentSheetId = sheetId;
+  await persistCurrentStateSafe();
+
   const spreadsheets = await sheets({ version: 'v4', auth: currentAuthClient }).spreadsheets.get({
     spreadsheetId: sheetId,
   });

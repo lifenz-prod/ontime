@@ -39,6 +39,7 @@ import { initRundown } from './services/rundown-service/RundownService.js';
 import { initialiseProject } from './services/project-service/ProjectService.js';
 import { getShowWelcomeDialog } from './services/app-state-service/AppStateService.js';
 import { oscServer } from './adapters/OscAdapter.js';
+import { init as initSheetService } from './services/sheet-service/SheetService.js';
 
 // Utilities
 import { clearUploadfolder } from './utils/upload.js';
@@ -145,6 +146,7 @@ export const initAssets = async () => {
   await clearUploadfolder();
   populateStyles();
   await populateDemo();
+  await initSheetService();
   const project = await initialiseProject();
   logger.info(LogOrigin.Server, `Initialised Ontime with ${project}`);
 };

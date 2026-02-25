@@ -118,6 +118,8 @@ export const publicDir = {
   corruptDir: join(resolvePublicDirectory, config.corrupt),
   /** path to uploads folder */
   uploadsDir: join(resolvePublicDirectory, config.uploads),
+  /** path to sheets integration data */
+  sheetsDir: join(resolvePublicDirectory, config.sheets.directory),
   /** path to external folder */
   externalDir: join(
     externalsStartDirectory,
@@ -144,6 +146,8 @@ export const publicFiles = {
   appState: join(publicDir.root, config.appState),
   /** path to restore file */
   restoreFile: join(publicDir.root, config.restoreFile),
+  /** path to persisted sheets integration state */
+  sheetsState: join(publicDir.sheetsDir, 'google-auth.json'),
   /** path to CSS override file */
   cssOverride: join(publicDir.stylesDir, config.styles.filename),
   /** path to external readme file */

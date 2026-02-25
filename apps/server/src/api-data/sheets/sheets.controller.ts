@@ -48,7 +48,7 @@ export async function requestConnection(
 
 export async function verifyAuthentication(
   _req: Request,
-  res: Response<{ authenticated: AuthenticationStatus } | ErrorResponse>,
+  res: Response<{ authenticated: AuthenticationStatus; sheetId: string } | ErrorResponse>,
 ) {
   try {
     const authenticated = hasAuth();
@@ -61,10 +61,10 @@ export async function verifyAuthentication(
 
 export async function revokeAuthentication(
   _req: Request,
-  res: Response<{ authenticated: AuthenticationStatus } | ErrorResponse>,
+  res: Response<{ authenticated: AuthenticationStatus; sheetId: string } | ErrorResponse>,
 ) {
   try {
-    const authenticated = revoke();
+    const authenticated = await revoke();
     res.status(200).send(authenticated);
   } catch (error) {
     const message = getErrorMessage(error);
