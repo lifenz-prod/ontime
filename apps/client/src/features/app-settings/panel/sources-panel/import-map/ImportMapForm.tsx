@@ -4,6 +4,8 @@ import { IoAdd, IoTrash } from 'react-icons/io5';
 import { Button, IconButton, Input, Select, Tooltip } from '@chakra-ui/react';
 import { ImportMap, isAlphanumericWithSpace } from 'ontime-utils';
 
+import { getWorksheetNames } from '../../../../../common/api/sheets';
+import { maybeAxiosError } from '../../../../../common/api/utils';
 import * as Panel from '../../../panel-utils/PanelUtils';
 import useGoogleSheet from '../useGoogleSheet';
 import { useSheetStore } from '../useSheetStore';
@@ -41,9 +43,32 @@ export default function ImportMapForm(props: ImportMapFormProps) {
   });
 
   const stepData = useSheetStore((state) => state.stepData);
+  const patchStepData = useSheetStore((state) => state.patchStepData);
   const worksheetNames = useSheetStore((state) => state.worksheetNames);
+  const setWorksheets = useSheetStore((state) => state.setWorksheets);
+  const sheetId = useSheetStore((state) => state.sheetId);
+  const setSheetId = useSheetStore((state) => state.setSheetId);
 
-  const [loading, setLoading] = useState<'' | 'export' | 'import'>('');
+  const [loading, setLoading] = useState<'' | 'sheet' | 'export' | 'import'>('');
+
+  const handleLoadWorksheets = async () => {
+    if (!sheetId) {
+      patchStepData({ worksheet: { available: false, error: 'Please enter a sheet ID' } });
+      return;
+    }
+
+    setLoading('sheet');
+    patchStepData({ worksheet: { available: false, error: '' } });
+
+    try {
+      const names = await getWorksheetNames(sheetId);
+      setWorksheets(names);
+    } catch (error) {
+      patchStepData({ worksheet: { available: false, error: maybeAxiosError(error) } });
+    } finally {
+      setLoading('');
+    }
+  };
 
   const handleExport = async (values: NamedImportMap) => {
     setLoading('export');
@@ -76,7 +101,7 @@ export default function ImportMapForm(props: ImportMapFormProps) {
 
   const isLoading = Boolean(loading);
   const canSubmitSpreadsheet = isSpreadsheet && !isLoading;
-  const canSubmitGSheet = !isLoading && !stepData.worksheet.error;
+  const canSubmitGSheet = !isLoading && !!sheetId && !!worksheetNames?.length && !stepData.worksheet.error;
   const canSubmit = !hasErrors && isValid && (canSubmitSpreadsheet || canSubmitGSheet);
 
   return (
@@ -116,6 +141,31 @@ export default function ImportMapForm(props: ImportMapFormProps) {
           </Button>
         </Panel.InlineElements>
       </Panel.Title>
+      {!isSpreadsheet && (
+        <Panel.ListGroup>
+          <Panel.Description>Choose which Google Sheet to use</Panel.Description>
+          <Panel.InlineElements>
+            <Input
+              size='sm'
+              variant='ontime-filled'
+              autoComplete='off'
+              placeholder='Sheet ID'
+              value={sheetId ?? ''}
+              onChange={(event) => setSheetId(event.target.value)}
+              isDisabled={isLoading}
+            />
+            <Button
+              size='sm'
+              variant='ontime-subtle'
+              onClick={handleLoadWorksheets}
+              isLoading={loading === 'sheet'}
+              isDisabled={isLoading || !sheetId}
+            >
+              Load worksheets
+            </Button>
+          </Panel.InlineElements>
+        </Panel.ListGroup>
+      )}
       <Panel.Table>
         <thead>
           <tr>
