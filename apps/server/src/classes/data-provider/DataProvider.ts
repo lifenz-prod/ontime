@@ -8,6 +8,7 @@ import {
   URLPreset,
   AutomationSettings,
   QlabSettings,
+  ServiceProfiles,
 } from 'ontime-types';
 
 import type { Low } from 'lowdb';
@@ -56,6 +57,8 @@ export function getDataProvider() {
     setAutomation,
     getQlab,
     setQlab,
+    getServiceProfiles,
+    setServiceProfiles,
     getRundown,
     mergeIntoData,
   };
@@ -139,6 +142,16 @@ async function setQlab(newData: QlabSettings): ReadonlyPromise<QlabSettings> {
   db.data.qlab = { ...newData };
   await persist();
   return db.data.qlab;
+}
+
+function getServiceProfiles(): Readonly<ServiceProfiles> {
+  return db.data.serviceProfiles ?? [];
+}
+
+async function setServiceProfiles(newData: ServiceProfiles): ReadonlyPromise<ServiceProfiles> {
+  db.data.serviceProfiles = [...newData];
+  await persist();
+  return db.data.serviceProfiles;
 }
 
 function getRundown(): Readonly<OntimeRundown> {

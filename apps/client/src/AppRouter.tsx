@@ -20,11 +20,13 @@ import { sentryDsn, sentryRecommendedIgnore } from './sentry.config';
 
 const Editor = React.lazy(() => import('./features/editors/ProtectedEditor'));
 const MobileEditor = React.lazy(() => import('./features/editors/ProtectedMobileEditor'));
+const IpadEditor = React.lazy(() => import('./features/editors/ProtectedIpadEditor'));
 const Cuesheet = React.lazy(() => import('./views/cuesheet/ProtectedCuesheet'));
 const Operator = React.lazy(() => import('./features/operator/OperatorExport'));
 
 const TimerView = React.lazy(() => import('./views/timer/Timer'));
 const CuescreenView = React.lazy(() => import('./views/cuescreen/CuescreenView'));
+const CuescreennowView = React.lazy(() => import('./views/cuescreen/CuescreennowView'));
 const MinimalTimerView = React.lazy(() => import('./features/viewers/minimal-timer/MinimalTimer'));
 const ClockView = React.lazy(() => import('./features/viewers/clock/Clock'));
 const Countdown = React.lazy(() => import('./features/viewers/countdown/Countdown'));
@@ -36,9 +38,11 @@ const Lower = React.lazy(() => import('./features/viewers/lower-thirds/LowerThir
 const StudioClock = React.lazy(() => import('./features/viewers/studio/StudioClock'));
 const ProjectInfo = React.lazy(() => import('./views/project-info/ProjectInfo'));
 const QlabTimerView = React.lazy(() => import('./views/qlab/QlabTimer'));
+const QlabCountdownView = React.lazy(() => import('./views/qlabcountdown/QlabCountdownView'));
 
 const STimer = withPreset(withData(TimerView));
 const SCuescreen = withPreset(withData(CuescreenView));
+const SCuescreennow = withPreset(withData(CuescreennowView));
 const SMinimalTimer = withPreset(withData(MinimalTimerView));
 const SClock = withPreset(withData(ClockView));
 const SCountdown = withPreset(withData(Countdown));
@@ -167,6 +171,14 @@ export default function AppRouter() {
           }
         />
         <Route
+          path='/cuescreennow'
+          element={
+            <ViewLoader>
+              <SCuescreennow />
+            </ViewLoader>
+          }
+        />
+        <Route
           path='/qlab'
           element={
             <ViewLoader>
@@ -174,10 +186,19 @@ export default function AppRouter() {
             </ViewLoader>
           }
         />
+        <Route
+          path='/qlabcountdown'
+          element={
+            <ViewLoader>
+              <QlabCountdownView />
+            </ViewLoader>
+          }
+        />
 
         {/*/!* Protected Routes *!/*/}
         <Route path='/editor' element={<Editor />} />
         <Route path='/mobile-editor' element={<MobileEditor />} />
+        <Route path='/ipad-editor' element={<IpadEditor />} />
         <Route path='/cuesheet' element={<PCuesheet />} />
         <Route
           path='/op'

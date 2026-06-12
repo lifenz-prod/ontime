@@ -44,6 +44,9 @@ export type { Settings } from './definitions/core/Settings.type.js';
 // ---> QLab
 export type { QlabState, QlabSettings } from './definitions/core/Qlab.type.js';
 
+// ---> Service Profiles
+export type { ServiceProfile, ServiceProfiles } from './definitions/core/ServiceProfiles.type.js';
+
 // ---> Views
 export type { ViewSettings } from './definitions/core/Views.type.js';
 export type { TimeFormat } from './definitions/core/TimeFormat.type.js';

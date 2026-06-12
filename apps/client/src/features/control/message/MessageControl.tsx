@@ -48,8 +48,8 @@ export function ExternalInput() {
 
   return (
     <InputRow
-      label='External Message'
-      placeholder='Message shown as secondary text in stage timer'
+      label='Stage Message'
+      placeholder='Message to show on cue screen'
       text={text}
       visible={visible}
       changeHandler={(newValue) => setMessage.externalText(newValue)}
@@ -57,7 +57,7 @@ export function ExternalInput() {
       <TooltipActionBtn
         clickHandler={toggleExternal}
         tooltip={visible ? 'Make invisible' : 'Make visible'}
-        aria-label='Toggle external message visibility'
+        aria-label='Toggle stage message visibility'
         openDelay={tooltipDelayMid}
         icon={visible ? <IoEye size='22px' /> : <IoEyeOffOutline size='22px' />}
         variant={visible ? 'ontime-filled' : 'ontime-subtle'}

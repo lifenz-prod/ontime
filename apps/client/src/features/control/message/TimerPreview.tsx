@@ -1,4 +1,4 @@
-import { IoArrowDown, IoArrowUp, IoBan, IoFlag, IoTime } from 'react-icons/io5';
+import { IoArrowDown, IoArrowUp, IoBan, IoTime, IoTimer } from 'react-icons/io5';
 import { Tooltip } from '@chakra-ui/react';
 import { TimerPhase, TimerType } from 'ontime-types';
 
@@ -24,7 +24,7 @@ export default function TimerPreview() {
     if (phase === TimerPhase.Pending) return 'Standby to start';
     if (phase === TimerPhase.Overtime && data.endMessage) return 'Custom end message';
     if (timerType === TimerType.Clock) return 'Clock';
-    if (countToEnd) return 'Count to End';
+    if (countToEnd) return 'Countdown to Time';
     return 'Timer';
   })();
 
@@ -34,7 +34,7 @@ export default function TimerPreview() {
 
     // we need to check aux first since it takes priority
     if (showAuxTimer) return 'Aux Timer';
-    if (showExternalMessage) return 'External message';
+    if (showExternalMessage) return 'Stage message';
     return null;
   })();
 
@@ -73,8 +73,8 @@ export default function TimerPreview() {
         <Tooltip label='Time type: None' openDelay={tooltipDelayMid} shouldWrapChildren>
           <IoBan className={style.statusIcon} data-active={timerType === TimerType.None} />
         </Tooltip>
-        <Tooltip label={countToEnd ? 'Count to end' : 'Count duration'} openDelay={tooltipDelayMid} shouldWrapChildren>
-          <IoFlag className={style.statusIcon} data-active={countToEnd} />
+        <Tooltip label={countToEnd ? 'Countdown to Time' : 'Fixed duration timer'} openDelay={tooltipDelayMid} shouldWrapChildren>
+          <IoTimer className={style.statusIcon} data-active={!countToEnd} />
         </Tooltip>
       </div>
     </div>

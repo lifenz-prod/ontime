@@ -3,13 +3,13 @@ import {
   IoArrowDown,
   IoArrowUp,
   IoBan,
-  IoFlag,
   IoPeople,
   IoPlay,
   IoPlayForward,
   IoPlaySkipForward,
   IoStop,
   IoTime,
+  IoTimer,
 } from 'react-icons/io5';
 import { Tooltip } from '@chakra-ui/react';
 import { EndAction, MaybeString, Playback, TimerType, TimeStrategy } from 'ontime-types';
@@ -17,6 +17,7 @@ import { EndAction, MaybeString, Playback, TimerType, TimeStrategy } from 'ontim
 import { cx } from '../../../common/utils/styleUtils';
 import { tooltipDelayMid } from '../../../ontimeConfig';
 import EditableBlockTitle from '../common/EditableBlockTitle';
+import { useRundownMode } from '../RundownModeContext';
 import TimeInputFlow from '../time-input-flow/TimeInputFlow';
 
 import EventBlockChip from './composite/EventBlockChip';
@@ -52,6 +53,7 @@ interface EventBlockInnerProps {
 }
 
 function EventBlockInner(props: EventBlockInnerProps) {
+  const { hideRowActions, hideEndTime } = useRundownMode();
   const {
     eventId,
     timeStart,
@@ -105,20 +107,23 @@ function EventBlockInner(props: EventBlockInnerProps) {
           timeStrategy={timeStrategy}
           linkStart={linkStart}
           countToEnd={countToEnd}
+          hideEndTime={hideEndTime}
         />
       </div>
       <div className={style.titleSection}>
         <EditableBlockTitle title={title} eventId={eventId} placeholder='Event title' className={style.eventTitle} />
         {isNext && <span className={style.nextTag}>UP NEXT</span>}
       </div>
-      <EventBlockPlayback
-        eventId={eventId}
-        skip={skip}
-        isPlaying={eventIsPlaying}
-        isPaused={eventIsPaused}
-        loaded={loaded}
-        disablePlayback={skip || isRolling}
-      />
+      {!hideRowActions && (
+        <EventBlockPlayback
+          eventId={eventId}
+          skip={skip}
+          isPlaying={eventIsPlaying}
+          isPaused={eventIsPaused}
+          loaded={loaded}
+          disablePlayback={skip || isRolling}
+        />
+      )}
       {!skip && (
         <EventBlockChip
           className={style.chipSection}
@@ -149,11 +154,13 @@ function EventBlockInner(props: EventBlockInnerProps) {
               <EndActionIcon action={endAction} className={style.statusIcon} />
             </span>
           </Tooltip>
-          <Tooltip label={`${countToEnd ? 'Count to End' : 'Count duration'}`} openDelay={tooltipDelayMid}>
-            <span>
-              <IoFlag className={`${style.statusIcon} ${countToEnd ? style.active : style.disabled}`} />
-            </span>
-          </Tooltip>
+          {!countToEnd && (
+            <Tooltip label='Fixed duration timer' openDelay={tooltipDelayMid}>
+              <span>
+                <IoTimer className={`${style.statusIcon} ${style.active}`} />
+              </span>
+            </Tooltip>
+          )}
           <Tooltip label={`${isPublic ? 'Event is public' : 'Event is private'}`} openDelay={tooltipDelayMid}>
             <span>
               <IoPeople className={`${style.statusIcon} ${isPublic ? style.active : style.disabled}`} />

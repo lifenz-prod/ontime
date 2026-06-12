@@ -16,6 +16,7 @@ export const VIEW_SETTINGS = ['viewSettings'];
 export const CLIENT_LIST = ['clientList'];
 export const REPORT = ['report'];
 export const QLAB = ['qlab'];
+export const SERVICE_PROFILES = ['serviceProfiles'];
 
 // API URLs
 export const apiEntryUrl = `${serverURL}/data`;

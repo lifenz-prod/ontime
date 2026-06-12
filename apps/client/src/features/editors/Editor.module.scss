@@ -46,6 +46,12 @@ $panel-gap: 0.5rem;
   gap: $panel-gap;
 }
 
+/* iPad editor: 10% wider control column */
+.ipadLeft {
+  min-width: $min-playback-width * 1.1;
+  max-width: $max-playback-width * 1.1;
+}
+
 .messages {
   flex: 1;
 }

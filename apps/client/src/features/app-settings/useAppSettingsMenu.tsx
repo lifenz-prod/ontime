@@ -63,6 +63,13 @@ const staticOptions = [
     ],
   },
   {
+    id: 'service_profiles',
+    label: 'Service Profiles',
+    secondary: [
+      { id: 'service_profiles__settings', label: 'Manage profiles' },
+    ],
+  },
+  {
     id: 'network',
     label: 'Network',
     split: true,

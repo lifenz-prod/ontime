@@ -1,5 +1,5 @@
 import { Fragment, lazy, useCallback, useEffect, useRef, useState } from 'react';
-import { closestCenter, DndContext, DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { closestCenter, DndContext, DragEndEvent, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useHotkeys } from '@mantine/hooks';
 import {
@@ -59,8 +59,11 @@ export default function Rundown({ data }: RundownProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
   useFollowComponent({ followRef: cursorRef, scrollRef, doFollow: appMode === AppMode.Run });
 
-  // DND KIT
-  const sensors = useSensors(useSensor(PointerSensor));
+  // DND KIT — TouchSensor with long-press for tablet/mobile support
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+  );
 
   const deleteAtCursor = useCallback(
     (cursor: string | null) => {

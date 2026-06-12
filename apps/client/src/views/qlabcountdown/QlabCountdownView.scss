@@ -1,0 +1,26 @@
+body[data-view='qlabcountdown'] {
+  [data-testid='navigation__toggle-menu'],
+  [data-testid='navigation__toggle-settings'] {
+    display: none;
+  }
+}
+
+.qlabcountdown {
+  margin: 0;
+  padding: 0;
+  background-color: #000;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+
+  &__timer {
+    font-family: Arial, sans-serif;
+    font-weight: bold;
+    color: #fff;
+    line-height: 1;
+    white-space: nowrap;
+  }
+}

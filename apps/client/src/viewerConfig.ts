@@ -10,6 +10,9 @@ export const navigatorConstants = [
   { url: 'countdown', label: 'Countdown' },
   { url: 'info', label: 'Project Info' },
   { url: 'cuescreen', label: 'Cuescreen' },
+  { url: 'cuescreennow', label: 'Cuescreen NOW/NEXT' },
+  { url: 'qlabcountdown', label: 'Qlab Countdown' },
+  { url: 'ipad-editor', label: 'iPad Editor' },
 ];
 
 // default time format to use for users in 12 hour clocks

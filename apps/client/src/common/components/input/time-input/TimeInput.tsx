@@ -14,10 +14,22 @@ interface TimeInputProps<T extends string> {
   disabled?: boolean;
   align?: 'left' | 'center';
   className?: string;
+  formatValue?: (millis: number) => string;
 }
 
 export default function TimeInput<T extends string>(props: TimeInputProps<T>) {
-  const { id, name, submitHandler, time = 0, displayTime, placeholder, disabled, align = 'center', className } = props;
+  const {
+    id,
+    name,
+    submitHandler,
+    time = 0,
+    displayTime,
+    placeholder,
+    disabled,
+    align = 'center',
+    className,
+    formatValue,
+  } = props;
   const { emitError } = useEmitLog();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [value, setValue] = useState<string>('');
@@ -29,12 +41,12 @@ export default function TimeInput<T extends string>(props: TimeInputProps<T>) {
    */
   const resetValue = useCallback(() => {
     try {
-      setValue(millisToString(comparisonTime));
+      setValue(formatValue ? formatValue(comparisonTime) : millisToString(comparisonTime));
     } catch (error) {
       setValue(millisToString(0));
       emitError(`Unable to parse time ${comparisonTime}: ${error}`);
     }
-  }, [comparisonTime, emitError]);
+  }, [comparisonTime, emitError, formatValue]);
 
   /**
    * @description Selects input text on focus

@@ -9,6 +9,7 @@ import GeneralPanel from './panel/general-panel/GeneralPanel';
 import NetworkLogPanel from './panel/network-panel/NetworkLogPanel';
 import ProjectPanel from './panel/project-panel/ProjectPanel';
 import QlabPanel from './panel/qlab-panel/QlabPanel';
+import ServiceProfilesPanel from './panel/service-profiles-panel/ServiceProfilesPanel';
 import ShutdownPanel from './panel/shutdown-panel/ShutdownPanel';
 import SourcesPanel from './panel/sources-panel/SourcesPanel';
 import PanelContent from './panel-content/PanelContent';
@@ -32,6 +33,7 @@ export default function AppSettings() {
           {panel === 'sources' && <SourcesPanel location={location} onClose={close} />}
           {panel === 'automation' && <AutomationPanel location={location} />}
           {panel === 'qlab' && <QlabPanel />}
+          {panel === 'service_profiles' && <ServiceProfilesPanel />}
           {panel === 'network' && <NetworkLogPanel location={location} />}
           {panel === 'about' && <AboutPanel />}
           {panel === 'shutdown' && <ShutdownPanel />}

@@ -136,7 +136,7 @@ function EventEditorTimes(props: EventEditorTimesProps) {
             </Select>
           </div>
           <div>
-            <Editor.Label htmlFor='countToEnd'>Count to End</Editor.Label>
+            <Editor.Label htmlFor='countToEnd'>Countdown to Time</Editor.Label>
             <Editor.Label className={style.switchLabel}>
               <Switch
                 id='countToEnd'

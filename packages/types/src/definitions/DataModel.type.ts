@@ -4,6 +4,7 @@ import type {
   OntimeRundown,
   ProjectData,
   QlabSettings,
+  ServiceProfiles,
   Settings,
   URLPreset,
   ViewSettings,
@@ -18,4 +19,5 @@ export type DatabaseModel = {
   customFields: CustomFields;
   automation: AutomationSettings;
   qlab: QlabSettings;
+  serviceProfiles: ServiceProfiles;
 };

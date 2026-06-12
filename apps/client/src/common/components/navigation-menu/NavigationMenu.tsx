@@ -108,6 +108,14 @@ function NavigationMenu(props: NavigationMenuProps) {
               <IoLockClosedOutline />
               Mobile Editor
             </Link>
+            <Link
+              to='/ipad-editor'
+              tabIndex={0}
+              className={`${style.link} ${location.pathname === '/ipad-editor' && style.current}`}
+            >
+              <IoLockClosedOutline />
+              iPad Editor
+            </Link>
             <ClientLink to='cuesheet' current={location.pathname === '/cuesheet'}>
               <IoLockClosedOutline />
               Cuesheet

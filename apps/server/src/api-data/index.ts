@@ -14,6 +14,7 @@ import { router as viewSettingsRouter } from './view-settings/viewSettings.route
 import { router as reportRouter } from './report/report.router.js';
 import { router as assetsRouter } from './assets/assets.router.js';
 import { router as qlabRouter } from './qlab/qlab.router.js';
+import { router as serviceProfilesRouter } from './service-profiles/serviceProfiles.router.js';
 
 export const appRouter = express.Router();
 
@@ -31,6 +32,7 @@ appRouter.use('/view-settings', viewSettingsRouter);
 appRouter.use('/report', reportRouter);
 appRouter.use('/assets', assetsRouter);
 appRouter.use('/qlab', qlabRouter);
+appRouter.use('/service-profiles', serviceProfilesRouter);
 
 //we don't want to redirect to react index when using api routes
 appRouter.all('/*', (_req, res) => {

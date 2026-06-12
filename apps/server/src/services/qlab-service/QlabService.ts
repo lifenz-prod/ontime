@@ -27,6 +27,10 @@ interface QlabCue {
   listName: string;
   type: string;
   colorName: string;
+  // QLab includes these timing fields directly on each cue in the /runningOrPausedCues response
+  currentDuration?: number; // seconds (float)
+  actionElapsed?: number;   // seconds (float) — elapsed playback time
+  isPaused?: boolean;
 }
 
 interface PendingCueData {
@@ -186,14 +190,18 @@ class QlabService {
       return;
     }
 
-    if (msg.oscType === 'bundle') return;
+    if (msg.oscType === 'bundle') {
+      return;
+    }
 
     const { address, args } = msg;
     this.lastResponseTime = Date.now();
 
     // QLab responses have the JSON payload as a string in the first arg
     const jsonString = args[0]?.value;
-    if (typeof jsonString !== 'string') return;
+    if (typeof jsonString !== 'string') {
+      return;
+    }
 
     let parsed: { data: unknown };
     try {
@@ -249,19 +257,55 @@ class QlabService {
     }
 
     const cue = filtered[0];
+
+    // QLab includes actionElapsed, currentDuration, and isPaused directly on each cue
+    // in the /runningOrPausedCues response. Use those if available — no extra round-trip needed.
+    if (typeof cue.actionElapsed === 'number' && typeof cue.currentDuration === 'number') {
+      const duration = Math.round(cue.currentDuration * 1000);
+      const elapsed = Math.round(cue.actionElapsed * 1000);
+      const isPaused = typeof cue.isPaused === 'boolean' ? cue.isPaused : false;
+      const effectiveElapsed = duration > 0 ? elapsed % duration : elapsed;
+      const remaining = Math.max(0, duration - effectiveElapsed);
+      const phase = this.getPhase(remaining);
+
+      this.currentState = {
+        enabled: true,
+        connected: true,
+        cueName: cue.listName || '',
+        cueNumber: cue.number || '',
+        duration,
+        elapsed: effectiveElapsed,
+        remaining,
+        isPaused,
+        phase,
+      };
+      this.pendingCue = null;
+      this.broadcastState();
+      return;
+    }
+
+    // Fallback: QLab version doesn't include inline timing data, so query each property
+    // individually. Preserve duration/isPaused across polls for the same cue so a slow
+    // or missing response doesn't prevent the countdown from updating.
+    const isSameCue = this.pendingCue?.uniqueID === cue.uniqueID;
     this.pendingCue = {
       uniqueID: cue.uniqueID,
       cueName: cue.listName || '',
       cueNumber: cue.number || '',
-      duration: null,
-      elapsed: null,
-      isPaused: null,
+      duration: isSameCue ? (this.pendingCue?.duration ?? null) : null,
+      elapsed: null, // always refresh elapsed – it changes every tick
+      isPaused: isSameCue ? (this.pendingCue?.isPaused ?? null) : null,
     };
 
-    // request details for this cue
-    this.sendOSC(`/cue_id/${cue.uniqueID}/currentDuration`);
+    // Always request elapsed (changes each tick). Only request duration and isPaused
+    // for a new cue – they are stable and the responses can be reused across polls.
     this.sendOSC(`/cue_id/${cue.uniqueID}/actionElapsed`);
-    this.sendOSC(`/cue_id/${cue.uniqueID}/isPaused`);
+    if (!isSameCue || this.pendingCue.duration === null) {
+      this.sendOSC(`/cue_id/${cue.uniqueID}/currentDuration`);
+    }
+    if (!isSameCue || this.pendingCue.isPaused === null) {
+      this.sendOSC(`/cue_id/${cue.uniqueID}/isPaused`);
+    }
   }
 
   private filterCues(cues: QlabCue[]): QlabCue[] {
@@ -307,11 +351,15 @@ class QlabService {
 
   private tryUpdateState() {
     if (this.pendingCue === null) return;
-    if (this.pendingCue.duration === null || this.pendingCue.elapsed === null || this.pendingCue.isPaused === null) {
+    // We must have at least duration and elapsed to compute a meaningful remaining time.
+    // isPaused defaults to false if its response hasn't arrived yet so a slow/missing
+    // reply doesn't block the countdown from updating.
+    if (this.pendingCue.duration === null || this.pendingCue.elapsed === null) {
       return;
     }
 
-    const { duration, elapsed, isPaused, cueName, cueNumber } = this.pendingCue;
+    const { duration, elapsed, cueName, cueNumber } = this.pendingCue;
+    const isPaused = this.pendingCue.isPaused ?? false;
 
     // handle looping cues where elapsed can exceed duration
     const effectiveElapsed = duration > 0 ? elapsed % duration : elapsed;

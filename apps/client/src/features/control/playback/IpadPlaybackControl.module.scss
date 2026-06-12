@@ -1,0 +1,8 @@
+/* Aux timer controls 10% taller than the default (2rem -> 2.2rem), same width */
+.tallAuxControls {
+  > button,
+  input {
+    height: 2.2rem;
+    min-height: 2.2rem;
+  }
+}

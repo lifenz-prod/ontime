@@ -1,0 +1,132 @@
+// Hide the floating navigation buttons while the cuescreennow view is active.
+body[data-view='cuescreennow'] {
+  [data-testid='navigation__toggle-menu'],
+  [data-testid='navigation__toggle-settings'] {
+    display: none;
+  }
+}
+
+.cuescreennow {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0 10px 0 40px;
+  background-color: #000;
+  color: #fff;
+  height: 1080px;
+  width: 1920px;
+  overflow: hidden;
+  box-sizing: border-box;
+  position: relative;
+
+  &__timer-container {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    width: 96%;
+    position: absolute;
+    top: -17px;
+  }
+
+  &__timer-row {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    position: relative;
+  }
+
+  &__main-timer {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    font-weight: bold;
+    font-size: 150px;
+    color: limegreen;
+    text-align: center;
+    margin: 0;
+  }
+
+  &__aux-timer {
+    font-size: 140px;
+    font-weight: bold;
+    color: orange;
+    text-align: right;
+    margin-right: 20px;
+    flex-grow: 1;
+    margin-left: auto;
+    position: relative;
+    top: -5px;
+  }
+
+  &__qlab-timer {
+    position: absolute;
+    top: 105px;
+    right: 70px;
+    font-size: 130px;
+    font-weight: bold;
+    color: white;
+    text-align: right;
+  }
+
+  &__clock {
+    font-size: 145px;
+    font-weight: bold;
+    color: white;
+    text-align: left;
+    margin-left: 20px;
+    flex-grow: 1;
+  }
+
+  &__event-container {
+    position: absolute;
+    top: 125px;
+    left: 60px;
+    width: 1450px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0;
+    padding-top: 30px;
+  }
+
+  &__title-card {
+    width: 100%;
+    padding: 0;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: baseline;
+    line-height: 1;
+  }
+
+  &__title-card__label {
+    font-size: 90px;
+    font-weight: bold;
+    color: white;
+    white-space: nowrap;
+    flex-shrink: 0;
+    line-height: 1;
+
+    &--next {
+      font-size: 70px;
+      color: #aaa;
+    }
+  }
+
+  &__title-card__title {
+    font-size: 90px;
+    font-weight: normal;
+    color: limegreen;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    display: inline-block;
+    line-height: 1;
+    vertical-align: baseline;
+
+    &--next {
+      font-size: 70px;
+      color: #ccc;
+    }
+  }
+}

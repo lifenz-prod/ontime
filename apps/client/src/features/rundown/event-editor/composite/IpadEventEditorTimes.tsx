@@ -1,28 +1,16 @@
-import { memo, useRef } from 'react';
-import {
-  AlertDialogContent,
-  AlertDialog,
-  AlertDialogOverlay,
-  Button,
-  Select,
-  Switch,
-  useDisclosure,
-  AlertDialogHeader,
-  AlertDialogBody,
-  AlertDialogFooter,
-} from '@chakra-ui/react';
+import { memo } from 'react';
+import { Select, Switch } from '@chakra-ui/react';
 import { EndAction, MaybeString, TimeStrategy } from 'ontime-types';
 import { millisToString } from 'ontime-utils';
 
 import { useEventAction } from '../../../../common/hooks/useEventAction';
 import { millisToDelayString } from '../../../../common/utils/dateConfig';
 import * as Editor from '../../../editors/editor-utils/EditorUtils';
-import TimeInputFlow from '../../time-input-flow/TimeInputFlow';
+import IpadTimeInputFlow from '../../time-input-flow/IpadTimeInputFlow';
 
 import style from '../EventEditor.module.scss';
-import { IoTrash } from 'react-icons/io5';
 
-interface MobileEventEditorTimesProps {
+interface IpadEventEditorTimesProps {
   eventId: string;
   timeStart: number;
   timeEnd: number;
@@ -38,32 +26,25 @@ interface MobileEventEditorTimesProps {
 
 type HandledActions = 'countToEnd' | 'showAsAuxTimer' | 'hideTimer' | 'endAction';
 
-function MobileEventEditorTimes(props: MobileEventEditorTimesProps) {
+function IpadEventEditorTimes(props: IpadEventEditorTimesProps) {
   const { eventId, timeStart, timeEnd, duration, timeStrategy, linkStart, countToEnd, showAsAuxTimer, hideTimer, delay, endAction } = props;
-  const { updateEvent, deleteEvent } = useEventAction();
-
-  // Delete event confirmation modal
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  const cancelRef = useRef<HTMLButtonElement | null>(null);
+  const { updateEvent } = useEventAction();
 
   const handleSubmit = (field: HandledActions, value: string | boolean) => {
     if (field === 'countToEnd') {
       updateEvent({ id: eventId, countToEnd: !(value as boolean) });
       return;
     }
-
     if (field === 'showAsAuxTimer') {
       const newValue = !(value as boolean);
       updateEvent({ id: eventId, showAsAuxTimer: newValue, ...(newValue && { hideTimer: false }) });
       return;
     }
-
     if (field === 'hideTimer') {
       const newValue = !(value as boolean);
       updateEvent({ id: eventId, hideTimer: newValue, ...(newValue && { showAsAuxTimer: false }) });
       return;
     }
-
     if (field === 'endAction') {
       updateEvent({ id: eventId, endAction: value as EndAction });
       return;
@@ -72,53 +53,16 @@ function MobileEventEditorTimes(props: MobileEventEditorTimesProps) {
 
   const hasDelay = delay !== 0;
   const delayLabel = hasDelay
-    ? `Event is ${millisToDelayString(delay, 'expanded')}. New schedule ${millisToString(
-        timeStart + delay,
-      )} → ${millisToString(timeEnd + delay)}`
+    ? `Event is ${millisToDelayString(delay, 'expanded')}. New schedule ${millisToString(timeStart + delay)}`
     : '';
-
-  const handleDeleteConfirm = () => {
-    deleteEvent([eventId]);
-  };
 
   return (
     <>
-      <Button
-        colorScheme='red'
-        variant='ontime-outlined'
-        color='#FA5656'
-        leftIcon={<IoTrash />}
-        size='sm'
-        width='100%'
-        mb={4}
-        onClick={onOpen}
-      >
-        Delete Event
-      </Button>
-      <AlertDialog variant='ontime' isOpen={isOpen} leastDestructiveRef={cancelRef} onClose={onClose}>
-        <AlertDialogOverlay>
-          <AlertDialogContent>
-            <AlertDialogHeader fontSize='lg' fontWeight='bold'>
-              Delete event
-            </AlertDialogHeader>
-            <AlertDialogBody>Are you sure you want to delete this event?</AlertDialogBody>
-            <AlertDialogFooter>
-              <Button ref={cancelRef} onClick={onClose} variant='ontime-ghosted-white'>
-                Cancel
-              </Button>
-              <Button colorScheme='red' onClick={handleDeleteConfirm} ml={4}>
-                Delete event
-              </Button>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialogOverlay>
-      </AlertDialog>
-
       <div className={style.column}>
         <Editor.Title>Event schedule</Editor.Title>
         <div>
           <div className={style.inline}>
-            <TimeInputFlow
+            <IpadTimeInputFlow
               eventId={eventId}
               timeStart={timeStart}
               timeEnd={timeEnd}
@@ -141,7 +85,7 @@ function MobileEventEditorTimes(props: MobileEventEditorTimesProps) {
             <Editor.Label htmlFor='endAction'>End Action</Editor.Label>
             <Select
               id='endAction'
-              size='sm'
+              size='md'
               name='endAction'
               value={endAction}
               onChange={(event) => handleSubmit('endAction', event.target.value)}
@@ -158,7 +102,7 @@ function MobileEventEditorTimes(props: MobileEventEditorTimesProps) {
             <Editor.Label className={style.switchLabel}>
               <Switch
                 id='countToEnd'
-                size='md'
+                size='lg'
                 isChecked={countToEnd}
                 onChange={() => handleSubmit('countToEnd', countToEnd)}
                 variant='ontime'
@@ -171,7 +115,7 @@ function MobileEventEditorTimes(props: MobileEventEditorTimesProps) {
             <Editor.Label className={style.switchLabel}>
               <Switch
                 id='showAsAuxTimer'
-                size='md'
+                size='lg'
                 isChecked={showAsAuxTimer}
                 onChange={() => handleSubmit('showAsAuxTimer', showAsAuxTimer)}
                 variant='ontime'
@@ -184,7 +128,7 @@ function MobileEventEditorTimes(props: MobileEventEditorTimesProps) {
             <Editor.Label className={style.switchLabel}>
               <Switch
                 id='hideTimer'
-                size='md'
+                size='lg'
                 isChecked={hideTimer}
                 onChange={() => handleSubmit('hideTimer', hideTimer)}
                 variant='ontime'
@@ -198,4 +142,4 @@ function MobileEventEditorTimes(props: MobileEventEditorTimesProps) {
   );
 }
 
-export default memo(MobileEventEditorTimes);
+export default memo(IpadEventEditorTimes);

@@ -100,7 +100,7 @@ export const getTimerOptions = (timeFormat: string, customFields: CustomFields):
         },
         {
           id: 'hideExternal',
-          title: 'Hide Auxiliary timer / External message',
+          title: 'Hide Auxiliary timer / Stage message',
           description: 'Prevents the screen from displaying the secondary timer field',
           type: 'boolean',
           defaultValue: false,
