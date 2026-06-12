@@ -56,11 +56,9 @@ function TimeInputFlow(props: EventBlockTimerProps) {
 
   const hasDelay = delay !== 0;
 
-  const isLockedEnd = timeStrategy === TimeStrategy.LockEnd;
   const isLockedDuration = timeStrategy === TimeStrategy.LockDuration;
 
   const activeStart = cx([style.timeAction, linkStart ? style.active : null]);
-  const activeEnd = cx([style.timeAction, isLockedEnd ? style.active : null]);
   const activeDuration = cx([style.timeAction, isLockedDuration ? style.active : null]);
 
   return (
@@ -74,10 +72,16 @@ function TimeInputFlow(props: EventBlockTimerProps) {
           displayTime={displayStart}
           hasDelay={hasDelay}
           placeholder='Start'
-          disabled={!hideEndTime && Boolean(linkStart)}
         >
           {!hideEndTime ? (
-            <Tooltip label='Link start to previous end' openDelay={tooltipDelayMid}>
+            <Tooltip
+              label={
+                linkStart
+                  ? 'Linked — edits stretch the previous event'
+                  : 'Unlinked — independent start (creates a gap)'
+              }
+              openDelay={tooltipDelayMid}
+            >
               <InputRightElement className={activeStart} onClick={() => handleLink(!linkStart)}>
                 <span className={style.timeLabel}>S</span>
                 <span className={style.fourtyfive}>{linkStart ? <IoLink /> : <IoUnlink />}</span>
@@ -100,19 +104,12 @@ function TimeInputFlow(props: EventBlockTimerProps) {
             time={timeEnd}
             displayTime={displayEnd}
             hasDelay={hasDelay}
-            disabled={isLockedDuration}
+            disabled
             placeholder='End'
           >
-            <Tooltip label='Lock end' openDelay={tooltipDelayMid}>
-              <InputRightElement
-                className={activeEnd}
-                onClick={() => handleChangeStrategy(TimeStrategy.LockEnd)}
-                data-testid='lock__end'
-              >
-                <span className={style.timeLabel}>E</span>
-                {isLockedEnd ? <IoLockClosed /> : <IoLockOpenOutline />}
-              </InputRightElement>
-            </Tooltip>
+            <InputRightElement>
+              <span className={style.timeLabel}>E</span>
+            </InputRightElement>
           </TimeInputWithButton>
         </div>
       )}
@@ -123,7 +120,6 @@ function TimeInputFlow(props: EventBlockTimerProps) {
           name='duration'
           submitHandler={handleSubmit}
           time={duration}
-          disabled={!hideEndTime && isLockedEnd}
           placeholder='Duration'
         >
           {!hideEndTime ? (

@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { IoAlertCircleOutline, IoLink, IoLockClosed, IoLockOpenOutline, IoUnlink } from 'react-icons/io5';
+import { IoAlertCircleOutline, IoLockClosed, IoLockOpenOutline } from 'react-icons/io5';
 import { InputRightElement, Tooltip } from '@chakra-ui/react';
 import { MaybeString, TimeField, TimeStrategy } from 'ontime-types';
 import { dayInMs } from 'ontime-utils';
@@ -25,7 +25,7 @@ interface IpadTimeInputFlowProps {
 }
 
 function IpadTimeInputFlow(props: IpadTimeInputFlowProps) {
-  const { eventId, timeStart, duration, timeStrategy, linkStart, delay, showLabels } = props;
+  const { eventId, timeStart, duration, timeStrategy, delay, showLabels } = props;
   const { updateEvent, updateTimer } = useEventAction();
   const displayStart = timeStart + delay;
 
@@ -37,10 +37,6 @@ function IpadTimeInputFlow(props: IpadTimeInputFlowProps) {
     updateEvent({ id: eventId, timeStrategy: newStrategy });
   };
 
-  const handleLink = (doLink: boolean) => {
-    updateEvent({ id: eventId, linkStart: doLink ? 'true' : null });
-  };
-
   const warnings = [];
   if (timeStart + duration > dayInMs) {
     warnings.push('Over midnight');
@@ -48,7 +44,6 @@ function IpadTimeInputFlow(props: IpadTimeInputFlowProps) {
 
   const hasDelay = delay !== 0;
   const isLockedDuration = timeStrategy === TimeStrategy.LockDuration;
-  const activeStart = cx([style.timeAction, linkStart ? style.active : null]);
   const activeDuration = cx([style.timeAction, isLockedDuration ? style.active : null]);
 
   return (
@@ -63,12 +58,9 @@ function IpadTimeInputFlow(props: IpadTimeInputFlowProps) {
           hasDelay={hasDelay}
           placeholder='Start'
         >
-          <Tooltip label='Link start to previous end' openDelay={tooltipDelayMid}>
-            <InputRightElement className={activeStart} onClick={() => handleLink(!linkStart)}>
-              <span className={style.timeLabel}>S</span>
-              <span className={style.fourtyfive}>{linkStart ? <IoLink /> : <IoUnlink />}</span>
-            </InputRightElement>
-          </Tooltip>
+          <InputRightElement>
+            <span className={style.timeLabel}>S</span>
+          </InputRightElement>
         </TimeInputWithButton>
       </div>
 
