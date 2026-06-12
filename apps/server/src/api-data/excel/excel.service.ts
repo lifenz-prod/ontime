@@ -3,7 +3,7 @@
  * Google Sheets
  */
 
-import { CustomFields, OntimeRundown } from 'ontime-types';
+import { CustomFields, OntimeRundown, ServiceProfiles } from 'ontime-types';
 import type { ImportMap } from 'ontime-utils';
 
 import { extname } from 'path';
@@ -34,7 +34,11 @@ export function listWorksheets(): string[] {
   return excelData.SheetNames;
 }
 
-export function generateRundownPreview(options: ImportMap): { rundown: OntimeRundown; customFields: CustomFields } {
+export function generateRundownPreview(options: ImportMap): {
+  rundown: OntimeRundown;
+  customFields: CustomFields;
+  serviceProfiles: ServiceProfiles;
+} {
   const data = excelData.Sheets[options.worksheet];
 
   if (!data) {
@@ -53,5 +57,5 @@ export function generateRundownPreview(options: ImportMap): { rundown: OntimeRun
   // clear the data
   excelData = xlsx.utils.book_new();
 
-  return { rundown, customFields };
+  return { rundown, customFields, serviceProfiles: dataFromExcel.serviceProfiles };
 }

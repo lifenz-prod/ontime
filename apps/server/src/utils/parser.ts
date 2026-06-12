@@ -17,6 +17,7 @@ import {
   LogOrigin,
   OntimeEvent,
   OntimeRundown,
+  ServiceProfiles,
   SupportedEvent,
   TimerType,
   TimeStrategy,
@@ -37,6 +38,7 @@ export const JSON_MIME = 'application/json';
 
 type ExcelData = Pick<DatabaseModel, 'rundown' | 'customFields'> & {
   rundownMetadata: Record<string, { row: number; col: number }>;
+  serviceProfiles: ServiceProfiles;
 };
 
 function parseBooleanString(value: unknown): boolean {
@@ -97,6 +99,10 @@ export const parseExcel = (
   const { customFields, customFieldImportKeys } = getCustomFieldData(importMap, existingCustomFields);
   const rundown: OntimeRundown = [];
 
+  // dual-service config gathered from marker rows / columns
+  let boundaryBlockId: string | null = null;
+  const services: ServiceProfiles['services'] = [];
+
   // title stuff: strings
   let titleIndex: number | null = null;
   let cueIndex: number | null = null;
@@ -122,6 +128,10 @@ export const parseExcel = (
   // options: enum properties
   let endActionIndex: number | null = null;
   let timerTypeIndex: number | null = null;
+
+  // dual-service markers
+  let serviceBoundaryIndex: number | null = null;
+  let serviceOffsetIndex: number | null = null;
 
   //ID
   let entryIdIndex: number | null = null;
@@ -205,6 +215,14 @@ export const parseExcel = (
         timeDangerIndex = col;
         rundownMetadata['timeDanger'] = { row, col };
       },
+      [importMap.serviceBoundary]: (row: number, col: number) => {
+        serviceBoundaryIndex = col;
+        rundownMetadata['serviceBoundary'] = { row, col };
+      },
+      [importMap.serviceOffset]: (row: number, col: number) => {
+        serviceOffsetIndex = col;
+        rundownMetadata['serviceOffset'] = { row, col };
+      },
       [importMap.entryId]: (row: number, col: number) => {
         entryIdIndex = col;
         rundownMetadata['id'] = { row, col };
@@ -218,13 +236,21 @@ export const parseExcel = (
     const event: any = {};
     const eventCustomFields: EventCustomFields = {};
 
+    // dual-service markers in this row
+    let isServiceDefinition = false;
+    let isServiceBoundary = false;
+    let serviceOffset = 0;
+
     for (let j = 0; j < row.length; j++) {
       const column = row[j];
       // 1. we check if we have set a flag for a known field
       if (j === timerTypeIndex) {
-        const maybeTimeType = makeString(column, '');
+        const maybeTimeType = makeString(column, '').toLowerCase();
         if (maybeTimeType === 'block') {
           event.type = SupportedEvent.Block;
+        } else if (maybeTimeType === 'service') {
+          // row defines a service instance, not a rundown entry
+          isServiceDefinition = true;
         } else if (maybeTimeType === '' || isKnownTimerType(maybeTimeType)) {
           event.type = SupportedEvent.Event;
           event.timerType = validateTimerType(maybeTimeType);
@@ -232,6 +258,10 @@ export const parseExcel = (
           // if it is not a block or a known type, we dont import it
           return;
         }
+      } else if (j === serviceBoundaryIndex) {
+        isServiceBoundary = parseBooleanString(column);
+      } else if (j === serviceOffsetIndex) {
+        serviceOffset = parseExcelDate(column);
       } else if (j === titleIndex) {
         event.title = makeString(column, '');
       } else if (j === timeStartIndex) {
@@ -295,11 +325,22 @@ export const parseExcel = (
       }
     }
 
+    // service definition rows configure dual-service mode and are not rundown entries
+    if (isServiceDefinition) {
+      services.push({ id: generateId(), name: makeString(event.title, ''), offset: serviceOffset });
+      return;
+    }
+
     // if any data was found in row, push to array
     const keysFound = Object.keys(event).length + Object.keys(eventCustomFields).length;
     if (keysFound > 0) {
       // if it is a Block type drop all other filed
       if (isOntimeBlock(event)) {
+        // a flagged block marks where the master service section begins
+        if (isServiceBoundary) {
+          event.id = event.id || generateId();
+          boundaryBlockId = event.id;
+        }
         rundown.push({ type: event.type, id: event.id, title: event.title });
       } else {
         if (timerTypeIndex === null) {
@@ -315,6 +356,7 @@ export const parseExcel = (
     rundown,
     customFields,
     rundownMetadata,
+    serviceProfiles: { boundaryBlockId, services },
   };
 };
 
@@ -322,6 +364,28 @@ export type ParsingError = {
   context: string;
   message: string;
 };
+
+/**
+ * Parse the serviceProfiles portion of a project file
+ * Discards data that does not match the current shape (eg. the legacy array format)
+ */
+export function parseServiceProfiles(jsonData: Partial<DatabaseModel>): ServiceProfiles {
+  const emptyProfiles: ServiceProfiles = { boundaryBlockId: null, services: [] };
+  const maybeProfiles = jsonData?.serviceProfiles;
+  if (!maybeProfiles || typeof maybeProfiles !== 'object' || Array.isArray(maybeProfiles)) {
+    return emptyProfiles;
+  }
+  if (!Array.isArray(maybeProfiles.services)) {
+    return emptyProfiles;
+  }
+  return {
+    boundaryBlockId: typeof maybeProfiles.boundaryBlockId === 'string' ? maybeProfiles.boundaryBlockId : null,
+    services: maybeProfiles.services.filter(
+      (service) =>
+        typeof service?.id === 'string' && typeof service?.name === 'string' && typeof service?.offset === 'number',
+    ),
+  };
+}
 
 /**
  * @description handles parsing of ontime project file
@@ -352,6 +416,7 @@ export function parseDatabaseModel(jsonData: Partial<DatabaseModel>): { data: Da
     customFields,
     automation: parseAutomationSettings(jsonData),
     qlab: parseQlabSettings(jsonData),
+    serviceProfiles: parseServiceProfiles(jsonData),
   };
 
   return { data, errors };

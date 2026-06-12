@@ -22,6 +22,8 @@ export const defaultImportMap = {
   timerType: 'timer type',
   timeWarning: 'warning time',
   timeDanger: 'danger time',
+  serviceBoundary: 'service boundary',
+  serviceOffset: 'service offset',
   custom: {},
   entryId: 'id',
 };

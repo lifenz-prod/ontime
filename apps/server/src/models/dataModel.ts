@@ -50,5 +50,5 @@ export const dbModel: DatabaseModel = {
     dangerThreshold: 10000,
     timeout: 3000,
   },
-  serviceProfiles: [],
+  serviceProfiles: { boundaryBlockId: null, services: [] },
 };

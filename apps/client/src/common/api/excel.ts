@@ -1,5 +1,5 @@
 import axios, { AxiosResponse } from 'axios';
-import { CustomFields, OntimeRundown } from 'ontime-types';
+import { CustomFields, OntimeRundown, ServiceProfiles } from 'ontime-types';
 import { ImportMap } from 'ontime-utils';
 
 import { apiEntryUrl } from './constants';
@@ -9,6 +9,7 @@ const excelPath = `${apiEntryUrl}/excel`;
 type PreviewSpreadsheetResponse = {
   rundown: OntimeRundown;
   customFields: CustomFields;
+  serviceProfiles: ServiceProfiles;
 };
 
 /**

@@ -1,10 +1,13 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
+import type { ServiceProfiles } from 'ontime-types';
 
 import { queryRefetchIntervalSlow } from '../../ontimeConfig';
-import { editServiceProfiles, getServiceProfiles } from '../api/serviceProfiles';
-import { SERVICE_PROFILES } from '../api/constants';
+import { RUNDOWN, SERVICE_PROFILES } from '../api/constants';
+import { editServiceProfiles, getServiceProfiles, regenerateServiceInstances } from '../api/serviceProfiles';
 import { logAxiosError } from '../api/utils';
 import { ontimeQueryClient } from '../queryClient';
+
+const emptyServiceProfiles: ServiceProfiles = { boundaryBlockId: null, services: [] };
 
 export default function useServiceProfiles() {
   const { data, status, isFetching, isError, refetch } = useQuery({
@@ -17,7 +20,7 @@ export default function useServiceProfiles() {
     networkMode: 'always',
   });
 
-  return { data: data ?? [], status, isFetching, isError, refetch };
+  return { data: data ?? emptyServiceProfiles, status, isFetching, isError, refetch };
 }
 
 export function useServiceProfilesMutation() {
@@ -27,7 +30,20 @@ export function useServiceProfilesMutation() {
     onSuccess: (data) => {
       ontimeQueryClient.setQueryData(SERVICE_PROFILES, data);
     },
-    onSettled: () => ontimeQueryClient.invalidateQueries({ queryKey: SERVICE_PROFILES }),
+    onSettled: () => {
+      ontimeQueryClient.invalidateQueries({ queryKey: SERVICE_PROFILES });
+      // saving the config rebuilds the generated sections
+      ontimeQueryClient.invalidateQueries({ queryKey: RUNDOWN });
+    },
   });
   return { isPending, mutateAsync };
+}
+
+export function useRegenerateServiceInstances() {
+  const { isPending, mutateAsync } = useMutation({
+    mutationFn: regenerateServiceInstances,
+    onError: (error) => logAxiosError('Error regenerating service instances', error),
+    onSettled: () => ontimeQueryClient.invalidateQueries({ queryKey: RUNDOWN }),
+  });
+  return { isPending, regenerate: mutateAsync };
 }

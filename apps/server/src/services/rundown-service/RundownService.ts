@@ -18,7 +18,8 @@ import { block as blockDef, delay as delayDef } from '../../models/eventsDefinit
 import { sendRefetch } from '../../adapters/websocketAux.js';
 import { logger } from '../../classes/Logger.js';
 import { createEvent } from '../../utils/parser.js';
-import { updateRundownData } from '../../stores/runtimeState.js';
+import { getDataProvider } from '../../classes/data-provider/DataProvider.js';
+import { getState, updateRundownData } from '../../stores/runtimeState.js';
 import { runtimeService } from '../runtime-service/RuntimeService.js';
 
 import * as cache from './rundownCache.js';
@@ -97,6 +98,8 @@ export async function addEvent(eventData: EventPostPayload): Promise<OntimeRundo
   // notify timer and external services of change
   notifyChanges({ timer: [eventData.id], external: true });
 
+  maybeRegenerateServiceInstances([newEvent.id]);
+
   return newEvent;
 }
 
@@ -105,6 +108,9 @@ export async function addEvent(eventData: EventPostPayload): Promise<OntimeRundo
  * @param eventId
  */
 export async function deleteEvent(eventIds: string[]) {
+  // deleted entries are not findable after the mutation, so we check first
+  const willRegenerate = shouldRegenerateInstances(eventIds);
+
   const scopedMutation = cache.mutateCache(cache.remove);
   const { didMutate } = await scopedMutation({ eventIds });
 
@@ -117,6 +123,10 @@ export async function deleteEvent(eventIds: string[]) {
 
   // notify timer and external services of change
   notifyChanges({ timer: eventIds, external: true });
+
+  if (willRegenerate) {
+    maybeRegenerateServiceInstances(true);
+  }
 }
 
 /**
@@ -156,6 +166,8 @@ export async function editEvent(patch: PatchWithId) {
   // notify timer and external services of change
   notifyChanges({ timer: [patch.id], external: true });
 
+  maybeRegenerateServiceInstances([patch.id]);
+
   return newEvent;
 }
 
@@ -173,6 +185,8 @@ export async function batchEditEvents(ids: string[], data: Partial<OntimeEvent>)
 
   // notify timer and external services of change
   notifyChanges({ timer: ids, external: true });
+
+  maybeRegenerateServiceInstances(ids);
 }
 
 /**
@@ -191,10 +205,15 @@ export async function reorderEvent(eventId: string, from: number, to: number) {
   // notify timer and external services of change
   notifyChanges({ timer: true, external: true });
 
+  maybeRegenerateServiceInstances([eventId]);
+
   return reorderedItem;
 }
 
 export async function applyDelay(eventId: string) {
+  // the delay entry is deleted by the mutation, so we check first
+  const willRegenerate = shouldRegenerateInstances([eventId]);
+
   const scopedMutation = cache.mutateCache(cache.applyDelay);
   await scopedMutation({ eventId });
 
@@ -203,6 +222,10 @@ export async function applyDelay(eventId: string) {
 
   // notify timer and external services of change
   notifyChanges({ timer: true, external: true });
+
+  if (willRegenerate) {
+    maybeRegenerateServiceInstances(true);
+  }
 }
 
 /**
@@ -220,6 +243,74 @@ export async function swapEvents(from: string, to: string) {
 
   // notify timer and external services of change
   notifyChanges({ timer: true, external: true });
+
+  maybeRegenerateServiceInstances([from, to]);
+}
+
+/**
+ * Whether dual-service generation is configured and the given mutation affects the master section
+ * @param affectedIds - ids touched by the mutation, or true for structural changes
+ */
+function shouldRegenerateInstances(affectedIds: string[] | true): boolean {
+  const serviceProfiles = getDataProvider().getServiceProfiles();
+  if (!serviceProfiles.boundaryBlockId || serviceProfiles.services.length < 2) {
+    return false;
+  }
+
+  const rundown = cache.getPersistedRundown();
+  const boundaryIndex = rundown.findIndex((entry) => entry.id === serviceProfiles.boundaryBlockId);
+  if (boundaryIndex < 0) {
+    return false;
+  }
+
+  if (affectedIds === true) {
+    return true;
+  }
+
+  // only mutations to master-section entries re-derive
+  // rehearsal entries (before the boundary) and generated entries do not
+  return affectedIds.some((id) => {
+    const index = rundown.findIndex((entry) => entry.id === id);
+    return index >= boundaryIndex && !rundown[index].generatedFor;
+  });
+}
+
+/**
+ * Rebuilds the generated service sections from the master section and notifies services
+ * Skipped while a generated section is loaded to avoid disturbing a live service
+ */
+export async function regenerateServiceInstances() {
+  const { eventNow } = getState();
+  if (eventNow !== null && eventNow.generatedFor) {
+    logger.warning(LogOrigin.Server, 'Skipping service regeneration: a generated service section is loaded');
+    return;
+  }
+
+  const serviceProfiles = getDataProvider().getServiceProfiles();
+  const scopedMutation = cache.mutateCache(cache.regenerateServiceInstances);
+  await scopedMutation({ serviceProfiles });
+
+  // notify runtime that rundown has changed
+  updateRuntimeOnChange();
+
+  // notify timer and external services of change
+  notifyChanges({ timer: true, external: true, reload: true });
+}
+
+/**
+ * Schedules a re-derive of generated service sections if the mutation affects the master section
+ */
+function maybeRegenerateServiceInstances(affectedIds: string[] | true) {
+  if (!shouldRegenerateInstances(affectedIds)) {
+    return;
+  }
+  setImmediate(async () => {
+    try {
+      await regenerateServiceInstances();
+    } catch (error) {
+      logger.error(LogOrigin.Server, `Failed regenerating service instances: ${error}`);
+    }
+  });
 }
 
 /**

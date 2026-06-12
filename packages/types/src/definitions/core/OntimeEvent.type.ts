@@ -9,6 +9,10 @@ export enum SupportedEvent {
 export type OntimeBaseEvent = {
   type: SupportedEvent;
   id: string;
+  /** ServiceProfile id this entry was generated for; absent on rehearsal and master-section entries */
+  generatedFor?: string;
+  /** Id of the master entry this generated entry was cloned from */
+  mirrorOf?: string;
 };
 
 export type OntimeDelay = OntimeBaseEvent & {

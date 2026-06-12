@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@chakra-ui/react';
-import { CustomFields, OntimeRundown } from 'ontime-types';
+import { CustomFields, OntimeRundown, ServiceProfiles } from 'ontime-types';
 
 import * as Panel from '../../panel-utils/PanelUtils';
 
@@ -11,12 +11,13 @@ import { useSheetStore } from './useSheetStore';
 interface ImportReviewProps {
   rundown: OntimeRundown;
   customFields: CustomFields;
+  serviceProfiles: ServiceProfiles | null;
   onFinished: () => void;
   onCancel: () => void;
 }
 
 export default function ImportReview(props: ImportReviewProps) {
-  const { rundown, customFields, onFinished, onCancel } = props;
+  const { rundown, customFields, serviceProfiles, onFinished, onCancel } = props;
 
   const [loading, setLoading] = useState(false);
   const { importRundown } = useGoogleSheet();
@@ -29,7 +30,7 @@ export default function ImportReview(props: ImportReviewProps) {
 
   const applyImport = async () => {
     setLoading(true);
-    await importRundown(rundown, customFields);
+    await importRundown(rundown, customFields, serviceProfiles);
     setLoading(false);
     onFinished();
   };

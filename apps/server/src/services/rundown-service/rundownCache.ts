@@ -11,6 +11,7 @@ import {
   OntimeRundown,
   OntimeRundownEntry,
   PlayableEvent,
+  ServiceProfiles,
 } from 'ontime-types';
 import {
   generateId,
@@ -24,6 +25,7 @@ import {
 import { getDataProvider } from '../../classes/data-provider/DataProvider.js';
 import { createPatch } from '../../utils/parser.js';
 import { apply } from './delayUtils.js';
+import { regenerateInstances } from './serviceInstanceUtils.js';
 import { calculateDayOffset, handleCustomField, handleLink, hasChanges, isDataStale } from './rundownCacheUtils.js';
 
 type EventID = string;
@@ -422,6 +424,16 @@ type ApplyDelayArgs = MutationParams<{ eventId: string }>;
  */
 export function applyDelay({ rundown, eventId }: ApplyDelayArgs): MutatingReturn {
   const newRundown = apply(eventId, rundown);
+  setIsStale();
+  return { newRundown, didMutate: true };
+}
+
+type RegenerateInstancesArgs = MutationParams<{ serviceProfiles: ServiceProfiles }>;
+/**
+ * Rebuild generated service-instance sections from the master section
+ */
+export function regenerateServiceInstances({ rundown, serviceProfiles }: RegenerateInstancesArgs): MutatingReturn {
+  const newRundown = regenerateInstances(rundown, serviceProfiles);
   setIsStale();
   return { newRundown, didMutate: true };
 }

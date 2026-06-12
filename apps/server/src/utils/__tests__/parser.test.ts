@@ -774,6 +774,8 @@ describe('getCustomFieldData()', () => {
       cue: 'cue',
       title: 'title',
       countToEnd: 'count to end',
+      showAsAuxTimer: 'aux timer',
+      hideTimer: 'hide timer',
       isPublic: 'public',
       skip: 'skip',
       note: 'notes',
@@ -782,6 +784,8 @@ describe('getCustomFieldData()', () => {
       timerType: 'timer type',
       timeWarning: 'warning time',
       timeDanger: 'danger time',
+      serviceBoundary: 'service boundary',
+      serviceOffset: 'service offset',
       custom: {
         lighting: 'lx',
         sound: 'sound',
@@ -826,6 +830,8 @@ describe('getCustomFieldData()', () => {
       cue: 'cue',
       title: 'title',
       countToEnd: 'count to end',
+      showAsAuxTimer: 'aux timer',
+      hideTimer: 'hide timer',
       isPublic: 'public',
       skip: 'skip',
       note: 'notes',
@@ -834,6 +840,8 @@ describe('getCustomFieldData()', () => {
       timerType: 'timer type',
       timeWarning: 'warning time',
       timeDanger: 'danger time',
+      serviceBoundary: 'service boundary',
+      serviceOffset: 'service offset',
       custom: {
         lighting: 'lx',
         sound: 'sound',
@@ -1297,6 +1305,8 @@ describe('parseExcel()', () => {
       timerType: 'timer type',
       timeWarning: 'warning time',
       timeDanger: 'danger time',
+      serviceBoundary: 'service boundary',
+      serviceOffset: 'service offset',
       custom: {},
     };
     const result = parseExcel(testdata, {}, importMap);
@@ -1390,11 +1400,47 @@ describe('parseExcel()', () => {
       timerType: 'timer type',
       timeWarning: 'warning time',
       timeDanger: 'danger time',
+      serviceBoundary: 'service boundary',
+      serviceOffset: 'service offset',
       custom: {},
     };
     const result = parseExcel(testdata, {}, importMap);
     expect(result.rundown.length).toBe(2);
     expect((result.rundown.at(0) as OntimeEvent).type).toBe(SupportedEvent.Block);
+  });
+
+  it('imports dual-service config from marker rows and columns', () => {
+    const testdata = [
+      ['Time Start', 'Time End', 'Title', 'Timer type', 'Service boundary', 'Service offset'],
+      ['1899-12-30T05:30:00.000Z', '1899-12-30T08:45:00.000Z', 'Rehearsal', '', '', ''],
+      ['', '', 'SERVICE', 'block', 'x', ''],
+      ['1899-12-30T08:45:00.000Z', '1899-12-30T09:00:00.000Z', 'Doors open', '', '', ''],
+      ['', '', '9am', 'service', '', '00:00'],
+      ['', '', '11am', 'service', '', '02:00'],
+    ];
+
+    const importMap = {
+      worksheet: 'event schedule',
+      timeStart: 'time start',
+      timeEnd: 'time end',
+      title: 'title',
+      timerType: 'timer type',
+      serviceBoundary: 'service boundary',
+      serviceOffset: 'service offset',
+      custom: {},
+    };
+
+    const result = parseExcel(testdata, {}, importMap);
+    // service rows are not rundown entries
+    expect(result.rundown.length).toBe(3);
+    expect(result.rundown.at(1)?.type).toBe(SupportedEvent.Block);
+
+    const { serviceProfiles } = result;
+    expect(serviceProfiles.boundaryBlockId).toBe(result.rundown.at(1)?.id);
+    expect(serviceProfiles.services).toMatchObject([
+      { name: '9am', offset: 0 },
+      { name: '11am', offset: 2 * 60 * MILLIS_PER_MINUTE },
+    ]);
   });
 
   it('imports as events if there is no timer type column', () => {
@@ -1460,6 +1506,8 @@ describe('parseExcel()', () => {
       timerType: 'timer type',
       timeWarning: 'warning time',
       timeDanger: 'danger time',
+      serviceBoundary: 'service boundary',
+      serviceOffset: 'service offset',
       custom: {},
     };
 
@@ -1583,6 +1631,8 @@ describe('parseExcel()', () => {
       timerType: 'timer type',
       timeWarning: 'warning time',
       timeDanger: 'danger time',
+      serviceBoundary: 'service boundary',
+      serviceOffset: 'service offset',
       custom: {},
     };
     const result = parseExcel(testdata, {}, importMap);
@@ -1624,6 +1674,8 @@ describe('parseExcel()', () => {
       timerType: 'timer type',
       timeWarning: 'warning time',
       timeDanger: 'danger time',
+      serviceBoundary: 'service boundary',
+      serviceOffset: 'service offset',
       custom: {},
     };
     const result = parseExcel(testData, {}, importMap);
@@ -1660,6 +1712,8 @@ describe('parseExcel()', () => {
       timerType: 'timer type',
       timeWarning: 'warning time',
       timeDanger: 'danger time',
+      serviceBoundary: 'service boundary',
+      serviceOffset: 'service offset',
       custom: {},
     };
 
@@ -1712,6 +1766,8 @@ describe('parseExcel()', () => {
       timerType: 'timer type',
       timeWarning: 'warning time',
       timeDanger: 'danger time',
+      serviceBoundary: 'service boundary',
+      serviceOffset: 'service offset',
       custom: {},
     };
 

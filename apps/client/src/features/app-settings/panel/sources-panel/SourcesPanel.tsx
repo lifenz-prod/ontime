@@ -41,6 +41,8 @@ export default function SourcesPanel({ location, onClose }: SourcesPanelProps) {
   const setRundown = useSheetStore((state) => state.setRundown);
   const customFields = useSheetStore((state) => state.customFields);
   const setCustomFields = useSheetStore((state) => state.setCustomFields);
+  const serviceProfiles = useSheetStore((state) => state.serviceProfiles);
+  const setServiceProfiles = useSheetStore((state) => state.setServiceProfiles);
   const setSheetId = useSheetStore((state) => state.setSheetId);
   const sheetId = useSheetStore((state) => state.sheetId);
 
@@ -81,6 +83,7 @@ export default function SourcesPanel({ location, onClose }: SourcesPanelProps) {
     setHasFile('none');
     setWorksheets(null);
     setCustomFields(null);
+    setServiceProfiles(null);
     setError('');
     setSheetId(null);
   };
@@ -120,6 +123,7 @@ export default function SourcesPanel({ location, onClose }: SourcesPanelProps) {
         const previewData = await importRundownPreviewExcel(importMap);
         setRundown(previewData.rundown);
         setCustomFields(previewData.customFields);
+        setServiceProfiles(previewData.serviceProfiles);
       } catch (error) {
         setError(maybeAxiosError(error));
       }
@@ -147,6 +151,7 @@ export default function SourcesPanel({ location, onClose }: SourcesPanelProps) {
     setHasFile('none');
     setWorksheets(null);
     setCustomFields(null);
+    setServiceProfiles(null);
     setError('');
   };
 
@@ -240,6 +245,7 @@ export default function SourcesPanel({ location, onClose }: SourcesPanelProps) {
             <ImportReview
               rundown={rundown}
               customFields={customFields}
+              serviceProfiles={serviceProfiles}
               onFinished={handleFinished}
               onCancel={cancelImportMap}
             />

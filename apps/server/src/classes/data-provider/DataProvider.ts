@@ -145,11 +145,11 @@ async function setQlab(newData: QlabSettings): ReadonlyPromise<QlabSettings> {
 }
 
 function getServiceProfiles(): Readonly<ServiceProfiles> {
-  return db.data.serviceProfiles ?? [];
+  return db.data.serviceProfiles ?? { boundaryBlockId: null, services: [] };
 }
 
 async function setServiceProfiles(newData: ServiceProfiles): ReadonlyPromise<ServiceProfiles> {
-  db.data.serviceProfiles = [...newData];
+  db.data.serviceProfiles = { boundaryBlockId: newData.boundaryBlockId, services: [...newData.services] };
   await persist();
   return db.data.serviceProfiles;
 }
@@ -168,6 +168,7 @@ async function mergeIntoData(newData: Partial<DatabaseModel>): ReadonlyPromise<D
   db.data.customFields = mergedData.customFields;
   db.data.rundown = mergedData.rundown;
   db.data.qlab = mergedData.qlab;
+  db.data.serviceProfiles = mergedData.serviceProfiles;
 
   await persist();
   return db.data;

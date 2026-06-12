@@ -4,7 +4,7 @@ import { ContextMenu } from '../../common/components/context-menu/ContextMenu';
 import ErrorBoundary from '../../common/components/error-boundary/ErrorBoundary';
 import { cx } from '../../common/utils/styleUtils';
 
-import RundownWrapper from './RundownWrapper';
+import MobileRundownWrapper from './MobileRundownWrapper';
 
 import style from './RundownExport.module.scss';
 
@@ -17,7 +17,7 @@ const MobileRundownExport = () => {
         <div className={style.list}>
           <ErrorBoundary>
             <ContextMenu>
-              <RundownWrapper />
+              <MobileRundownWrapper />
             </ContextMenu>
           </ErrorBoundary>
         </div>

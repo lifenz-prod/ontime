@@ -1,19 +1,20 @@
 import { lazy, useCallback, useEffect } from 'react';
 import { IoApps, IoClose, IoSettingsOutline } from 'react-icons/io5';
-import { IconButton, useDisclosure } from '@chakra-ui/react';
+import { Button, ButtonGroup, IconButton, useDisclosure } from '@chakra-ui/react';
 import { useHotkeys } from '@mantine/hooks';
+import { ErrorBoundary } from '@sentry/react';
 
 import NavigationMenu from '../../common/components/navigation-menu/NavigationMenu';
 import { useElectronListener } from '../../common/hooks/useElectronEvent';
+import useServiceSwitcher from '../../common/hooks/useServiceSwitcher';
 import { useWindowTitle } from '../../common/hooks/useWindowTitle';
 import AppSettings from '../app-settings/AppSettings';
 import useAppSettingsNavigation from '../app-settings/useAppSettingsNavigation';
-
-import styles from './Editor.module.scss';
-import rundownStyle from '../rundown/RundownExport.module.scss';
-import { MobileEditorOverview } from '../overview/MobileOverview';
 import { ExternalInput } from '../control/message/MessageControl';
-import { ErrorBoundary } from '@sentry/react';
+import { MobileEditorOverview } from '../overview/MobileOverview';
+
+import rundownStyle from '../rundown/RundownExport.module.scss';
+import styles from './Editor.module.scss';
 
 const MobileTimerControl = lazy(() => import('../control/playback/MobileTimerControlExport'));
 const MobileRundown = lazy(() => import('../rundown/MobileRundownExport'));
@@ -22,6 +23,7 @@ export default function MobileEditor() {
   const { isOpen: isSettingsOpen, setLocation, close } = useAppSettingsNavigation();
   const { isOpen: isMenuOpen, onOpen, onClose } = useDisclosure();
   const { onToggle: onFinderToggle, onClose: onFinderClose } = useDisclosure();
+  const { tabs, activeTabId, selectTab } = useServiceSwitcher();
 
   useWindowTitle('Mobile Editor');
 
@@ -71,6 +73,19 @@ export default function MobileEditor() {
           onClick={toggleSettings}
         />
       </MobileEditorOverview>
+      {!isSettingsOpen && tabs.length > 0 && (
+        <ButtonGroup size='md' variant='ontime-subtle' isAttached mx={4} my={2}>
+          {tabs.map((tab) => (
+            <Button
+              key={tab.id}
+              onClick={() => selectTab(tab.id)}
+              variant={activeTabId === tab.id ? 'ontime-filled' : 'ontime-subtle'}
+            >
+              {tab.name}
+            </Button>
+          ))}
+        </ButtonGroup>
+      )}
       {isSettingsOpen ? (
         <AppSettings />
       ) : (

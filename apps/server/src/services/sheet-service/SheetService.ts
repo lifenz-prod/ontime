@@ -4,7 +4,7 @@
  * @link https://developers.google.com/identity/protocols/oauth2/limited-input-device
  */
 
-import { AuthenticationStatus, CustomFields, LogOrigin, MaybeString, OntimeRundown } from 'ontime-types';
+import { AuthenticationStatus, CustomFields, LogOrigin, MaybeString, OntimeRundown, ServiceProfiles } from 'ontime-types';
 import { ImportMap, getErrorMessage } from 'ontime-utils';
 
 import { sheets, type sheets_v4 } from '@googleapis/sheets';
@@ -476,6 +476,7 @@ export async function download(
 ): Promise<{
   rundown: OntimeRundown;
   customFields: CustomFields;
+  serviceProfiles: ServiceProfiles;
 }> {
   const { range } = await verifyWorksheet(sheetId, options.worksheet);
 
@@ -495,5 +496,5 @@ export async function download(
   if (rundown.length < 1) {
     throw new Error('Sheet: Could not find data to import in the worksheet');
   }
-  return { rundown, customFields };
+  return { rundown, customFields, serviceProfiles: dataFromSheet.serviceProfiles };
 }

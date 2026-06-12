@@ -14,3 +14,7 @@ export async function editServiceProfiles(profiles: ServiceProfiles): Promise<Se
   const res = await axios.post(serviceProfilesPath, profiles);
   return res.data;
 }
+
+export async function regenerateServiceInstances(): Promise<void> {
+  await axios.post(`${serviceProfilesPath}/regenerate`);
+}

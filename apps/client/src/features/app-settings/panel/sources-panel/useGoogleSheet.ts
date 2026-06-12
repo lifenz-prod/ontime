@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { AuthenticationStatus, CustomFields, OntimeRundown } from 'ontime-types';
+import { AuthenticationStatus, CustomFields, OntimeRundown, ServiceProfiles } from 'ontime-types';
 import { ImportMap } from 'ontime-utils';
 
 import { CUSTOM_FIELDS, RUNDOWN } from '../../../../common/api/constants';
@@ -21,6 +21,7 @@ export default function useGoogleSheet() {
   const patchStepData = useSheetStore((state) => state.patchStepData);
   const setRundown = useSheetStore((state) => state.setRundown);
   const setCustomFields = useSheetStore((state) => state.setCustomFields);
+  const setServiceProfiles = useSheetStore((state) => state.setServiceProfiles);
 
   /** whether the current session has been authenticated */
   const verifyAuth = async (): Promise<{ authenticated: AuthenticationStatus; sheetId: string } | void> => {
@@ -58,6 +59,7 @@ export default function useGoogleSheet() {
       const data = await previewRundown(sheetId, fileOptions);
       setRundown(data.rundown);
       setCustomFields(data.customFields);
+      setServiceProfiles(data.serviceProfiles);
     } catch (error) {
       patchStepData({ pullPush: { available: true, error: maybeAxiosError(error) } });
     }
@@ -75,9 +77,13 @@ export default function useGoogleSheet() {
   };
 
   /** applies rundown and customFields to current project */
-  const importRundown = async (rundown: OntimeRundown, customFields: CustomFields) => {
+  const importRundown = async (
+    rundown: OntimeRundown,
+    customFields: CustomFields,
+    serviceProfiles?: ServiceProfiles | null,
+  ) => {
     try {
-      await patchData({ rundown, customFields });
+      await patchData({ rundown, customFields, ...(serviceProfiles ? { serviceProfiles } : {}) });
       // we are unable to optimistically set the rundown since we need
       // it to be normalised
       await queryClient.invalidateQueries({

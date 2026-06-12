@@ -1,9 +1,10 @@
 import { useFieldArray, useForm } from 'react-hook-form';
 import { IoAdd, IoTrash } from 'react-icons/io5';
-import { Button, IconButton, Input } from '@chakra-ui/react';
-import { ServiceProfiles } from 'ontime-types';
+import { Button, IconButton, Input, Select } from '@chakra-ui/react';
+import { isOntimeBlock, ServiceProfiles } from 'ontime-types';
 
 import { maybeAxiosError } from '../../../../common/api/utils';
+import useRundown from '../../../../common/hooks-query/useRundown';
 import useServiceProfiles, { useServiceProfilesMutation } from '../../../../common/hooks-query/useServiceProfiles';
 import * as Panel from '../../panel-utils/PanelUtils';
 
@@ -20,15 +21,27 @@ function timeStringToMs(timeStr: string): number {
 }
 
 type ProfileForm = {
-  profiles: Array<{ id: string; name: string; startTimeStr: string }>;
+  boundaryBlockId: string;
+  services: Array<{ id: string; name: string; offsetStr: string }>;
 };
 
 export default function ServiceProfilesPanel() {
   const { data } = useServiceProfiles();
+  const { data: rundownData } = useRundown();
   const { mutateAsync } = useServiceProfilesMutation();
 
+  // boundary candidates are the blocks authored in the rundown, not generated ones
+  const blockOptions = rundownData.order
+    .map((id) => rundownData.rundown[id])
+    .filter((entry) => entry && isOntimeBlock(entry) && !entry.generatedFor);
+
   const defaultValues: ProfileForm = {
-    profiles: data.map((p) => ({ id: p.id, name: p.name, startTimeStr: msToTimeString(p.startTime) })),
+    boundaryBlockId: data.boundaryBlockId ?? '',
+    services: data.services.map((service) => ({
+      id: service.id,
+      name: service.name,
+      offsetStr: msToTimeString(service.offset),
+    })),
   };
 
   const {
@@ -40,15 +53,18 @@ export default function ServiceProfilesPanel() {
     formState: { errors, isSubmitting, isDirty },
   } = useForm<ProfileForm>({ defaultValues, values: defaultValues, resetOptions: { keepDirtyValues: true } });
 
-  const { fields, append, remove } = useFieldArray({ control, name: 'profiles' });
+  const { fields, append, remove } = useFieldArray({ control, name: 'services' });
 
   const onSubmit = async (formData: ProfileForm) => {
     try {
-      const profiles: ServiceProfiles = formData.profiles.map((p) => ({
-        id: p.id,
-        name: p.name,
-        startTime: timeStringToMs(p.startTimeStr),
-      }));
+      const profiles: ServiceProfiles = {
+        boundaryBlockId: formData.boundaryBlockId || null,
+        services: formData.services.map((service) => ({
+          id: service.id,
+          name: service.name,
+          offset: timeStringToMs(service.offsetStr),
+        })),
+      };
       await mutateAsync(profiles);
       reset(formData);
     } catch (error) {
@@ -57,8 +73,9 @@ export default function ServiceProfilesPanel() {
     }
   };
 
-  const addProfile = () => {
-    append({ id: crypto.randomUUID(), name: 'New Service', startTimeStr: '09:00' });
+  const addService = () => {
+    // a new service defaults to the common two-hour offset from the master
+    append({ id: crypto.randomUUID(), name: 'New Service', offsetStr: fields.length === 0 ? '00:00' : '02:00' });
   };
 
   return (
@@ -87,9 +104,25 @@ export default function ServiceProfilesPanel() {
 
       <Panel.Section as='form' id='service-profiles-form' onSubmit={handleSubmit(onSubmit)}>
         <Panel.Description>
-          Configure service start times for the iPad Editor. Each service profile creates a tab that
-          shifts the entire rundown to start at the specified time.
+          Configure dual-service mode. The boundary block marks where the master service section begins: entries
+          before it are rehearsal and run once. The first service is the authored master; each additional service is
+          generated after it as a copy of the master, time-shifted by its offset. The iPad and mobile editors show one
+          tab per service (plus PRE for the rehearsal).
         </Panel.Description>
+
+        <Panel.ListGroup>
+          <Panel.ListItem>
+            <Panel.Field title='Service boundary block' description='Block where the master service section begins' />
+            <Select size='sm' width='14rem' variant='ontime' {...register('boundaryBlockId')}>
+              <option value=''>No boundary (single section)</option>
+              {blockOptions.map((block) => (
+                <option key={block.id} value={block.id}>
+                  {isOntimeBlock(block) ? block.title || 'Untitled block' : block.id}
+                </option>
+              ))}
+            </Select>
+          </Panel.ListItem>
+        </Panel.ListGroup>
 
         <Panel.ListGroup>
           {fields.map((field, index) => (
@@ -99,17 +132,18 @@ export default function ServiceProfilesPanel() {
                 size='sm'
                 width='10rem'
                 variant='ontime-filled'
-                {...register(`profiles.${index}.name`, { required: true })}
+                {...register(`services.${index}.name`, { required: true })}
               />
               <Input
                 type='time'
                 size='sm'
                 width='8rem'
                 variant='ontime-filled'
-                {...register(`profiles.${index}.startTimeStr`, { required: true })}
+                title={index === 0 ? 'Offset of the master service (usually 00:00)' : 'Offset from the master service'}
+                {...register(`services.${index}.offsetStr`, { required: true })}
               />
               <IconButton
-                aria-label='Delete service profile'
+                aria-label='Delete service'
                 icon={<IoTrash />}
                 size='sm'
                 variant='ontime-ghosted'
@@ -120,13 +154,7 @@ export default function ServiceProfilesPanel() {
           ))}
         </Panel.ListGroup>
 
-        <Button
-          leftIcon={<IoAdd />}
-          variant='ontime-subtle'
-          size='sm'
-          onClick={addProfile}
-          marginTop={2}
-        >
+        <Button leftIcon={<IoAdd />} variant='ontime-subtle' size='sm' onClick={addService} marginTop={2}>
           Add service
         </Button>
       </Panel.Section>

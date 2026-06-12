@@ -54,6 +54,7 @@ describe('safeMerge', () => {
       dangerThreshold: 10000,
       timeout: 3000,
     },
+    serviceProfiles: { boundaryBlockId: null, services: [] },
   } as DatabaseModel;
 
   it('returns existing data if new data is not provided', () => {
@@ -154,6 +155,7 @@ describe('safeMerge', () => {
         dangerThreshold: 10000,
         timeout: 3000,
       },
+      serviceProfiles: { boundaryBlockId: null, services: [] },
     } as DatabaseModel;
 
     const newData = {

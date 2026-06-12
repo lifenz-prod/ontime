@@ -13,6 +13,7 @@ export function safeMerge(existing: DatabaseModel, newData: Partial<DatabaseMode
     customFields = existing.customFields,
     automation = existing.automation,
     qlab = existing.qlab,
+    serviceProfiles = existing.serviceProfiles,
   } = newData;
 
   return {
@@ -25,5 +26,6 @@ export function safeMerge(existing: DatabaseModel, newData: Partial<DatabaseMode
     customFields: customFields ?? existing.customFields,
     automation: { ...existing.automation, ...automation },
     qlab: { ...existing.qlab, ...qlab },
+    serviceProfiles: serviceProfiles ?? existing.serviceProfiles,
   };
 }

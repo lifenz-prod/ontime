@@ -22,6 +22,8 @@ export const namedImportMap = {
   'Timer type': 'timer type',
   'Time warning': 'warning time',
   'Time danger': 'danger time',
+  'Service boundary': 'service boundary',
+  'Service offset': 'service offset',
   ID: 'id',
   custom: [] as ImportCustom[],
 };
@@ -62,6 +64,8 @@ export function convertToImportMap(namedImportMap: NamedImportMap): ImportMap {
     timerType: namedImportMap['Timer type'],
     timeWarning: namedImportMap['Time warning'],
     timeDanger: namedImportMap['Time danger'],
+    serviceBoundary: namedImportMap['Service boundary'],
+    serviceOffset: namedImportMap['Service offset'],
     custom,
     entryId: namedImportMap.ID,
   };

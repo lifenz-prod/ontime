@@ -24,7 +24,7 @@ import { config } from '../../setup/config.js';
 import { getDataProvider, initPersistence } from '../../classes/data-provider/DataProvider.js';
 import { safeMerge } from '../../classes/data-provider/DataProvider.utils.js';
 
-import { initRundown } from '../rundown-service/RundownService.js';
+import { initRundown, regenerateServiceInstances } from '../rundown-service/RundownService.js';
 import {
   getLastLoadedProject,
   isLastLoadedProject,
@@ -308,6 +308,8 @@ export async function patchCurrentProject(data: Partial<DatabaseModel>) {
   if (rundown != null) {
     const result = parseRundown(data);
     await initRundown(result.rundown, result.customFields);
+    // materialise generated service sections if dual-service is configured
+    await regenerateServiceInstances();
   }
 
   return newData;
