@@ -1,15 +1,16 @@
 import { memo, useRef } from 'react';
+import { IoTrash } from 'react-icons/io5';
 import {
-  AlertDialogContent,
   AlertDialog,
+  AlertDialogBody,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
   AlertDialogOverlay,
   Button,
   Select,
   Switch,
   useDisclosure,
-  AlertDialogHeader,
-  AlertDialogBody,
-  AlertDialogFooter,
 } from '@chakra-ui/react';
 import { EndAction, MaybeString, TimeStrategy } from 'ontime-types';
 import { millisToString } from 'ontime-utils';
@@ -20,7 +21,6 @@ import * as Editor from '../../../editors/editor-utils/EditorUtils';
 import TimeInputFlow from '../../time-input-flow/TimeInputFlow';
 
 import style from '../EventEditor.module.scss';
-import { IoTrash } from 'react-icons/io5';
 
 interface MobileEventEditorTimesProps {
   eventId: string;

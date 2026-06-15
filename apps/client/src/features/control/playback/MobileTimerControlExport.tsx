@@ -2,8 +2,9 @@ import { memo } from 'react';
 
 import ErrorBoundary from '../../../common/components/error-boundary/ErrorBoundary';
 
-import style from '../../editors/Editor.module.scss';
 import PlaybackControl from './PlaybackControl';
+
+import style from '../../editors/Editor.module.scss';
 
 const MobileTimerControlExport = () => {
   return (

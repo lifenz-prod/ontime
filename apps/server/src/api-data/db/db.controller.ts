@@ -18,7 +18,8 @@ import * as projectService from '../../services/project-service/ProjectService.j
 
 export async function patchPartialProjectFile(req: Request, res: Response<DatabaseModel | ErrorResponse>) {
   try {
-    const { rundown, project, settings, viewSettings, urlPresets, customFields, automation, qlab } = req.body;
+    const { rundown, project, settings, viewSettings, urlPresets, customFields, automation, qlab, serviceProfiles } =
+      req.body;
     const patchDb: DatabaseModel = {
       rundown,
       project,
@@ -28,6 +29,7 @@ export async function patchPartialProjectFile(req: Request, res: Response<Databa
       customFields,
       automation,
       qlab,
+      serviceProfiles,
     };
 
     const newData = await projectService.patchCurrentProject(patchDb);

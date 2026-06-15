@@ -8,6 +8,7 @@ import ProgressBar from '../../common/components/progress-bar/ProgressBar';
 import Empty from '../../common/components/state/Empty';
 import ViewLogo from '../../common/components/view-logo/ViewLogo';
 import ViewParamsEditor from '../../common/components/view-params-editor/ViewParamsEditor';
+import { useExternalMessageInput } from '../../common/hooks/useSocket';
 import { useWindowTitle } from '../../common/hooks/useWindowTitle';
 import { ViewExtendedTimer } from '../../common/models/TimeManager.type';
 import { cx, timerPlaceholderMin } from '../../common/utils/styleUtils';
@@ -16,10 +17,8 @@ import SuperscriptTime from '../../features/viewers/common/superscript-time/Supe
 import { useTranslation } from '../../translation/TranslationProvider';
 import ScheduleExport from '../common/schedule/ScheduleExport';
 
-import { useExternalMessageInput } from '../../common/hooks/useSocket';
-
 import { getBackstageOptions, useBackstageOptions } from './backstage.options';
-import { getCardData, getFollowedByEvent, getIsPendingStart, getShowProgressBar, getTimeToMinutes, isOvertime } from './backstage.utils';
+import { getCardData, getFollowedByEvent, getIsPendingStart, getShowProgressBar, isOvertime } from './backstage.utils';
 
 import './Backstage.scss';
 
@@ -113,10 +112,6 @@ export default function Backstage(props: BackstageProps) {
     displayTimer = `${isNegative ? '-' : ''}${mins}:${timerParts[2]}`;
   }
   const overtime = isOvertime(time.current);
-
-  // compute time-to values for next and followed by
-  const timeToNext = getTimeToMinutes(time.current);
-  const timeToFollowedBy = getTimeToMinutes(time.current, eventNext?.duration);
 
   // gather presentation styles
   const qrSize = Math.max(window.innerWidth / 15, 72);

@@ -17,6 +17,8 @@ describe('cloneEvent()', () => {
       timeStrategy: TimeStrategy.LockEnd,
       linkStart: null,
       countToEnd: false,
+      showAsAuxTimer: false,
+      hideTimer: false,
       endAction: EndAction.None,
       isPublic: false,
       skip: false,

@@ -25,7 +25,7 @@ interface IpadTimeInputFlowProps {
 }
 
 function IpadTimeInputFlow(props: IpadTimeInputFlowProps) {
-  const { eventId, countToEnd, timeStart, duration, timeStrategy, linkStart, delay, showLabels } = props;
+  const { eventId, timeStart, duration, timeStrategy, linkStart, delay, showLabels } = props;
   const { updateEvent, updateTimer } = useEventAction();
   const displayStart = timeStart + delay;
 

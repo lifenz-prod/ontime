@@ -1,9 +1,9 @@
 import { CustomFieldLabel, OntimeEvent } from 'ontime-types';
 
+import MobileEventEditorTimes from './composite/MobileEventEditorTimes';
 import EventEditorEmpty from './EventEditorEmpty';
 
 import style from './EventEditor.module.scss';
-import MobileEventEditorTimes from './composite/MobileEventEditorTimes';
 
 export type EventEditorSubmitActions = keyof OntimeEvent;
 

@@ -1,9 +1,9 @@
 import { OntimeEvent } from 'ontime-types';
 
+import IpadEventEditorTimes from './composite/IpadEventEditorTimes';
 import EventEditorEmpty from './EventEditorEmpty';
 
 import style from './EventEditor.module.scss';
-import IpadEventEditorTimes from './composite/IpadEventEditorTimes';
 
 interface IpadEventEditorProps {
   event: OntimeEvent;

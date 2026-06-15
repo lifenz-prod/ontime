@@ -8,9 +8,9 @@ import GlobalOffset from './global-offset/GlobalOffset';
 import IpadPlaybackButtons from './playback-buttons/IpadPlaybackButtons';
 import IpadTimerDisplay from './timer-display/IpadTimerDisplay';
 
-import style from './PlaybackControl.module.scss';
 import ipadStyle from './IpadPlaybackControl.module.scss';
 import timerStyle from './playback-timer/PlaybackTimer.module.scss';
+import style from './PlaybackControl.module.scss';
 
 function IpadPlaybackTimer({ playback }: { playback: Playback }) {
   const timer = useTimer();

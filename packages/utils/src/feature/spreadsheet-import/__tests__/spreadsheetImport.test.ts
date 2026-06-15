@@ -22,6 +22,8 @@ describe('isImportMap()', () => {
       timerType: 'timer type',
       timeWarning: 'warning time',
       timeDanger: 'danger time',
+      serviceBoundary: 'service boundary',
+      serviceOffset: 'service offset',
       custom: {},
       entryId: 'id',
     };
@@ -47,6 +49,8 @@ describe('isImportMap()', () => {
       timerType: 'timer type',
       timeWarning: 'warning time',
       timeDanger: 'danger time',
+      serviceBoundary: 'service boundary',
+      serviceOffset: 'service offset',
       custom: {},
     };
 
@@ -73,6 +77,8 @@ describe('isImportMap()', () => {
       timerType: 'timer type',
       timeWarning: 'warning time',
       timeDanger: 'danger time',
+      serviceBoundary: 'service boundary',
+      serviceOffset: 'service offset',
       custom: {
         userDefined: 'userDefined',
         anotherOne: 'anotherOne',

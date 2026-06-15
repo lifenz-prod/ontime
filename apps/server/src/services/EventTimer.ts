@@ -8,7 +8,7 @@ type UpdateCallbackFn = (updateResult: UpdateResult) => void;
  * Service manages Ontime's main timer
  */
 export class EventTimer {
-  private readonly _interval: NodeJS.Timeout;
+  private readonly _interval: NodeJS.Timeout | undefined;
   /** how often we recalculate */
   static _refreshInterval: number;
 
@@ -25,9 +25,13 @@ export class EventTimer {
    */
   constructor(timerConfig: { refresh: number; updateInterval: number }) {
     EventTimer._refreshInterval = timerConfig.refresh;
-    this._interval = setInterval(() => {
-      this.update();
-    }, EventTimer._refreshInterval);
+    // Skip the background refresh loop under test: the module-level singleton would otherwise
+    // leak a setInterval that fires runtimeState.update() after a test's mocks are torn down.
+    if (!process.env.IS_TEST) {
+      this._interval = setInterval(() => {
+        this.update();
+      }, EventTimer._refreshInterval);
+    }
   }
 
   /**

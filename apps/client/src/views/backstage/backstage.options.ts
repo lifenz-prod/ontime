@@ -33,7 +33,7 @@ export const getBackstageOptions = (timeFormat: string, customFields: CustomFiel
       ...scheduleOptions,
       options: scheduleOptions.options.map((opt) =>
         opt.id === 'stopCycle' ? { ...opt, defaultValue: true } : opt,
-      ),
+      ) as typeof scheduleOptions.options,
     },
   ];
 };

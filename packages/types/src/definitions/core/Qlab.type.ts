@@ -1,4 +1,4 @@
-import { TimerPhase } from '../runtime/TimerState.type.js';
+import type { TimerPhase } from '../runtime/TimerState.type.js';
 
 export type QlabState = {
   enabled: boolean;

@@ -2,8 +2,8 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import type { QlabSettings } from 'ontime-types';
 
 import { queryRefetchIntervalSlow } from '../../ontimeConfig';
-import { editQlabSettings, getQlabSettings } from '../api/qlab';
 import { QLAB } from '../api/constants';
+import { editQlabSettings, getQlabSettings } from '../api/qlab';
 import { logAxiosError } from '../api/utils';
 import { ontimeQueryClient } from '../queryClient';
 

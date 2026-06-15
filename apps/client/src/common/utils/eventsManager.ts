@@ -18,6 +18,8 @@ export const cloneEvent = (event: OntimeEvent): ClonedEvent => {
     timerType: event.timerType,
     timeStrategy: event.timeStrategy,
     countToEnd: event.countToEnd,
+    showAsAuxTimer: event.showAsAuxTimer,
+    hideTimer: event.hideTimer,
     linkStart: event.linkStart,
     endAction: event.endAction,
     isPublic: event.isPublic,

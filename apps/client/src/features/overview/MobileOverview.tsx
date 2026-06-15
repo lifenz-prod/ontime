@@ -1,6 +1,6 @@
 import { memo, PropsWithChildren, ReactNode, useMemo } from 'react';
-import { millisToString, removeLeadingZero } from 'ontime-utils';
 import { Box } from '@chakra-ui/react';
+import { millisToString, removeLeadingZero } from 'ontime-utils';
 
 import ErrorBoundary from '../../common/components/error-boundary/ErrorBoundary';
 import { useIsOnline, useRuntimeOverview, useRuntimePlaybackOverview, useTimer } from '../../common/hooks/useSocket';
