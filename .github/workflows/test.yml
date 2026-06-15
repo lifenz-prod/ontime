@@ -30,17 +30,17 @@ jobs:
       # Run code quality per package
       - name: React - Run linter +  TypeScript checks
         if: always()
-        run: pnpm lint && tsc --noEmit
+        run: pnpm lint && pnpm exec tsc --noEmit
         working-directory: ./apps/client
 
       - name: Server - Run linter +  TypeScript checks
         if: always()
-        run: pnpm lint && tsc --noEmit
+        run: pnpm lint && pnpm exec tsc --noEmit
         working-directory: ./apps/server
 
       - name: Utils - Run linter +  TypeScript checks
         if: always()
-        run: pnpm lint && tsc --noEmit
+        run: pnpm lint && pnpm exec tsc --noEmit
         working-directory: ./packages/utils
 
       - name: Types - Run linter
