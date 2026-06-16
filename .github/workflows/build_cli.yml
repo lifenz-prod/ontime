@@ -45,8 +45,19 @@ jobs:
       - name: Copy external
         run: cp -R apps/server/src/external apps/cli/external
       
-      - name: Publish to NPM
+      # Stable releases move the `latest` dist-tag; betas go to `beta` so that
+      # `npm i @getontime/cli` keeps resolving to the last stable.
+      - name: Publish to NPM (stable)
+        if: github.event.release.prerelease == false
         run: pnpm publish --access public --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true
+        working-directory: ./apps/cli
+
+      - name: Publish to NPM (beta)
+        if: github.event.release.prerelease == true
+        run: pnpm publish --access public --no-git-checks --tag beta
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true

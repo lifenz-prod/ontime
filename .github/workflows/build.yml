@@ -9,7 +9,28 @@ permissions:
   contents: write
 
 jobs:
+  # Fail fast if the pushed tag (e.g. v3.19.0-beta.0) does not match the
+  # versions baked into the packages we publish. Prevents shipping a binary or
+  # npm package whose number disagrees with the release tag.
+  verify_version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - name: Check tag matches package versions
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          for pkg in package.json apps/cli/package.json apps/electron/package.json; do
+            V=$(node -p "require('./$pkg').version")
+            if [ "$V" != "$TAG" ]; then
+              echo "::error::$pkg is $V but tag is $TAG. Run 'pnpm set-version $TAG' and re-tag."
+              exit 1
+            fi
+            echo "$pkg OK ($V)"
+          done
+
   build_macos:
+    needs: verify_version
     runs-on: macos-latest
 
     steps:
@@ -46,6 +67,7 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
             ./apps/electron/dist/ontime-macOS-x64.dmg
             ./apps/electron/dist/ontime-macOS-arm64.dmg
@@ -55,6 +77,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build_windows:
+    needs: verify_version
     runs-on: windows-latest
 
     steps:
@@ -83,11 +106,13 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: './apps/electron/dist/ontime-win64.exe'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build_ubuntu:
+    needs: verify_version
     runs-on: ubuntu-latest
 
     steps:
@@ -116,6 +141,7 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
+          prerelease: ${{ contains(github.ref_name, '-') }}
           files: './apps/electron/dist/ontime-linux.AppImage'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

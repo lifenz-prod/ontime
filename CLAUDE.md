@@ -74,6 +74,26 @@ Generated 9am/11am replica service sections so playback runs continuously across
 - iPad/mobile PRE/9am/11am tabs are view filters only; the PRE tab is synthesized client-side.
 - Settings UI: `features/app-settings/panel/service-profiles-panel`.
 
+## Releases (beta + stable)
+
+Releases are driven entirely by the **git tag**. Pushing a tag triggers `build.yml`, which builds the desktop binaries and creates a GitHub Release; that Release's `published` event then triggers `build_cli.yml` (npm) and `build_docker.yml` (Docker Hub).
+
+The tag string decides the channel: a tag containing `-` (e.g. `v3.19.0-beta.0`) is a **prerelease/beta**; a clean tag (`v3.19.0`) is **stable**.
+
+| Channel | npm dist-tag | Docker tag | GH Release |
+|---|---|---|---|
+| Stable `v3.19.0` | `latest` | `:3.19.0` + `:latest` | normal |
+| Beta `v3.19.0-beta.0` | `beta` | `:...-beta.0` + `:nightly` | prerelease |
+
+Betas never move `latest`/`:latest`, so existing stable users are unaffected; testers opt in with `@getontime/cli@beta` or `getontime/ontime:nightly`.
+
+**Cutting a release:**
+1. `pnpm set-version 3.19.0-beta.0` — stamps the version into root + `apps/cli` + `apps/electron` (+ client/server) package.jsons. The root version also feeds the in-app version via the `addversion` hook → `ONTIME_VERSION.js` (generated, gitignored). `apps/cli` drives the npm version; `apps/electron` drives the desktop build.
+2. `git commit -am "release: v3.19.0-beta.0" && git tag v3.19.0-beta.0`
+3. `git push && git push --tags`
+
+`build.yml`'s `verify_version` job fails the build if the tag doesn't match the package versions — so if you forget step 1, nothing ships with a wrong number. Develop on `master`; cut `-beta.N` tags for test builds, then a clean tag to promote to stable.
+
 ## Working conventions
 
 - **Make changes in the main repo** (`/Users/alanaiken/Documents/GitHub/ontime`), not in worktrees — the running app is served from here, so worktree edits don't take effect until merged.
