@@ -15,11 +15,12 @@ import style from './AddTime.module.scss';
 interface AddTimeProps {
   playback: Playback;
   bigger?: boolean;
+  label?: string;
 }
 
 export default function AddTime(props: AddTimeProps) {
-  const { playback, bigger } = props;
-  const [time, setTime] = useLocalStorage({ key: 'add-time', defaultValue: 60_000 }); // 1 minute
+  const { playback, bigger, label } = props;
+  const [time, setTime] = useLocalStorage({ key: 'add-time-v2', defaultValue: 60_000 }); // 1 minute
 
   const handleTimeChange = (_field: string, value: string) => {
     // Add time is displayed and entered as mm:ss. A two-section entry (e.g. "1:30")
@@ -60,6 +61,7 @@ export default function AddTime(props: AddTimeProps) {
 
   return (
     <div className={style.addTime}>
+      {label && <span className={style.label}>{label}</span>}
       <TimeInput
         name='addtime'
         submitHandler={handleTimeChange}

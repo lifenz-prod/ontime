@@ -31,8 +31,9 @@ export default function SourcesPanel({ location, onClose }: SourcesPanelProps) {
   const [importFlow, setImportFlow] = useState<'none' | 'excel' | 'gsheet' | 'finished'>('none');
   const [error, setError] = useState('');
   const [hasFile, setHasFile] = useState<'none' | 'loading' | 'done'>('none');
+  const [isOpeningGSheet, setIsOpeningGSheet] = useState(false);
 
-  const { exportRundown, importRundownPreview, verifyAuth } = useGoogleSheet();
+  const { exportRundown, importRundownPreview, importRundown, verifyAuth } = useGoogleSheet();
 
   const setWorksheets = useSheetStore((state) => state.setWorksheets);
   const authenticationStatus = useSheetStore((state) => state.authenticationStatus);
@@ -89,21 +90,26 @@ export default function SourcesPanel({ location, onClose }: SourcesPanelProps) {
   };
 
   const openGSheetFlow = async () => {
-    const result = await verifyAuth();
-    if (result) {
-      setAuthenticationStatus(result.authenticated);
-      setSheetId(result.sheetId);
-      if (result.authenticated === 'authenticated' && result.sheetId) {
-        try {
-          const names = await getWorksheetNames(result.sheetId);
-          setWorksheets(names);
-        } catch (error) {
-          const message = maybeAxiosError(error);
-          setError(`Error getting worksheets: ${message}`);
+    setIsOpeningGSheet(true);
+    try {
+      const result = await verifyAuth();
+      if (result) {
+        setAuthenticationStatus(result.authenticated);
+        setSheetId(result.sheetId);
+        if (result.authenticated === 'authenticated' && result.sheetId) {
+          try {
+            const names = await getWorksheetNames(result.sheetId);
+            setWorksheets(names);
+          } catch (error) {
+            const message = maybeAxiosError(error);
+            setError(`Error getting worksheets: ${message}`);
+          }
         }
       }
+      setImportFlow('gsheet');
+    } finally {
+      setIsOpeningGSheet(false);
     }
-    setImportFlow('gsheet');
   };
 
   useEffect(() => {
@@ -117,21 +123,22 @@ export default function SourcesPanel({ location, onClose }: SourcesPanelProps) {
     resetFlow();
   };
 
-  const handleSubmitImportPreview = async (importMap: ImportMap) => {
-    if (importFlow === 'excel') {
-      try {
-        const previewData = await importRundownPreviewExcel(importMap);
-        setRundown(previewData.rundown);
-        setCustomFields(previewData.customFields);
-        setServiceProfiles(previewData.serviceProfiles);
-      } catch (error) {
-        setError(maybeAxiosError(error));
+  const handleSubmitImport = async (importMap: ImportMap) => {
+    try {
+      let previewData = null;
+      if (importFlow === 'excel') {
+        previewData = await importRundownPreviewExcel(importMap);
+      } else if (importFlow === 'gsheet') {
+        if (!sheetId) return;
+        previewData = (await importRundownPreview(sheetId, importMap)) ?? null;
       }
-    }
 
-    if (importFlow === 'gsheet') {
-      if (!sheetId) return;
-      await importRundownPreview(sheetId, importMap);
+      if (!previewData) return;
+
+      await importRundown(previewData.rundown, previewData.customFields, previewData.serviceProfiles);
+      handleFinished();
+    } catch (error) {
+      setError(maybeAxiosError(error));
     }
   };
 
@@ -163,7 +170,7 @@ export default function SourcesPanel({ location, onClose }: SourcesPanelProps) {
   const isExcelFlow = importFlow === 'excel';
   const isGSheetFlow = importFlow === 'gsheet';
   const isAuthenticated = authenticationStatus === 'authenticated';
-  const showInput = importFlow === 'none';
+  const showInput = importFlow === 'none' && !isOpeningGSheet;
   const showCompleted = importFlow === 'finished';
   const showAuth = isGSheetFlow && !isAuthenticated;
   const showImportMap = (isGSheetFlow && isAuthenticated) || (isExcelFlow && hasFile === 'done');
@@ -176,6 +183,7 @@ export default function SourcesPanel({ location, onClose }: SourcesPanelProps) {
         <Panel.Card>
           <Panel.SubHeader>Synchronise your rundown with an external source</Panel.SubHeader>
           {error && <Panel.Error>{error}</Panel.Error>}
+          <Panel.Loader isLoading={isOpeningGSheet} />
           {showInput && (
             <>
               <GSheetInfo />
@@ -238,7 +246,7 @@ export default function SourcesPanel({ location, onClose }: SourcesPanelProps) {
               isSpreadsheet={isExcelFlow}
               onCancel={cancelImportMap}
               onSubmitExport={handleSubmitExport}
-              onSubmitImport={handleSubmitImportPreview}
+              onSubmitImport={handleSubmitImport}
             />
           )}
           {showReview && (

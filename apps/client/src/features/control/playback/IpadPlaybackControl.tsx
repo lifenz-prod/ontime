@@ -14,16 +14,13 @@ import style from './PlaybackControl.module.scss';
 
 function IpadPlaybackTimer({ playback }: { playback: Playback }) {
   const timer = useTimer();
-  const isOvertime = timer.phase === TimerPhase.Overtime;
   const isWaiting = timer.phase === TimerPhase.Pending;
 
   return (
     <div className={timerStyle.timeContainer}>
-      <div className={timerStyle.indicators}>
-        <div className={timerStyle.indicatorNegative} data-active={isOvertime} />
-      </div>
+      <div className={timerStyle.indicators} />
       <IpadTimerDisplay time={isWaiting ? timer.secondaryTimer : timer.current} />
-      <AddTime playback={playback} bigger />
+      <AddTime playback={playback} bigger label='Adjust Current' />
     </div>
   );
 }

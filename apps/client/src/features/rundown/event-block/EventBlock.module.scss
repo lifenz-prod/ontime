@@ -52,6 +52,12 @@ $skip-opacity: 0.2;
     outline: 1px solid $block-selected-color;
   }
 
+  &.dragging {
+    // use the standalone `rotate` property so we don't clobber dnd-kit's
+    // inline `transform: translate(...)` that makes the block follow the finger
+    animation: wiggle 0.2s ease-in-out infinite;
+  }
+
   &.hasCursor {
     outline: 1px solid $block-cursor-color;
   }
@@ -120,6 +126,7 @@ $skip-opacity: 0.2;
   grid-area: pb-actions;
   display: flex;
   flex-direction: column;
+  align-self: start;
   margin: 0 0.5rem;
   gap: 0.25rem;
 }
@@ -217,5 +224,17 @@ $skip-opacity: 0.2;
 
   .statusIcon.disabled {
     color: $gray-1000;
+  }
+}
+
+@keyframes wiggle {
+  0% {
+    rotate: -0.6deg;
+  }
+  50% {
+    rotate: 0.6deg;
+  }
+  100% {
+    rotate: -0.6deg;
   }
 }

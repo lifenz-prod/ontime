@@ -6,7 +6,7 @@ import ErrorBoundary from '../../common/components/error-boundary/ErrorBoundary'
 import { useIsOnline, useRuntimeOverview, useRuntimePlaybackOverview, useTimer } from '../../common/hooks/useSocket';
 import useProjectData from '../../common/hooks-query/useProjectData';
 import { useRuntimeStore } from '../../common/stores/runtime';
-import { cx, enDash, timerPlaceholder } from '../../common/utils/styleUtils';
+import { cx, timerPlaceholder } from '../../common/utils/styleUtils';
 
 import { TimeColumn, TimeRow } from './composite/TimeLayout';
 import { calculateEndAndDaySpan, formatedTime, getOffsetText } from './overviewUtils';
@@ -15,7 +15,12 @@ import style from './Overview.module.scss';
 
 export const MobileEditorOverview = memo(_MobileEditorOverview);
 
-function _MobileEditorOverview({ children }: PropsWithChildren) {
+interface MobileEditorOverviewProps {
+  children?: ReactNode;
+  rightContent?: ReactNode;
+}
+
+function _MobileEditorOverview({ children, rightContent }: MobileEditorOverviewProps) {
   const { plannedEnd, expectedEnd } = useRuntimeOverview();
 
   const [maybePlannedEnd, maybePlannedDaySpan] = useMemo(() => calculateEndAndDaySpan(plannedEnd), [plannedEnd]);
@@ -25,10 +30,9 @@ function _MobileEditorOverview({ children }: PropsWithChildren) {
   const expectedEndText = formatedTime(maybeExpectedEnd);
 
   return (
-    <OverviewWrapper navElements={children}>
+    <OverviewWrapper navElements={children} rightNavElements={rightContent}>
       <Box maxW="1100px" mx="auto" px={4} ml={-2} display="flex" alignItems="center" gap={8}>
         <TitlesOverview />
-        <ProgressOverview />
         <RuntimeOverview />
         <div>
           <TimeRow
@@ -90,14 +94,18 @@ function _MobileCuesheetOverview({ children }: PropsWithChildren) {
 
 interface OverviewWrapperProps {
   navElements: ReactNode;
+  rightNavElements?: ReactNode;
 }
 
-function OverviewWrapper({ navElements, children }: PropsWithChildren<OverviewWrapperProps>) {
+function OverviewWrapper({ navElements, rightNavElements, children }: PropsWithChildren<OverviewWrapperProps>) {
   const { isOnline } = useIsOnline();
   return (
     <div className={cx([style.overview, !isOnline && style.isOffline])}>
       <ErrorBoundary>
-        <div className={style.nav}>{navElements}</div>
+        <div className={style.nav}>
+          {navElements}
+          {rightNavElements && <div style={{ marginLeft: 'auto' }}>{rightNavElements}</div>}
+        </div>
         <div className={style.info}>{children}</div>
       </ErrorBoundary>
     </div>
@@ -125,16 +133,6 @@ function TimerOverview() {
   const display = millisToString(current, { fallback: timerPlaceholder });
 
   return <TimeColumn label='Running timer' value={display} muted={current === null} />;
-}
-
-function ProgressOverview() {
-  const { numEvents, selectedEventIndex } = useRuntimePlaybackOverview();
-
-  const current = selectedEventIndex !== null ? selectedEventIndex + 1 : enDash;
-  const ofTotal = numEvents || enDash;
-  const progressText = numEvents ? `${current} of ${ofTotal}` : '-';
-
-  return <TimeColumn label='Progress' value={progressText} />;
 }
 
 function RuntimeOverview() {

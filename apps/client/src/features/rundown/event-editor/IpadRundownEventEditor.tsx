@@ -4,7 +4,6 @@ import { isOntimeEvent, OntimeEvent } from 'ontime-types';
 import useRundown from '../../../common/hooks-query/useRundown';
 import { useEventSelection } from '../useEventSelection';
 
-import EventEditorEmpty from './EventEditorEmpty';
 import IpadEventEditor from './IpadEventEditor';
 
 import style from './EventEditor.module.scss';
@@ -37,7 +36,7 @@ function IpadRundownEventEditor() {
   }, [order, rundown, selectedEvents]);
 
   if (!event) {
-    return <EventEditorEmpty />;
+    return null;
   }
 
   return (

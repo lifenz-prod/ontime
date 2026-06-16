@@ -19,9 +19,6 @@ export default function useGoogleSheet() {
   const queryClient = useQueryClient();
   // functions push data to store
   const patchStepData = useSheetStore((state) => state.patchStepData);
-  const setRundown = useSheetStore((state) => state.setRundown);
-  const setCustomFields = useSheetStore((state) => state.setCustomFields);
-  const setServiceProfiles = useSheetStore((state) => state.setServiceProfiles);
 
   /** whether the current session has been authenticated */
   const verifyAuth = async (): Promise<{ authenticated: AuthenticationStatus; sheetId: string } | void> => {
@@ -56,12 +53,10 @@ export default function useGoogleSheet() {
   /** fetches data from a worksheet by its ID */
   const importRundownPreview = async (sheetId: string, fileOptions: ImportMap) => {
     try {
-      const data = await previewRundown(sheetId, fileOptions);
-      setRundown(data.rundown);
-      setCustomFields(data.customFields);
-      setServiceProfiles(data.serviceProfiles);
+      return await previewRundown(sheetId, fileOptions);
     } catch (error) {
       patchStepData({ pullPush: { available: true, error: maybeAxiosError(error) } });
+      return undefined;
     }
   };
 

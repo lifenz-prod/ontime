@@ -7,7 +7,7 @@ import RundownModeContext from './RundownModeContext';
 
 import styles from './Rundown.module.scss';
 
-const ipadMode = { hideRowActions: true, hideEndTime: true };
+const ipadMode = { hideRowActions: false, hideEndTime: true, playbackOnly: true };
 
 export default function IpadRundownWrapper() {
   const { data, status } = useRundown();
@@ -17,7 +17,7 @@ export default function IpadRundownWrapper() {
     <RundownModeContext.Provider value={ipadMode}>
       <div className={styles.rundownWrapper}>
         {status === 'success' && data ? (
-          <Rundown data={{ ...data, order: visibleOrder }} />
+          <Rundown data={{ ...data, order: visibleOrder }} fullOrder={data.order} />
         ) : (
           <Empty text='Connecting to server' />
         )}

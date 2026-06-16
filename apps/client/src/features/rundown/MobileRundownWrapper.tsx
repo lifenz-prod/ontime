@@ -15,7 +15,7 @@ export default function MobileRundownWrapper() {
     <div className={styles.rundownWrapper}>
       <RundownHeader />
       {status === 'success' && data ? (
-        <Rundown data={{ ...data, order: visibleOrder }} />
+        <Rundown data={{ ...data, order: visibleOrder }} fullOrder={data.order} />
       ) : (
         <Empty text='Connecting to server' />
       )}

@@ -1,5 +1,17 @@
-import { memo } from 'react';
-import { Select, Switch } from '@chakra-ui/react';
+import { memo, useRef } from 'react';
+import { IoTrash } from 'react-icons/io5';
+import {
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogOverlay,
+  Button,
+  Select,
+  Switch,
+  useDisclosure,
+} from '@chakra-ui/react';
 import { EndAction, MaybeString, TimeStrategy } from 'ontime-types';
 import { millisToString } from 'ontime-utils';
 
@@ -28,7 +40,15 @@ type HandledActions = 'countToEnd' | 'showAsAuxTimer' | 'hideTimer' | 'endAction
 
 function IpadEventEditorTimes(props: IpadEventEditorTimesProps) {
   const { eventId, timeStart, timeEnd, duration, timeStrategy, linkStart, countToEnd, showAsAuxTimer, hideTimer, delay, endAction } = props;
-  const { updateEvent } = useEventAction();
+  const { updateEvent, deleteEvent } = useEventAction();
+
+  // Delete event confirmation modal
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const cancelRef = useRef<HTMLButtonElement | null>(null);
+
+  const handleDeleteConfirm = () => {
+    deleteEvent([eventId]);
+  };
 
   const handleSubmit = (field: HandledActions, value: string | boolean) => {
     if (field === 'countToEnd') {
@@ -58,6 +78,37 @@ function IpadEventEditorTimes(props: IpadEventEditorTimesProps) {
 
   return (
     <>
+      <Button
+        colorScheme='red'
+        variant='ontime-outlined'
+        color='#FA5656'
+        leftIcon={<IoTrash />}
+        size='md'
+        width='100%'
+        mb={4}
+        onClick={onOpen}
+      >
+        Delete Event
+      </Button>
+      <AlertDialog variant='ontime' isOpen={isOpen} leastDestructiveRef={cancelRef} onClose={onClose}>
+        <AlertDialogOverlay>
+          <AlertDialogContent>
+            <AlertDialogHeader fontSize='lg' fontWeight='bold'>
+              Delete event
+            </AlertDialogHeader>
+            <AlertDialogBody>Are you sure you want to delete this event?</AlertDialogBody>
+            <AlertDialogFooter>
+              <Button ref={cancelRef} onClick={onClose} variant='ontime-ghosted-white'>
+                Cancel
+              </Button>
+              <Button colorScheme='red' onClick={handleDeleteConfirm} ml={4}>
+                Delete event
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
+
       <div className={style.column}>
         <Editor.Title>Event schedule</Editor.Title>
         <div>

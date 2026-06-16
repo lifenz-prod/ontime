@@ -83,7 +83,7 @@ export default function ImportMapForm(props: ImportMapFormProps) {
     onCancel();
   };
 
-  const handleImportPreview = async (values: NamedImportMap) => {
+  const handleImport = async (values: NamedImportMap) => {
     setLoading('import');
     const importMap = convertToImportMap(values);
     persistImportMap(values);
@@ -133,11 +133,11 @@ export default function ImportMapForm(props: ImportMapFormProps) {
           <Button
             variant='ontime-filled'
             size='sm'
-            onClick={handleSubmit(handleImportPreview)}
+            onClick={handleSubmit(handleImport)}
             isDisabled={!canSubmit}
             isLoading={loading === 'import'}
           >
-            Import preview
+            Import
           </Button>
         </Panel.InlineElements>
       </Panel.Title>

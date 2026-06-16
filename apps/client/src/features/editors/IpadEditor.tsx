@@ -30,7 +30,23 @@ export default function IpadEditor() {
   return (
     <div className={styles.mainContainer} data-testid='ipad-editor'>
       <NavigationMenu isOpen={isMenuOpen} onClose={onClose} />
-      <MobileEditorOverview>
+      <MobileEditorOverview
+        rightContent={
+          tabs.length > 0 ? (
+            <ButtonGroup size='lg' isAttached>
+              {tabs.map((tab) => (
+                <Button
+                  key={tab.id}
+                  onClick={() => selectTab(tab.id)}
+                  variant={activeTabId === tab.id ? 'ontime-filled' : 'ontime-subtle-white'}
+                >
+                  {tab.name}
+                </Button>
+              ))}
+            </ButtonGroup>
+          ) : undefined
+        }
+      >
         <IconButton
           aria-label='Toggle navigation'
           variant='ontime-subtle-white'
@@ -47,34 +63,24 @@ export default function IpadEditor() {
         />
       </MobileEditorOverview>
 
-      {isSettingsOpen && <AppSettings />}
-
-      {tabs.length > 0 && (
-        <ButtonGroup size='md' variant='ontime-subtle' isAttached mx={4} my={2}>
-          {tabs.map((tab) => (
-            <Button
-              key={tab.id}
-              onClick={() => selectTab(tab.id)}
-              variant={activeTabId === tab.id ? 'ontime-filled' : 'ontime-subtle'}
-            >
-              {tab.name}
-            </Button>
-          ))}
-        </ButtonGroup>
-      )}
-
-      <div id='panels' className={styles.panelContainer}>
-        <div className={`${styles.left} ${styles.ipadLeft}`}>
-          <IpadTimerControl />
-          <ExternalInput />
-          <div className={rundownStyle.side}>
-            <ErrorBoundary>
-              <IpadRundownEventEditor />
-            </ErrorBoundary>
+      {isSettingsOpen ? (
+        <AppSettings />
+      ) : (
+        <>
+          <div id='panels' className={styles.panelContainer}>
+            <div className={`${styles.left} ${styles.ipadLeft}`}>
+              <IpadTimerControl />
+              <ExternalInput />
+              <div className={rundownStyle.side}>
+                <ErrorBoundary>
+                  <IpadRundownEventEditor />
+                </ErrorBoundary>
+              </div>
+            </div>
+            <IpadRundown />
           </div>
-        </div>
-        <IpadRundown />
-      </div>
+        </>
+      )}
     </div>
   );
 }

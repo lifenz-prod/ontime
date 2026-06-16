@@ -30,10 +30,11 @@ interface EventBlockPlaybackProps {
   isPaused: boolean;
   loaded: boolean;
   disablePlayback: boolean;
+  playbackOnly?: boolean;
 }
 
 const EventBlockPlayback = (props: EventBlockPlaybackProps) => {
-  const { eventId, skip, isPlaying, isPaused, loaded, disablePlayback } = props;
+  const { eventId, skip, isPlaying, isPaused, loaded, disablePlayback, playbackOnly } = props;
   const { updateEvent } = useEventAction();
 
   const toggleSkip = (event: MouseEvent) => {
@@ -85,30 +86,34 @@ const EventBlockPlayback = (props: EventBlockPlaybackProps) => {
 
   return (
     <div className={style.playbackActions}>
-      <TooltipActionBtn
-        variant='ontime-subtle-white'
-        aria-label='Skip event'
-        tooltip='Skip event'
-        icon={skip ? <IoRemoveCircle /> : <IoRemoveCircleOutline />}
-        backgroundColor={skip ? '#B20000' : undefined}
-        _hover={{ backgroundColor: '#FF7878' }}
-        {...tooltipProps}
-        {...blockBtnStyle}
-        clickHandler={toggleSkip}
-        tabIndex={-1}
-        isDisabled={loaded}
-      />
-      <TooltipActionBtn
-        variant='ontime-subtle-white'
-        aria-label='Load event'
-        tooltip='Load event'
-        icon={<IoReload className={style.flip} />}
-        isDisabled={disablePlayback}
-        {...tooltipProps}
-        {...blockBtnStyle}
-        clickHandler={load}
-        tabIndex={-1}
-      />
+      {!playbackOnly && (
+        <TooltipActionBtn
+          variant='ontime-subtle-white'
+          aria-label='Skip event'
+          tooltip='Skip event'
+          icon={skip ? <IoRemoveCircle /> : <IoRemoveCircleOutline />}
+          backgroundColor={skip ? '#B20000' : undefined}
+          _hover={{ backgroundColor: '#FF7878' }}
+          {...tooltipProps}
+          {...blockBtnStyle}
+          clickHandler={toggleSkip}
+          tabIndex={-1}
+          isDisabled={loaded}
+        />
+      )}
+      {!playbackOnly && (
+        <TooltipActionBtn
+          variant='ontime-subtle-white'
+          aria-label='Load event'
+          tooltip='Load event'
+          icon={<IoReload className={style.flip} />}
+          isDisabled={disablePlayback}
+          {...tooltipProps}
+          {...blockBtnStyle}
+          clickHandler={load}
+          tabIndex={-1}
+        />
+      )}
       <TooltipActionBtn
         variant='ontime-subtle-white'
         aria-label='Start event'

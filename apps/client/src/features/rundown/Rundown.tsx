@@ -1,5 +1,5 @@
 import { Fragment, lazy, useCallback, useEffect, useRef, useState } from 'react';
-import { closestCenter, DndContext, DragEndEvent, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { closestCenter, DndContext, DragEndEvent, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useHotkeys } from '@mantine/hooks';
 import {
@@ -40,9 +40,10 @@ const RundownEntry = lazy(() => import('./RundownEntry'));
 
 interface RundownProps {
   data: RundownCached;
+  fullOrder?: string[];
 }
 
-export default function Rundown({ data }: RundownProps) {
+export default function Rundown({ data, fullOrder }: RundownProps) {
   const { order, rundown } = data;
   const [statefulEntries, setStatefulEntries] = useState(order);
 
@@ -61,8 +62,8 @@ export default function Rundown({ data }: RundownProps) {
 
   // DND KIT — TouchSensor with long-press for tablet/mobile support
   const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+    useSensor(MouseSensor),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 75 } }),
   );
 
   const deleteAtCursor = useCallback(
@@ -246,12 +247,17 @@ export default function Rundown({ data }: RundownProps) {
 
     if (over?.id) {
       if (active.id !== over?.id) {
-        const fromIndex = active.data.current?.sortable.index;
-        const toIndex = over.data.current?.sortable.index;
+        const localFrom = active.data.current?.sortable.index;
+        const localTo = over.data.current?.sortable.index;
         // ugly hack to handle inconsistencies between dnd-kit and async store updates
         setStatefulEntries((currentEntries) => {
-          return arrayMove(currentEntries, fromIndex, toIndex);
+          return arrayMove(currentEntries, localFrom, localTo);
         });
+        // when a filtered view is active (e.g. service tab), statefulEntries indices don't
+        // match the full server rundown — resolve against fullOrder for the API call
+        const referenceOrder = fullOrder ?? statefulEntries;
+        const fromIndex = referenceOrder.indexOf(String(active.id));
+        const toIndex = referenceOrder.indexOf(String(over.id));
         reorderEvent(String(active.id), fromIndex, toIndex);
       }
     }

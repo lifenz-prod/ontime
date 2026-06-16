@@ -53,7 +53,7 @@ interface EventBlockInnerProps {
 }
 
 function EventBlockInner(props: EventBlockInnerProps) {
-  const { hideRowActions, hideEndTime } = useRundownMode();
+  const { hideRowActions, hideEndTime, playbackOnly } = useRundownMode();
   const {
     eventId,
     timeStart,
@@ -122,6 +122,7 @@ function EventBlockInner(props: EventBlockInnerProps) {
           isPaused={eventIsPaused}
           loaded={loaded}
           disablePlayback={skip || isRolling}
+          playbackOnly={playbackOnly}
         />
       )}
       {!skip && (

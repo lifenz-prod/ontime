@@ -5,6 +5,13 @@
   gap: $element-inner-spacing;
 }
 
+.label {
+  font-size: calc(1rem - 3px);
+  color: $label-gray;
+  text-align: center;
+  line-height: 1.2;
+}
+
 .addButtons {
   display: grid;
   grid-template-columns: 1fr 1fr;

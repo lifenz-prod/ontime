@@ -254,6 +254,7 @@ export default function EventBlock(props: EventBlockProps) {
     playback ? style[playback] : null,
     isSelected ? style.selected : null,
     hasCursor ? style.hasCursor : null,
+    isDragging ? style.dragging : null,
   ]);
 
   const handleFocusClick = (event: MouseEvent) => {
