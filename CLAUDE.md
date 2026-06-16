@@ -92,7 +92,11 @@ Betas never move `latest`/`:latest`, so existing stable users are unaffected; te
 2. `git commit -am "release: v3.19.0-beta.0" && git tag v3.19.0-beta.0`
 3. `git push && git push --tags`
 
-`build.yml`'s `verify_version` job fails the build if the tag doesn't match the package versions — so if you forget step 1, nothing ships with a wrong number. Develop on `master`; cut `-beta.N` tags for test builds, then a clean tag to promote to stable.
+`build.yml`'s `verify_version` job fails the build if the tag doesn't match the package versions — so if you forget step 1, nothing ships with a wrong number.
+
+**Branching workflow:** active development happens on **`beta-releases`** (cut `-beta.N` tags from there for test builds). `master` is the stable line — merge `beta-releases` into it (or PR) only once a beta is proven, then cut a clean tag from `master` to promote to stable. A tag push triggers the build from whichever branch it points at; build.yml builds desktop binaries on any tag.
+
+Note: only `build.yml` (desktop binaries + GitHub Release) is wired up and verified. `build_cli.yml` (npm) and `build_docker.yml` (Docker) listen for `release: published` but never auto-fire, because the release is created by `GITHUB_TOKEN` — see the release-channels memory if you need to enable CLI/Docker publishing.
 
 ## Working conventions
 
