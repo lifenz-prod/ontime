@@ -3,6 +3,7 @@ import type { PanelBaseProps } from '../../panel-list/PanelList';
 import * as Panel from '../../panel-utils/PanelUtils';
 
 import CustomFields from './custom-fields/CustomFields';
+import AutoLaunchSettings from './AutoLaunchSettings';
 import ReportSettings from './ReportSettings';
 import UrlPresetsForm from './UrlPresetsForm';
 
@@ -14,6 +15,7 @@ export default function FeatureSettingsPanel({ location }: PanelBaseProps) {
   return (
     <>
       <Panel.Header>Feature Settings</Panel.Header>
+      <AutoLaunchSettings />
       <div ref={customFieldsRef}>
         <CustomFields />
       </div>

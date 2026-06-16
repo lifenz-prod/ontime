@@ -298,3 +298,27 @@ ipcMain.on('send-to-link', (_event, arg) => {
     /** unhandled error */
   }
 });
+
+/**
+ * Reports whether the app is configured to launch on system login.
+ * Works on macOS and Windows via the OS login-item registry.
+ */
+ipcMain.handle('get-auto-launch', () => {
+  try {
+    return app.getLoginItemSettings().openAtLogin;
+  } catch (_error) {
+    return false;
+  }
+});
+
+/**
+ * Enables or disables launching the app on system login.
+ * Works on macOS and Windows via the OS login-item registry.
+ */
+ipcMain.on('set-auto-launch', (_event, enabled) => {
+  try {
+    app.setLoginItemSettings({ openAtLogin: Boolean(enabled) });
+  } catch (_error) {
+    /** unhandled error */
+  }
+});
