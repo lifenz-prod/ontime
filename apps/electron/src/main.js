@@ -1,5 +1,6 @@
 const { app, BrowserWindow, Menu, globalShortcut, Tray, dialog, ipcMain, shell, Notification } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
 const { getApplicationMenu } = require('./menu/applicationMenu.js');
 const { getTrayMenu } = require('./menu/trayMenu.js');
@@ -134,6 +135,57 @@ function showDialog(name) {
   win.webContents.send('dialog', name);
 }
 
+/**
+ * Path to a small JSON file tracking whether the auto-launch default
+ * has been applied. Lives in userData so it survives app updates.
+ * Must be called after the app is ready (app.getPath('userData')).
+ */
+function getAutoLaunchFlagPath() {
+  return path.join(app.getPath('userData'), 'auto-launch.json');
+}
+
+/**
+ * @returns {boolean} whether the user has explicitly chosen an auto-launch
+ * preference. Until they do, we treat auto-launch as opt-out (default on).
+ */
+function hasAutoLaunchPreference() {
+  try {
+    return fs.existsSync(getAutoLaunchFlagPath());
+  } catch (_error) {
+    return false;
+  }
+}
+
+/**
+ * Records that an explicit auto-launch preference now exists, so the
+ * default-on logic never overrides the user's choice again.
+ */
+function markAutoLaunchPreference() {
+  try {
+    fs.writeFileSync(getAutoLaunchFlagPath(), JSON.stringify({ initialised: true }));
+  } catch (_error) {
+    /** best-effort persistence */
+  }
+}
+
+/**
+ * Auto-launch defaults to ON. The first time the packaged app runs (no stored
+ * preference yet), enable launch-on-login; the user can then opt out via the
+ * Feature Settings toggle. Guarded to production so dev runs don't register
+ * the bundled electron binary as a login item.
+ */
+function applyDefaultAutoLaunch() {
+  if (!isProduction || hasAutoLaunchPreference()) {
+    return;
+  }
+  try {
+    app.setLoginItemSettings({ openAtLogin: true });
+  } catch (_error) {
+    /** OS login-item registry unavailable */
+  }
+  markAutoLaunchPreference();
+}
+
 // Ensure there isn't another instance of the app running already
 const lock = app.requestSingleInstanceLock();
 if (!lock) {
@@ -197,6 +249,9 @@ app.whenReady().then(() => {
   if (isWindows) {
     app.setAppUserModelId(app.name);
   }
+
+  // Auto-launch is opt-out: enable it by default on first run
+  applyDefaultAutoLaunch();
 
   createWindow();
   startBackend()
@@ -321,4 +376,7 @@ ipcMain.on('set-auto-launch', (_event, enabled) => {
   } catch (_error) {
     /** unhandled error */
   }
+  // record that the user has made an explicit choice so the default-on
+  // logic never overrides it on a later launch
+  markAutoLaunchPreference();
 });
