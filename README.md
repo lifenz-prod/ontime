@@ -18,8 +18,8 @@ Backstage / on-stage
 /countdown    > Countdown to anything
 /studio       > Studio clock
 /timeline     > Timeline
-/cuescreen    > Cue screen (used for ProPresenter, see below)
-/cuescreennow > Cue screen (current item only)
+/cuescreen    > Cue screen, shows just the NEXT event title (used for ProPresenter, see below)
+/cuescreennow > Cue screen (showing both NOW and NEXT event titles)
 
 Public
 -------------------------------------------------------------
@@ -48,12 +48,17 @@ The cue screen can be displayed inside ProPresenter as a web layer, so operators
    ```
 
    Use `localhost` if ProPresenter runs on the same machine as the Ontime server. If Ontime runs on a different machine, use that machine's IP instead, e.g. `http://192.168.1.3:4001/cuescreen`.
+5. This shows timers very similiar to the default ProPresenter config, with main timer and aux timer at the top. Current and Next slide content etc can be shown in the lower two thirds of the display.
 
 The cue screen updates live as the rundown plays, with no extra configuration needed in ProPresenter.
 
 ## Found a bug?
 
 If something isn't working right, please **[open a bug report](https://github.com/lifenz-prod/ontime/issues/new)**. Include what you were doing, what you expected, and what happened — a screenshot helps a lot. Bug reports are the fastest way to get things fixed.
+
+## Got an idea?
+
+I'd love to hear feature requests — this build grows from how people actually use it, so if there's something that would make your workflow smoother, **[open a feature request](https://github.com/lifenz-prod/ontime/issues/new)**. No idea is too small; tell me what you're trying to do and how you'd picture it working. Please do send them through!
 
 ## Development
 
