@@ -95,7 +95,12 @@ export type { TimerMessage, MessageState, SecondarySource } from './definitions/
 export type { Runtime } from './definitions/runtime/Runtime.type.js';
 export { OffsetMode } from './definitions/runtime/Runtime.type.js';
 export type { RuntimeStore } from './definitions/runtime/RuntimeStore.type.js';
-export { runtimeStorePlaceholder, qlabStatePlaceholder } from './definitions/runtime/RuntimeStore.js';
+export { runtimeStorePlaceholder, qlabStatePlaceholder, rundownSourcesPlaceholder } from './definitions/runtime/RuntimeStore.js';
+export type {
+  RundownSource,
+  RundownSourceProvider,
+  RundownSourcesState,
+} from './definitions/runtime/RundownSources.type.js';
 export { type TimerState, TimerPhase } from './definitions/runtime/TimerState.type.js';
 export type { CurrentBlockState } from './definitions/runtime/CurrentBlockState.type.js';
 

@@ -3,6 +3,7 @@ import type { QlabState } from '../core/Qlab.type.js';
 import type { SimpleTimerState } from './AuxTimer.type.js';
 import type { CurrentBlockState } from './CurrentBlockState.type.js';
 import type { MessageState } from './MessageControl.type.js';
+import type { RundownSourcesState } from './RundownSources.type.js';
 import type { Runtime } from './Runtime.type.js';
 import type { TimerState } from './TimerState.type.js';
 
@@ -28,6 +29,9 @@ export type RuntimeStore = {
 
   // external integrations
   qlab: QlabState;
+
+  // recallable rundown sources
+  rundownSources: RundownSourcesState;
 
   // utils
   ping: number;
