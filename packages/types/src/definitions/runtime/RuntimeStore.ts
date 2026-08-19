@@ -16,6 +16,16 @@ export const qlabStatePlaceholder: RuntimeStore['qlab'] = {
   phase: TimerPhase.None,
 };
 
+export const rundownSourcesPlaceholder: RuntimeStore['rundownSources'] = {
+  provider: null,
+  containerId: null,
+  sources: [],
+  loaded: null,
+  loading: false,
+  error: null,
+  revision: 0,
+};
+
 export const runtimeStorePlaceholder: Readonly<RuntimeStore> = {
   clock: 0,
   timer: {
@@ -68,5 +78,6 @@ export const runtimeStorePlaceholder: Readonly<RuntimeStore> = {
     playback: SimplePlayback.Stop,
   },
   qlab: qlabStatePlaceholder,
+  rundownSources: rundownSourcesPlaceholder,
   ping: -1,
 };

@@ -1,13 +1,21 @@
-import { MessageState, OffsetMode, OntimeEvent, SimpleDirection, SimplePlayback } from 'ontime-types';
-import { MILLIS_PER_HOUR, MILLIS_PER_SECOND } from 'ontime-utils';
+import { LogOrigin, MessageState, OffsetMode, OntimeEvent, SimpleDirection, SimplePlayback } from 'ontime-types';
+import { getErrorMessage, MILLIS_PER_HOUR, MILLIS_PER_SECOND } from 'ontime-utils';
 
 import { DeepPartial } from 'ts-essentials';
 
+import { logger } from '../classes/Logger.js';
 import { ONTIME_VERSION } from '../ONTIME_VERSION.js';
 import { auxTimerService } from '../services/aux-timer-service/AuxTimerService.js';
 import * as messageService from '../services/message-service/MessageService.js';
 import { validateMessage, validateTimerMessage } from '../services/message-service/messageUtils.js';
 import { runtimeService } from '../services/runtime-service/RuntimeService.js';
+import {
+  assertRecallAllowed,
+  getRundownSourcesState,
+  loadRundownSource,
+  refreshRundownSources,
+} from '../services/rundown-source-service/RundownSourceService.js';
+import { parseSourceTarget } from '../services/rundown-source-service/rundownSourceUtils.js';
 import { eventStore } from '../stores/EventStore.js';
 import * as assert from '../utils/assert.js';
 import { isEmptyObject } from '../utils/parserUtils.js';
@@ -322,6 +330,26 @@ const actionHandlers: Record<string, ActionHandler> = {
   offsetmode: (payload) => {
     const mode = coerceEnum<OffsetMode>(payload, OffsetMode);
     runtimeService.setOffsetMode(mode);
+    return { payload: 'success' };
+  },
+  /* Rundown sources */
+  sources: () => ({ payload: getRundownSourcesState() }),
+  refreshsources: () => {
+    // the request is long running, we reply immediately and report through the store
+    refreshRundownSources().catch((error) => {
+      logger.error(LogOrigin.Rx, getErrorMessage(error));
+    });
+    return { payload: 'success' };
+  },
+  loadsource: (payload) => {
+    const target = parseSourceTarget(payload);
+    // refuse a recall onto a live show before we reply, so the caller sees the error
+    assertRecallAllowed();
+
+    // the request is long running, we reply immediately and report through the store
+    loadRundownSource(target).catch((error) => {
+      logger.error(LogOrigin.Rx, getErrorMessage(error));
+    });
     return { payload: 'success' };
   },
 };
