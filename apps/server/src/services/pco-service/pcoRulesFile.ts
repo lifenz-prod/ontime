@@ -19,10 +19,25 @@ import { defaultPcoRules, mergePcoRules, type PcoRules } from './pcoRules.js';
 
 export const pcoRulesPath = join(publicDir.root, 'pco-rules.json');
 
-/** Writes the defaults out so there is always something to edit */
+/**
+ * The file this seeds holds ONLY the keys somebody has to decide -- the switch and
+ * the service type. Everything absent from it follows the shipped defaults.
+ *
+ * Writing a full snapshot of `defaultPcoRules` instead would be a trap: the file is
+ * merged over the defaults, so the snapshot would freeze them at the version which
+ * created it, and no rule shipped later could ever reach an existing installation.
+ */
+const seedRules = {
+  '//': 'Only the keys set here are used; anything absent follows the defaults shipped with Ontime, which change between versions. See pco-rules.example.json in the source for every available option.',
+  enabled: false,
+  serviceTypeId: null,
+  serviceTypeName: null,
+};
+
+/** Writes the switches out so there is always something to edit */
 export function ensurePcoRulesFile(): string {
   if (!existsSync(pcoRulesPath)) {
-    writeFileSync(pcoRulesPath, `${JSON.stringify(defaultPcoRules, null, 2)}\n`, 'utf-8');
+    writeFileSync(pcoRulesPath, `${JSON.stringify(seedRules, null, 2)}\n`, 'utf-8');
     logger.info(LogOrigin.Server, `Created Planning Center rules at ${pcoRulesPath}`);
   }
   return pcoRulesPath;

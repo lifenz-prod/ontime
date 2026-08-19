@@ -134,7 +134,11 @@ export const defaultPcoRules: PcoRules = {
   serviceNames: ['9am', '11am'],
   headersAsBlocks: true,
 
-  ignoreItems: [],
+  // the briefing header is a `during` item with no length, so it would otherwise
+  // become a block stranded in the middle of the service section, naming a time
+  // that has already passed. Its one piece of information -- 8:05 -- is the
+  // inferred entry below. Drop this rule to get the divider back.
+  ignoreItems: [{ titleMatch: '^\\s*service briefing', itemType: 'header' }],
   titleStrip: '\\s*//\\s*\\d{1,2}\\s*(am|pm)\\s*$',
   respectMasterExclusions: true,
 
@@ -161,10 +165,32 @@ export const defaultPcoRules: PcoRules = {
     },
   ],
 
-  // Empty by design. Doors, walk-in and the pre-service video are all ON the run
-  // sheet as `service_position: 'pre'` items, so they are imported, not inferred.
+  // Doors, walk-in and the pre-service video are all ON the run sheet as
+  // `service_position: 'pre'` items, so they are imported, not inferred.
   // Add entries here only for things the sheet genuinely never states.
-  inferredEntries: [],
+  inferredEntries: [
+    {
+      // The service briefing is one of those things. PCO holds it nowhere: the
+      // plan opens with a header titled "SERVICE BRIEFING 8:05AM" which carries
+      // no length and sits in `during`, so those four characters of title text
+      // are the only record that it happens.
+      //
+      // Anchoring it to the start of the pre-service run rather than to a clock
+      // time is what makes it track the plan: the run back-times to the service,
+      // so a service that moves takes the briefing with it. On the 23 August
+      // plan the run starts at 8:20, which puts this at 8:05 -- the time the
+      // header claims.
+      //
+      // The 15 minutes is the one number not derived from the data. It is the
+      // gap between the title's 8:05 and the 8:20 the lengths add up to.
+      name: 'Service Briefing',
+      title: 'Service Briefing',
+      section: 'pre',
+      anchor: 'pre-start',
+      offset: -15 * 60 * 1000,
+      duration: 15 * 60 * 1000,
+    },
+  ],
 };
 
 /** Compiles a regex source, returning null rather than throwing on a bad pattern */

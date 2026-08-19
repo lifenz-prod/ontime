@@ -50,10 +50,18 @@ instead would put doors open at 9:00.
 
 **Headers are not necessarily where they look.** The plan opens with a
 _SERVICE BRIEFING 8:05AM_ header, and that header is a `during` item carrying no
-length — so it lands in the master section rather than at the top of PRE, and the
-8:05 briefing itself is nowhere in the data. Nothing in PCO says when it happens
-except those four characters of title text. Representing it as a real entry is a
-job for `inferredEntries`, which is what that mechanism is for.
+length — so it would land in the master section rather than at the top of PRE, and
+the 8:05 briefing itself is nowhere in the data. Nothing in PCO says when it
+happens except those four characters of title text.
+
+So the shipped rules do two things with it: `ignoreItems` drops the header, which
+would otherwise be a divider stranded mid-service naming a time already past, and
+an `inferredEntries` entry puts the briefing back as a real 15 minute event
+anchored to `pre-start`. On the 23 August plan that lands it at 8:05, the time the
+header claims. Anchoring rather than hardcoding is the point: the pre run
+back-times to the service, so a service that moves takes the briefing with it. The
+15 minutes is the only number not derived from the plan — it is the gap between
+the title's 8:05 and the 8:20 the lengths add up to.
 
 **One item list serves every time in a plan.** PCO does not hold a separate run
 sheet per service. That is what makes the 9am/11am relationship a pure time
@@ -147,8 +155,12 @@ hundreds of service types, so guessing would be worse than failing.
 ## Rules config
 
 Timer types and the implicit parts of the morning live in
-`<ontime data dir>/pco-rules.json`, seeded from `defaultPcoRules` on first read.
-`pco-rules.example.json` in this directory is a copy for reference.
+`<ontime data dir>/pco-rules.json`, which is **merged over** `defaultPcoRules` —
+so it only needs the keys it wants to change, and anything it leaves out follows
+the shipped defaults even as those change between versions. On first use the file
+is seeded with just the switch and the service type for that reason.
+`pco-rules.example.json` in this directory lists every option with the shipped
+values.
 
 - `defaultEffect` — applied to every event. Ships as count-down + `countToEnd`
   (Ontime's "Countdown to Time") + `lock-end`.
@@ -159,9 +171,9 @@ Timer types and the implicit parts of the morning live in
   offset, so they track the plan when times move.
 - `ignoreItems` — items that never reach the rundown.
 
-> The single shipped `inferredEntries` value (_Doors Open_, 15 minutes before the
-> service) is a **placeholder**. The shape is what has been proven, not the
-> content.
+The one shipped `inferredEntries` value is the service briefing described above.
+Doors, walk-in and the pre-service video are **not** inferred — they are real
+`pre` items on the sheet.
 
 ## Verifying against a real plan
 

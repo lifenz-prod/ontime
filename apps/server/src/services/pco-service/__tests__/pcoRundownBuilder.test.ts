@@ -108,14 +108,53 @@ describe('pre-service items back-time to the service start', () => {
   });
 
   it('starts the pre run 40:00 before the service, where the sheet puts it', () => {
-    // 25:00 prayer + 12:20 doors + 1:00 online + 1:40 video = 40:00, so 8:20.
-    // The 8:05 briefing is not in the data at all, only in a header's title text.
-    const { rundown } = build();
-    const briefing = rundown.find((entry) => titleOf(entry).startsWith('SERVICE BRIEFING'));
+    // 25:00 prayer + 12:20 doors + 1:00 online + 1:40 video = 40:00, so 8:20
+    expect(eventNamed(build().rundown, 'Prayer Meeting').timeStart).toBe(at(9) - at(0, 40));
+  });
+});
 
-    expect(briefing && isOntimeBlock(briefing)).toBe(true);
-    // the block itself carries no time, but the first pre entry proves the anchor
-    expect(eventNamed(rundown, 'Prayer Meeting').timeStart).toBe(at(9) - at(0, 40));
+describe('the inferred service briefing', () => {
+  it('runs 8:05 to 8:20, the time its header claims', () => {
+    const briefing = eventNamed(build().rundown, 'Service Briefing');
+
+    expect(briefing.timeStart).toBe(at(8, 5));
+    expect(briefing.timeEnd).toBe(at(8, 20));
+  });
+
+  it('sits at the top of PRE, immediately before the prayer meeting', () => {
+    const result = build();
+    const preTitles = titles(result.rundown).slice(0, boundaryIndexOf(result));
+
+    expect(preTitles.indexOf('Service Briefing')).toBe(0);
+    expect(preTitles.indexOf('Prayer Meeting')).toBe(1);
+  });
+
+  it('tracks the plan rather than a fixed clock time', () => {
+    // drop the 1:40 pre-service video and the whole run, briefing included, slides later
+    const withoutVideo = items.filter((entry) => entry.attributes.title !== 'Pre Service Video');
+    const briefing = eventNamed(build({ items: withoutVideo }).rundown, 'Service Briefing');
+
+    expect(briefing.timeStart).toBe(at(8, 6, 40));
+    expect(briefing.timeEnd).toBe(at(8, 21, 40));
+  });
+
+  it('is not carried into the mirrored service, because PRE runs once', () => {
+    const result = build();
+    const mirrored = regenerateInstances(result.rundown, result.serviceProfiles);
+
+    expect(mirrored.filter((entry) => titleOf(entry) === 'Service Briefing')).toHaveLength(1);
+  });
+
+  it('counts down to its end time, like everything else in the house style', () => {
+    const briefing = eventNamed(build().rundown, 'Service Briefing');
+
+    expect(briefing.timerType).toBe(TimerType.CountDown);
+    expect(briefing.countToEnd).toBe(true);
+    expect(briefing.timeStrategy).toBe(TimeStrategy.LockEnd);
+  });
+
+  it('leaves the stranded briefing header out of the rundown', () => {
+    expect(titles(build().rundown)).not.toContain('SERVICE BRIEFING 8:05AM');
   });
 });
 
@@ -149,11 +188,9 @@ describe('sectioning', () => {
     expect(titleOf(result.rundown[index])).toBe('9am');
   });
 
-  it('keeps only the prayer meeting in PRE', () => {
-    // the briefing header is a `during` item, so it lands in the master section
-    // rather than in PRE, even though it opens the sheet
+  it('keeps only the briefing and the prayer meeting in PRE', () => {
     const result = build();
-    expect(titles(result.rundown).slice(0, boundaryIndexOf(result))).toEqual(['Prayer Meeting']);
+    expect(titles(result.rundown).slice(0, boundaryIndexOf(result))).toEqual(['Service Briefing', 'Prayer Meeting']);
   });
 
   it('puts doors, walk-in and the pre-service video in the master section, not PRE', () => {
@@ -165,7 +202,8 @@ describe('sectioning', () => {
 
   it('turns every PCO header into an Ontime block', () => {
     const { rundown } = build();
-    for (const title of ['SERVICE BRIEFING 8:05AM', 'PRAISE & WORSHIP', 'WELCOME & ANNOUNCEMENTS', 'MESSAGE', 'END']) {
+    // the briefing header is absent by rule, see ignoreItems
+    for (const title of ['PRAISE & WORSHIP', 'WELCOME & ANNOUNCEMENTS', 'MESSAGE', 'END']) {
       const found = rundown.find((entry) => titleOf(entry) === title);
       expect(found && isOntimeBlock(found), `${title} should be a block`).toBe(true);
     }

@@ -9,7 +9,7 @@
   "serviceNames": ["9am", "11am"],
   "headersAsBlocks": true,
 
-  "ignoreItems": [],
+  "ignoreItems": [{ "titleMatch": "^\\s*service briefing", "itemType": "header" }],
   "titleStrip": "\\s*//\\s*\\d{1,2}\\s*(am|pm)\\s*$",
   "respectMasterExclusions": true,
 
@@ -32,5 +32,14 @@
     }
   ],
 
-  "inferredEntries": []
+  "inferredEntries": [
+    {
+      "name": "Service Briefing",
+      "title": "Service Briefing",
+      "section": "pre",
+      "anchor": "pre-start",
+      "offset": -900000,
+      "duration": 900000
+    }
+  ]
 }
