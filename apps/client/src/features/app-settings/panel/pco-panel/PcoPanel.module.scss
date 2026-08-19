@@ -1,0 +1,103 @@
+.fit {
+  width: 1px;
+  white-space: nowrap;
+}
+
+.fullWidth {
+  width: 100%;
+}
+
+.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* the date column reads as a column of dates, not of prose */
+.date {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.muted {
+  color: $gray-400;
+}
+
+.statusRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background-color: $gray-500;
+
+  &.ok {
+    background-color: $green-500;
+  }
+
+  &.bad {
+    background-color: $red-500;
+  }
+}
+
+/* the pinned list and the search results share a compact row */
+.pinRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.pinName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.groupHeading {
+  color: $gray-300;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.25rem 0;
+}
+
+.searchResults {
+  max-height: 16rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.searchResult {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 3px;
+  background-color: $gray-1100;
+}
+
+.itemControls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.warnings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.875rem;
+  color: $orange-500;
+}

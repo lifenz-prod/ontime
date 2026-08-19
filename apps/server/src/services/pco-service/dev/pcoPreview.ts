@@ -10,13 +10,13 @@
 
 import { readFileSync } from 'fs';
 
-import { isOntimeBlock, isOntimeEvent, OntimeRundown } from 'ontime-types';
+import { isOntimeBlock, isOntimeEvent, OntimeRundown, type PcoRules } from 'ontime-types';
 import { millisToString } from 'ontime-utils';
 
 import { regenerateInstances } from '../../rundown-service/serviceInstanceUtils.js';
 import { items, itemTimes, plan, planTimes } from '../__tests__/fixtures/centralAm.js';
 import { buildRundownFromPlan } from '../pcoRundownBuilder.js';
-import { defaultPcoRules, mergePcoRules, type PcoRules } from '../pcoRules.js';
+import { defaultPcoRules, mergePcoRules } from '../pcoRules.js';
 
 /** run sheets carry seconds (8:58:20), so they are never trimmed away */
 const clock = (ms: number): string => millisToString(ms);

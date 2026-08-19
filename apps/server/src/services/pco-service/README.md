@@ -5,11 +5,11 @@ including the PRE section and both Sunday services.
 
 ## Status
 
-Usable, without a settings UI. The API client, the rundown builder and the rules
-config are unit tested against a fixture shaped like a real Central AM plan, and
-the connector is registered as a **rundown source provider**, so a plan can be
-recalled into the project over OSC, websocket or HTTP. Configuration is a token in
-the environment plus `pco-rules.json`; there is no settings panel yet.
+Usable. The API client, the rundown builder and the rules config are unit tested
+against a fixture shaped like a real Central AM plan. The connector is registered
+as a **rundown source provider**, so a plan can be recalled over OSC, websocket or
+HTTP, and there is a settings panel for importing by hand and for configuring what
+each run sheet item does. Credentials are still environment-only.
 
 ## What PCO gives us, and what it does not
 
@@ -140,17 +140,56 @@ between the two service times is written to the log rather than flattened silent
 
 Two separate switches, on purpose:
 
-1. `PCO_APP_ID` / `PCO_SECRET` in the environment — the ability to read PCO.
-2. `"enabled": true` in `pco-rules.json` — the decision to recall plans **instead
-   of** Google Sheet tabs. A token sitting in the environment does not change what
-   an existing Companion button does.
+1. `PCO_APP_ID` / `PCO_SECRET` — the ability to read PCO. Read from the environment,
+   or from a `.env` in the Ontime **data directory**, next to `pco-rules.json`: an
+   installed copy has no shell to export a variable from. A real environment
+   variable wins over the file.
+2. **Recall plans instead of Google Sheet tabs**, the switch on the settings panel
+   (`enabled` in `pco-rules.json`) — the decision to serve `loadsource` from
+   Planning Center. A token sitting in the environment does not change what an
+   existing Companion button does.
 
 With both set, the provider serves the source list ahead of the sheet. Which
 service type it pulls from is `PCO_SERVICE_TYPE_ID`, else `serviceTypeId`, else
 `serviceTypeName` (a case-insensitive substring, so `central am` finds
-_Central AM Service_), else the organisation's only service type. Anything
-ambiguous is an error listing the ids to choose from — this organisation has
-hundreds of service types, so guessing would be worse than failing.
+_Central AM Service_), else the first **pinned** service type, else the
+organisation's only one. Anything ambiguous is an error listing the ids to choose
+from — this organisation has 329 service types, so guessing would be worse than
+failing.
+
+## The settings panel
+
+Two entries under _Planning Center_ in app settings, both editing the same
+`pco-rules.json`. Every control saves immediately: a dirty form on either would
+have to write the whole file back, silently reverting the other.
+
+**Import from Planning Center** — connection state, the switch above, the pinned
+service types, and the upcoming plans across them with an Import button per plan.
+Pinning exists because of the 329: the picker is a search, and what gets used is
+kept. A pin carries an optional campus heading, which groups the plan list.
+Importing replaces the rundown and the service profiles, and is refused while a
+show is running.
+
+**Import defaults** — the default timing applied to every event, then the items
+Planning Center actually carries, read from the next few run sheets of a pinned
+service type. Each row offers timing, hide timer, aux timer and skip, and writes a
+rule matching that title. Rows for things that cannot be affected — a header that
+imports as a block, an item dropped by `ignoreItems` — say so and are disabled
+rather than offering a control that would do nothing.
+
+A rule written by the panel matches `titleContains`, a literal case-insensitive
+substring, because a run sheet title is not a regex and nobody should have to
+escape one. Panel rules are inserted **ahead** of hand-written ones, since first
+match wins. Hand-written rules are listed separately, and can be removed there but
+not edited.
+
+### What the file holds
+
+Only what differs from the shipped defaults. The file is merged over
+`defaultPcoRules`, so persisting the whole object would freeze the defaults at the
+version that saved it and no rule shipped later could reach the installation. The
+trade-off: choosing a value that happens to equal today's default records nothing,
+so a later change to that default carries.
 
 ## Rules config
 
@@ -213,11 +252,12 @@ builder or any calling code.
 
 ## Not done yet
 
-- Settings UI: credentials, service type and the rules file are all edited by hand.
-  A panel beside the Google Sheet one would sit on top of `PcoService`, which
-  already answers everything it would need to show.
+- Credentials in the UI. They are environment or `.env` only, so setting them up
+  still means touching a file. The panel reports whether they are present, never
+  their value.
 - Building a plan for a chosen day. `buildRundownFromPlan` takes a `targetDate` and
-  reports `availableDays`, but a recall always builds the plan's first service day,
-  because a source is addressed by one name.
+  reports `availableDays`, and the import route accepts one, but neither the panel
+  nor a recall offers the choice yet.
+- Editing hand-written pattern rules in the panel, and reordering rules.
 - Honouring `ItemTime` divergence instead of only warning about it.
 - OAuth 2, if this ever needs to serve more than one organisation.

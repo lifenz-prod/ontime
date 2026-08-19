@@ -10,21 +10,52 @@
  * same `loadsource` command as a Google Sheet tab and lands in the project through
  * the same guarded path. See services/rundown-source-service.
  *
- * Credentials are read from the environment only, never written to disk:
+ * Credentials are read from the environment, never written to disk:
  *   PCO_APP_ID / PCO_SECRET   a Personal Access Token pair
  *   PCO_SERVICE_TYPE_ID       optional, pins the service type
  *   PCO_TIMEZONE              optional, overrides the timezone in pco-rules.json
+ *
+ * A `.env` in the Ontime data directory is read as well, because a packaged app has
+ * no shell to export anything from. See `loadEnvFiles`.
  */
 
-import { LogOrigin, type MaybeString } from 'ontime-types';
+import {
+  LogOrigin,
+  type MaybeString,
+  type PcoImportRequest,
+  type PcoImportResult,
+  type PcoKnownItems,
+  type PcoPlanSummary,
+  type PcoRules,
+  type PcoServiceTypeSummary,
+  type PcoStatus,
+} from 'ontime-types';
+import { getErrorMessage } from 'ontime-utils';
+
+import { existsSync } from 'fs';
+import { join, resolve } from 'path';
+
+import dotenv from 'dotenv';
 
 import { logger } from '../../classes/Logger.js';
+import { publicDir } from '../../setup/index.js';
+import { patchCurrentProject } from '../project-service/ProjectService.js';
+import { getCustomFields } from '../rundown-service/rundownCache.js';
+import { getState } from '../../stores/runtimeState.js';
+import { playbackBlocksRecall } from '../rundown-source-service/rundownSourceUtils.js';
 
 import { PcoClient, PcoError, type PcoCredentials } from './PcoClient.js';
-import type { PcoRules } from './pcoRules.js';
+import type { PcoItem, PcoServiceType } from './pcoTypes.js';
 import { ensurePcoRulesFile, readPcoRules } from './pcoRulesFile.js';
 import { buildRundownFromPlan, type PcoBuildResult } from './pcoRundownBuilder.js';
-import { findPlanBySourceName, planSourceNames, resolveServiceType } from './pcoSourceUtils.js';
+import {
+  findPlanBySourceName,
+  knownItemsFromPlans,
+  planSourceNames,
+  planSummary,
+  resolveServiceType,
+} from './pcoSourceUtils.js';
+import { savePcoRules } from './pcoRulesFile.js';
 
 /** how many upcoming plans are offered as sources; a service type publishes months ahead */
 const PLAN_LIST_LIMIT = 12;
@@ -40,12 +71,51 @@ const missingCredentialsMessage =
  */
 let resolvedServiceType: { key: string; id: string; name: string } | null = null;
 
+/**
+ * The service type list, cached because it is the expensive call: this organisation
+ * has 329 of them over four pages, and the settings panel wants the list to pick
+ * from. They change about never.
+ */
+const SERVICE_TYPE_TTL = 10 * 60 * 1000;
+let serviceTypeCache: { at: number; serviceTypes: PcoServiceType[] } | null = null;
+
 export type PcoConfig = {
   rules: PcoRules;
   credentials: PcoCredentials | null;
   /** id pinned through the environment, which wins over the rules file */
   pinnedServiceTypeId: MaybeString;
 };
+
+/**
+ * Files the credentials may come from, in the order they are tried.
+ *
+ * `dotenv/config` in app.ts only covers the working directory, which is the server
+ * folder in development and something arbitrary in a packaged app. Neither is where
+ * anyone would put the file:
+ *
+ * - the Ontime data directory, next to pco-rules.json, is the one that matters for
+ *   an installed copy. There is no shell to export a variable from.
+ * - the repository root is where the file sits in development.
+ *
+ * dotenv does not overwrite a variable that is already set, so a real environment
+ * variable still wins over both.
+ */
+function loadEnvFiles(): void {
+  if (envFilesLoaded) {
+    return;
+  }
+  envFilesLoaded = true;
+
+  const candidates = [join(publicDir.root, '.env'), resolve(process.cwd(), '.env'), resolve(process.cwd(), '../../.env')];
+
+  for (const path of candidates) {
+    if (existsSync(path)) {
+      dotenv.config({ path });
+    }
+  }
+}
+
+let envFilesLoaded = false;
 
 /**
  * Reads the environment and the rules file.
@@ -57,6 +127,8 @@ export type PcoConfig = {
  * which has nothing to do with PCO should not collect its config file.
  */
 export function getPcoConfig(): PcoConfig {
+  loadEnvFiles();
+
   const timezone = process.env.PCO_TIMEZONE;
   const applicationId = process.env.PCO_APP_ID;
   const secret = process.env.PCO_SECRET;
@@ -95,7 +167,12 @@ export function getResolvedServiceTypeId(): MaybeString {
 
 /** identifies the configuration a cached resolution came from */
 function configKey(config: PcoConfig): string {
-  return [config.pinnedServiceTypeId, config.rules.serviceTypeId, config.rules.serviceTypeName].join('|');
+  return [
+    config.pinnedServiceTypeId,
+    config.rules.serviceTypeId,
+    config.rules.serviceTypeName,
+    config.rules.pinnedServiceTypes.map((pinned) => pinned.id).join(','),
+  ].join('|');
 }
 
 function getClient(config: PcoConfig): PcoClient {
@@ -115,10 +192,11 @@ async function useServiceType(client: PcoClient, config: PcoConfig): Promise<{ i
     return resolvedServiceType;
   }
 
-  const serviceType = resolveServiceType(await client.getServiceTypes(), {
+  const serviceType = resolveServiceType(await listServiceTypesFor(client), {
     pinnedServiceTypeId: config.pinnedServiceTypeId,
     serviceTypeId: config.rules.serviceTypeId,
     serviceTypeName: config.rules.serviceTypeName,
+    pinnedServiceTypes: config.rules.pinnedServiceTypes,
   });
   resolvedServiceType = { key, id: serviceType.id, name: serviceType.attributes.name };
   logger.info(LogOrigin.Server, `Planning Center service type ${serviceType.id} "${serviceType.attributes.name}"`);
@@ -184,7 +262,225 @@ export async function fetchPcoSource(name: string): Promise<Pick<PcoBuildResult,
   return { rundown: result.rundown, serviceProfiles: result.serviceProfiles };
 }
 
-/** Drops the cached service type, so the next call resolves it again */
+/** Drops the cached service type and service type list, so the next call re-reads */
 export function resetPcoCache(): void {
   resolvedServiceType = null;
+  serviceTypeCache = null;
+}
+
+/* -------------------------------------------------------------------------- */
+/* what the settings panel calls                                               */
+/* -------------------------------------------------------------------------- */
+
+/** The service type list, from cache when it is fresh */
+async function listServiceTypesFor(client: PcoClient): Promise<PcoServiceType[]> {
+  if (serviceTypeCache && Date.now() - serviceTypeCache.at < SERVICE_TYPE_TTL) {
+    return serviceTypeCache.serviceTypes;
+  }
+  const serviceTypes = await client.getServiceTypes();
+  serviceTypeCache = { at: Date.now(), serviceTypes };
+  return serviceTypes;
+}
+
+/**
+ * Every service type in the organisation, for the picker.
+ * Sorted by name because PCO returns them in creation order, which is meaningless
+ * once there are hundreds.
+ */
+export async function listPcoServiceTypes(): Promise<PcoServiceTypeSummary[]> {
+  const config = getPcoConfig();
+  const serviceTypes = await listServiceTypesFor(getClient(config));
+
+  return serviceTypes
+    .map((serviceType) => ({ id: serviceType.id, name: serviceType.attributes.name.trim() }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * Whether the connector is usable and what it is pointed at.
+ *
+ * Resolving the service type is a live call, so a failure here is the honest answer
+ * to "is this working" rather than something to throw.
+ */
+export async function getPcoStatus(): Promise<PcoStatus> {
+  const config = getPcoConfig();
+
+  const status: PcoStatus = {
+    hasCredentials: config.credentials !== null,
+    enabled: config.rules.enabled,
+    connected: false,
+    serviceTypeCount: null,
+    serviceType: null,
+    error: null,
+  };
+
+  if (!config.credentials) {
+    return { ...status, error: missingCredentialsMessage };
+  }
+
+  const client = getClient(config);
+
+  // reaching the API is the connection test; anything after it is configuration
+  let serviceTypeCount: number;
+  try {
+    serviceTypeCount = (await listServiceTypesFor(client)).length;
+  } catch (error) {
+    return { ...status, error: getErrorMessage(error) };
+  }
+
+  const connected = { ...status, connected: true, serviceTypeCount };
+
+  try {
+    const serviceType = await useServiceType(client, config);
+    return { ...connected, serviceType: { id: serviceType.id, name: serviceType.name.trim() } };
+  } catch {
+    // nothing chosen yet, or the choice no longer exists. The panel says so itself
+    return connected;
+  }
+}
+
+/**
+ * Upcoming plans across the given service types, or across the pinned ones.
+ *
+ * Failures are per service type: a pinned type that has been archived should not
+ * take the whole list down, so it is logged and skipped.
+ */
+export async function listPcoPlans(serviceTypeIds?: string[], perServiceType = 8): Promise<PcoPlanSummary[]> {
+  const config = getPcoConfig();
+  const client = getClient(config);
+
+  const wanted = serviceTypeIds?.length
+    ? serviceTypeIds
+    : config.rules.pinnedServiceTypes.map((pinned) => pinned.id);
+
+  if (wanted.length === 0) {
+    return [];
+  }
+
+  const serviceTypes = await listServiceTypesFor(client);
+  const summaries: PcoPlanSummary[] = [];
+
+  for (const serviceTypeId of wanted) {
+    const serviceType = serviceTypes.find((candidate) => candidate.id === serviceTypeId);
+    if (!serviceType) {
+      logger.warning(LogOrigin.Server, `Planning Center service type ${serviceTypeId} no longer exists`);
+      continue;
+    }
+
+    try {
+      const plans = await client.getFuturePlans(serviceTypeId, perServiceType);
+      for (const plan of plans) {
+        summaries.push(planSummary(plan, { id: serviceTypeId, name: serviceType.attributes.name }));
+      }
+    } catch (error) {
+      logger.warning(
+        LogOrigin.Server,
+        `Could not read plans for "${serviceType.attributes.name.trim()}": ${getErrorMessage(error)}`,
+      );
+    }
+  }
+
+  // soonest first across every service type, so a Sunday's services sit together
+  return summaries.sort((a, b) => a.date.localeCompare(b.date) || a.serviceTypeName.localeCompare(b.serviceTypeName));
+}
+
+/**
+ * The distinct item titles a service type's run sheets use, with the rule that
+ * currently claims each one.
+ *
+ * Sampling several plans rather than one is deliberate: a single week is missing
+ * whatever did not happen that week, and the panel is for configuring the usual.
+ */
+export async function getPcoKnownItems(serviceTypeId?: string, plansToSample = 4): Promise<PcoKnownItems> {
+  const config = getPcoConfig();
+  const client = getClient(config);
+  const serviceType = serviceTypeId
+    ? (await listServiceTypesFor(client)).find((candidate) => candidate.id === serviceTypeId)
+    : undefined;
+
+  const resolved = serviceType
+    ? { id: serviceType.id, name: serviceType.attributes.name.trim() }
+    : await useServiceType(client, config);
+
+  const plans = await client.getFuturePlans(resolved.id, plansToSample);
+  const contents: PcoItem[][] = [];
+
+  for (const plan of plans) {
+    try {
+      const { items } = await client.getPlanContent(resolved.id, plan.id);
+      contents.push(items);
+    } catch (error) {
+      logger.warning(LogOrigin.Server, `Could not read plan ${plan.id}: ${getErrorMessage(error)}`);
+    }
+  }
+
+  return {
+    serviceTypeId: resolved.id,
+    serviceTypeName: resolved.name,
+    plansSampled: contents.length,
+    items: knownItemsFromPlans(contents, config.rules),
+  };
+}
+
+/**
+ * Builds one plan and replaces the project's rundown with it.
+ *
+ * The same destructive operation as a recall or a sheet import, so it carries the
+ * same refusal: not while a show is running.
+ */
+export async function importPcoPlan(request: PcoImportRequest): Promise<PcoImportResult> {
+  const { playback } = getState().timer;
+  if (playbackBlocksRecall(playback)) {
+    throw new Error(`Refusing to import while playback is ${playback}, stop playback first`);
+  }
+
+  const config = getPcoConfig();
+  const client = getClient(config);
+
+  const plan = await client.getPlan(request.serviceTypeId, request.planId);
+  const [planTimes, content] = await Promise.all([
+    client.getPlanTimes(request.serviceTypeId, plan.id),
+    client.getPlanContent(request.serviceTypeId, plan.id),
+  ]);
+
+  const result = buildRundownFromPlan({
+    plan,
+    planTimes,
+    items: content.items,
+    itemTimes: content.itemTimes,
+    rules: config.rules,
+    targetDate: request.targetDate,
+  });
+
+  // replaces the rundown, stops playback and regenerates the mirrored service
+  await patchCurrentProject({
+    rundown: result.rundown,
+    customFields: getCustomFields(),
+    serviceProfiles: result.serviceProfiles,
+  });
+
+  logger.info(
+    LogOrigin.Server,
+    `Imported Planning Center plan ${plan.id} (${result.day.dateKey}) with ${result.rundown.length} entries`,
+  );
+  for (const warning of result.warnings) {
+    logger.warning(LogOrigin.Server, `Planning Center: ${warning}`);
+  }
+
+  return {
+    planId: plan.id,
+    date: result.day.dateKey,
+    entries: result.rundown.length,
+    warnings: result.warnings,
+  };
+}
+
+/**
+ * Writes the rules and drops the caches the change could invalidate.
+ * The whole object is written, because that is what the panel holds.
+ */
+export function setPcoRules(rules: PcoRules): PcoRules {
+  savePcoRules(rules);
+  resetPcoCache();
+  return getPcoConfig().rules;
 }

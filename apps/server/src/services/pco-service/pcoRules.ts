@@ -1,133 +1,29 @@
 /**
- * Rules that turn a Planning Center run sheet into an Ontime rundown.
+ * The shipped Planning Center rules, and the matching logic they drive.
  *
- * A run sheet says what happens and how long each thing lasts. It does not say
- * which Ontime timer type each segment wants, and it leaves some of the morning
- * implicit (doors, walk-in, band call). Those two gaps are filled here rather
- * than in code, so they can be tuned against real plans without a rebuild.
+ * The types live in ontime-types, because the settings panel edits them. What is
+ * here is the values Ontime ships with, and the pure functions that apply them.
  *
- * The file lives at <ontime data dir>/pco-rules.json and is merged over these
- * defaults, so a partial file only needs the keys it wants to change.
+ * The file at <ontime data dir>/pco-rules.json is merged over these defaults, so a
+ * partial file only needs the keys it wants to change.
  */
 
-import { EndAction, TimeStrategy, TimerType } from 'ontime-types';
-
-import type { PcoItemType, PcoServicePosition } from './pcoTypes.js';
-
-/** properties applied to a generated Ontime event */
-export type PcoRuleEffect = {
-  timerType?: TimerType;
-  /** Ontime's "Countdown to Time" - the event counts down to a wall clock time */
-  countToEnd?: boolean;
-  timeStrategy?: TimeStrategy;
-  endAction?: EndAction;
-  colour?: string;
-  isPublic?: boolean;
-  skip?: boolean;
-  hideTimer?: boolean;
-  showAsAuxTimer?: boolean;
-};
-
-/** all present fields must match; `titleMatch` is a case-insensitive regex source */
-export type PcoRuleMatch = {
-  titleMatch?: string;
-  itemType?: PcoItemType;
-  servicePosition?: PcoServicePosition;
-};
-
-export type PcoTimerRule = {
-  /** label used in import warnings, not matched against anything */
-  name: string;
-  match: PcoRuleMatch;
-  effect: PcoRuleEffect;
-};
-
-/**
- * An entry that the run sheet implies but never states.
- * Positioned by an anchor plus a signed offset, so it tracks the plan when times move.
- */
-export type PcoInferredEntry = {
-  name: string;
-  title: string;
-  /** which section the entry belongs to */
-  section: 'pre' | 'service';
-  anchor: 'pre-start' | 'service-start' | 'service-end';
-  /** milliseconds from the anchor; negative is before it */
-  offset: number;
-  /** milliseconds */
-  duration: number;
-  effect?: PcoRuleEffect;
-};
-
-export type PcoRules = {
-  /**
-   * Whether the connector serves the project's rundown sources.
-   *
-   * Off by default, and deliberately not implied by the presence of credentials:
-   * putting a token in the environment is not on its own a decision to stop
-   * recalling Google Sheet tabs. Turning this on makes Planning Center the active
-   * source provider, ahead of the linked sheet.
-   */
-  enabled: boolean;
-  /** IANA zone used to turn PCO's UTC timestamps into an Ontime time of day */
-  timezone: string;
-  /** PCO service type to pull plans from, as shown by the probe or the server log */
-  serviceTypeId: string | null;
-  /** alternative to serviceTypeId: the service type's name in PCO, matched case insensitively */
-  serviceTypeName: string | null;
-  /**
-   * The PRE section runs from the top of the plan up to and including the item
-   * whose title matches this. The Ontime boundary block is inserted right after,
-   * so everything below it becomes the mirrored master service section.
-   */
-  preBoundaryTitleMatch: string;
-  /**
-   * How the pre-service run is placed.
-   *
-   * 'back-from-service' is how Planning Center itself works and is the default:
-   * every `service_position: 'pre'` item back-times as one contiguous run ending
-   * at the service start, so doors, walk-in and the pre-service video land where
-   * the run sheet says they do.
-   *
-   * 'plan-time' instead anchors the run forward from the earliest non-service
-   * PlanTime on the chosen day. Only useful when the plan's pre-service lengths
-   * do not add up to the real call time.
-   */
-  preAnchor: 'plan-time' | 'back-from-service';
-  /** display names for the service instances, chronological; falls back to PCO plan time names */
-  serviceNames: string[];
-  /** PCO `header` items become Ontime blocks instead of events */
-  headersAsBlocks: boolean;
-  /** items matching any of these never reach the rundown */
-  ignoreItems: PcoRuleMatch[];
-  /**
-   * Regex removed from item titles. Plans express per-service variants in the
-   * title -- "Doors Open // 9am" alongside "Doors Open // 11am" -- and only the
-   * master's variant survives the exclusion filter, so the suffix is noise by
-   * the time it reaches the rundown. Empty string disables the cleanup.
-   */
-  titleStrip: string;
-  /**
-   * Drop items that PCO excludes from the master service time.
-   *
-   * This matters: a plan holding both "Doors Open // 9am" and "Doors Open // 11am"
-   * would otherwise put both in the master section, and the mirror would double
-   * each of them. With this on, the master keeps only what PCO says belongs to it
-   * and the mirror generates the rest.
-   */
-  respectMasterExclusions: boolean;
-  /** applied to every event, then overridden by the first matching timer rule */
-  defaultEffect: PcoRuleEffect;
-  /** first match wins */
-  timerRules: PcoTimerRule[];
-  inferredEntries: PcoInferredEntry[];
-};
+import {
+  EndAction,
+  TimeStrategy,
+  TimerType,
+  type PcoItemType,
+  type PcoRuleMatch,
+  type PcoRules,
+  type PcoServicePosition,
+} from 'ontime-types';
 
 export const defaultPcoRules: PcoRules = {
   enabled: false,
   timezone: 'Pacific/Auckland',
   serviceTypeId: null,
   serviceTypeName: null,
+  pinnedServiceTypes: [],
 
   preBoundaryTitleMatch: 'prayer meeting',
   preAnchor: 'back-from-service',
@@ -215,6 +111,12 @@ export function matchesRule(
   if (match.servicePosition && match.servicePosition !== candidate.servicePosition) {
     return false;
   }
+  if (match.titleContains) {
+    // a literal substring, so a title with regex characters in it needs no escaping
+    if (!candidate.title.toLowerCase().includes(match.titleContains.trim().toLowerCase())) {
+      return false;
+    }
+  }
   if (match.titleMatch) {
     const matcher = compileMatcher(match.titleMatch);
     if (!matcher || !matcher.test(candidate.title)) {
@@ -222,7 +124,7 @@ export function matchesRule(
     }
   }
   // an empty match object matches nothing, so a stray {} cannot swallow the rundown
-  return Boolean(match.itemType || match.servicePosition || match.titleMatch);
+  return Boolean(match.itemType || match.servicePosition || match.titleMatch || match.titleContains);
 }
 
 /** keys a user file may explicitly blank out, rather than falling back to the default */

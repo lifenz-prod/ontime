@@ -70,9 +70,14 @@ export type PcoPlanTimeAttributes = {
 };
 export type PcoPlanTime = PcoResource<'PlanTime', PcoPlanTimeAttributes>;
 
-/** where in the service an item sits; only `during` counts toward plan.total_length */
-export type PcoServicePosition = 'pre' | 'during' | 'post';
-export type PcoItemType = 'song' | 'header' | 'media' | 'item';
+/**
+ * Where in the service an item sits, and what kind of item it is.
+ * Defined in ontime-types because the rules that match on them are edited in the
+ * settings panel; re-exported here so the API shapes below read as one unit.
+ */
+import type { PcoItemType, PcoServicePosition } from 'ontime-types';
+
+export type { PcoItemType, PcoServicePosition };
 
 export type PcoItemAttributes = {
   title: string | null;

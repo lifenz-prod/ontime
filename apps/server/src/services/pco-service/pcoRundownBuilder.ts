@@ -17,6 +17,9 @@
 
 import {
   isOntimeEvent,
+  type PcoInferredEntry,
+  type PcoRuleEffect,
+  type PcoRules,
   OntimeBlock,
   OntimeEvent,
   OntimeRundown,
@@ -30,7 +33,7 @@ import { dayInMs, generateId } from 'ontime-utils';
 
 import { event as eventDef } from '../../models/eventsDefinition.js';
 
-import { compileMatcher, matchesRule, type PcoInferredEntry, type PcoRuleEffect, type PcoRules } from './pcoRules.js';
+import { compileMatcher, matchesRule } from './pcoRules.js';
 import { localDateKey, localDayLabel, localTimeOfDayMs } from './pcoTime.js';
 import type { PcoItem, PcoItemTime, PcoPlan, PcoPlanTime } from './pcoTypes.js';
 

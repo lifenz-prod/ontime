@@ -7,6 +7,7 @@ import AutomationPanel from './panel/automations-panel/AutomationPanel';
 import FeatureSettingsPanel from './panel/feature-settings-panel/FeatureSettingsPanel';
 import GeneralPanel from './panel/general-panel/GeneralPanel';
 import NetworkLogPanel from './panel/network-panel/NetworkLogPanel';
+import PcoPanel from './panel/pco-panel/PcoPanel';
 import ProjectPanel from './panel/project-panel/ProjectPanel';
 import QlabPanel from './panel/qlab-panel/QlabPanel';
 import ServiceProfilesPanel from './panel/service-profiles-panel/ServiceProfilesPanel';
@@ -32,6 +33,7 @@ export default function AppSettings() {
           {panel === 'feature_settings' && <FeatureSettingsPanel location={location} />}
           {panel === 'sources' && <SourcesPanel location={location} onClose={close} />}
           {panel === 'automation' && <AutomationPanel location={location} />}
+          {panel === 'pco' && <PcoPanel location={location} />}
           {panel === 'qlab' && <QlabPanel />}
           {panel === 'service_profiles' && <ServiceProfilesPanel />}
           {panel === 'network' && <NetworkLogPanel location={location} />}

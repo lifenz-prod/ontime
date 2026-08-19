@@ -42,6 +42,23 @@ export type { ProjectData } from './definitions/core/ProjectData.type.js';
 export type { Settings } from './definitions/core/Settings.type.js';
 
 // ---> QLab
+export type {
+  PcoImportRequest,
+  PcoImportResult,
+  PcoInferredEntry,
+  PcoItemType,
+  PcoKnownItem,
+  PcoKnownItems,
+  PcoPinnedServiceType,
+  PcoPlanSummary,
+  PcoRuleEffect,
+  PcoRuleMatch,
+  PcoRules,
+  PcoServicePosition,
+  PcoServiceTypeSummary,
+  PcoStatus,
+  PcoTimerRule,
+} from './definitions/core/Pco.type.js';
 export type { QlabState, QlabSettings } from './definitions/core/Qlab.type.js';
 
 // ---> Service Profiles
@@ -95,7 +112,11 @@ export type { TimerMessage, MessageState, SecondarySource } from './definitions/
 export type { Runtime } from './definitions/runtime/Runtime.type.js';
 export { OffsetMode } from './definitions/runtime/Runtime.type.js';
 export type { RuntimeStore } from './definitions/runtime/RuntimeStore.type.js';
-export { runtimeStorePlaceholder, qlabStatePlaceholder, rundownSourcesPlaceholder } from './definitions/runtime/RuntimeStore.js';
+export {
+  runtimeStorePlaceholder,
+  qlabStatePlaceholder,
+  rundownSourcesPlaceholder,
+} from './definitions/runtime/RuntimeStore.js';
 export type {
   RundownSource,
   RundownSourceProvider,

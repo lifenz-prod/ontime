@@ -12,12 +12,13 @@ import {
   SupportedEvent,
   TimeStrategy,
   TimerType,
+  type PcoRules,
 } from 'ontime-types';
 import { MILLIS_PER_HOUR, MILLIS_PER_MINUTE, MILLIS_PER_SECOND } from 'ontime-utils';
 import { describe, expect, it } from 'vitest';
 
 import { regenerateInstances } from '../../rundown-service/serviceInstanceUtils.js';
-import { defaultPcoRules, type PcoRules } from '../pcoRules.js';
+import { defaultPcoRules } from '../pcoRules.js';
 import { buildRundownFromPlan, groupPlanTimesByDay } from '../pcoRundownBuilder.js';
 import { localTimeOfDayMs } from '../pcoTime.js';
 
@@ -374,5 +375,70 @@ describe('handing off to the existing dual-service mirror', () => {
 
     expect(mirrored.filter((entry) => titleOf(entry) === 'Prayer Meeting')).toHaveLength(1);
     expect(mirrored.filter((entry) => titleOf(entry) === 'Doors Open')).toHaveLength(2);
+  });
+});
+
+describe('rules the settings panel writes', () => {
+  /** the panel writes literal substrings, never regex */
+  const withRules = (timerRules: PcoRules['timerRules']) => build({ rules: { ...rules, timerRules } });
+
+  it('hides the timer on the pre-service video', () => {
+    const { rundown } = withRules([
+      { name: 'pre-service video has no timer', match: { titleContains: 'pre service video' }, effect: { hideTimer: true } },
+    ]);
+
+    expect(eventNamed(rundown, 'Pre Service Video').hideTimer).toBe(true);
+    expect(eventNamed(rundown, 'Welcome').hideTimer).toBe(false);
+  });
+
+  it('shows an item as an aux timer', () => {
+    const { rundown } = withRules([
+      { name: 'altar call runs on the aux timer', match: { titleContains: 'ministry' }, effect: { showAsAuxTimer: true } },
+    ]);
+
+    expect(eventNamed(rundown, 'Message (Incl. Ministry & Altar Call)').showAsAuxTimer).toBe(true);
+  });
+
+  it('makes an item a fixed-duration countdown instead of counting to a time', () => {
+    const { rundown } = withRules([
+      {
+        name: 'message and altar call are countdowns',
+        match: { titleContains: 'message' },
+        effect: { timerType: TimerType.CountDown, countToEnd: false, timeStrategy: TimeStrategy.LockDuration },
+      },
+    ]);
+
+    const message = eventNamed(rundown, 'Message (Incl. Ministry & Altar Call)');
+    expect(message.countToEnd).toBe(false);
+    expect(message.timeStrategy).toBe(TimeStrategy.LockDuration);
+
+    // everything else keeps the house default of counting down to its end time
+    expect(eventNamed(rundown, 'Welcome').countToEnd).toBe(true);
+  });
+
+  it('matches a title containing regex characters without escaping', () => {
+    const { rundown } = withRules([
+      { name: 'meet and greet', match: { titleContains: 'Meet & Greet' }, effect: { skip: true } },
+    ]);
+
+    expect(eventNamed(rundown, 'Meet & Greet').skip).toBe(true);
+  });
+
+  it('applies the first matching rule only', () => {
+    const { rundown } = withRules([
+      { name: 'first', match: { titleContains: 'welcome' }, effect: { colour: 'red' } },
+      { name: 'second', match: { titleContains: 'welcome' }, effect: { colour: 'blue' } },
+    ]);
+
+    expect(eventNamed(rundown, 'Welcome').colour).toBe('red');
+  });
+
+  it('narrows a rule to a position, so a pre-service item is left alone', () => {
+    const { rundown } = withRules([
+      { name: 'during only', match: { titleContains: 'o', servicePosition: 'during' }, effect: { skip: true } },
+    ]);
+
+    expect(eventNamed(rundown, 'Doors Open').skip).toBe(false);
+    expect(eventNamed(rundown, 'MC Moment').skip).toBe(true);
   });
 });

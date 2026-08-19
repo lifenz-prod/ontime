@@ -56,6 +56,14 @@ const staticOptions = [
     ],
   },
   {
+    id: 'pco',
+    label: 'Planning Center',
+    secondary: [
+      { id: 'pco__import', label: 'Import from Planning Center' },
+      { id: 'pco__defaults', label: 'Import defaults' },
+    ],
+  },
+  {
     id: 'qlab',
     label: 'QLab',
     secondary: [

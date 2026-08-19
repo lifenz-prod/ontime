@@ -10,12 +10,12 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
-import { LogOrigin } from 'ontime-types';
+import { LogOrigin, type PcoRules } from 'ontime-types';
 
 import { logger } from '../../classes/Logger.js';
 import { publicDir } from '../../setup/index.js';
 
-import { defaultPcoRules, mergePcoRules, type PcoRules } from './pcoRules.js';
+import { defaultPcoRules, mergePcoRules } from './pcoRules.js';
 
 export const pcoRulesPath = join(publicDir.root, 'pco-rules.json');
 
@@ -75,6 +75,47 @@ export function loadPcoRules(): PcoRules {
   }
 }
 
+/** structural equality, so a key is only persisted when it really differs */
+function sameValue(a: unknown, b: unknown): boolean {
+  if (a === b) {
+    return true;
+  }
+  if (typeof a !== typeof b || a === null || b === null || typeof a !== 'object') {
+    return false;
+  }
+  if (Array.isArray(a) !== Array.isArray(b)) {
+    return false;
+  }
+  const left = a as Record<string, unknown>;
+  const right = b as Record<string, unknown>;
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+
+  return [...keys].every((key) => sameValue(left[key], right[key]));
+}
+
+/**
+ * Writes only what differs from the shipped defaults.
+ *
+ * The file is merged over `defaultPcoRules` when read, so persisting the whole
+ * object would freeze the defaults at the version that saved it: a rule shipped
+ * later could never reach anyone who had ever opened the settings panel. Keeping
+ * the file to actual deviations means new defaults keep arriving.
+ *
+ * The trade-off is deliberate: choosing a value which happens to equal today's
+ * default records nothing, so if that default later changes, the choice changes
+ * with it. For a house style expressed as defaults, following them is the more
+ * useful behaviour -- and a value nobody ever set silently going stale is worse.
+ */
 export function savePcoRules(rules: PcoRules): void {
-  writeFileSync(pcoRulesPath, `${JSON.stringify(rules, null, 2)}\n`, 'utf-8');
+  const deviations: Record<string, unknown> = {
+    '//': seedRules['//'],
+  };
+
+  for (const key of Object.keys(defaultPcoRules) as (keyof PcoRules)[]) {
+    if (!sameValue(rules[key], defaultPcoRules[key])) {
+      deviations[key] = rules[key];
+    }
+  }
+
+  writeFileSync(pcoRulesPath, `${JSON.stringify(deviations, null, 2)}\n`, 'utf-8');
 }

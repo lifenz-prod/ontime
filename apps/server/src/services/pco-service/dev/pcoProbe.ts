@@ -24,13 +24,20 @@ import { resolve } from 'path';
 
 import dotenv from 'dotenv';
 
-import { isOntimeBlock, isOntimeEvent, OntimeRundown, OntimeRundownEntry, ServiceProfiles } from 'ontime-types';
+import {
+  isOntimeBlock,
+  isOntimeEvent,
+  OntimeRundown,
+  OntimeRundownEntry,
+  ServiceProfiles,
+  type PcoRules,
+} from 'ontime-types';
 import { millisToString } from 'ontime-utils';
 
 import { regenerateInstances } from '../../rundown-service/serviceInstanceUtils.js';
 import { PcoClient, PcoError } from '../PcoClient.js';
 import { buildRundownFromPlan, groupPlanTimesByDay } from '../pcoRundownBuilder.js';
-import { defaultPcoRules, mergePcoRules, type PcoRules } from '../pcoRules.js';
+import { defaultPcoRules, mergePcoRules } from '../pcoRules.js';
 
 /* ---------------------------------------------------------------- arguments */
 

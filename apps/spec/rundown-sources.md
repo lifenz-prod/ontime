@@ -125,10 +125,13 @@ layout**, so the recall picks up the same mapping.
 | `pco`    | a PCO service type | its upcoming plans, soonest first | the date the plan runs on, eg `2026-08-23` |
 
 One provider is active at a time and the first available one wins, so the order matters. Planning
-Center comes first but is only available once **both** a credential pair is in the environment and
-`"enabled": true` is set in `pco-rules.json` — a token on its own does not change what an existing
-button does. Everything else keeps recalling sheet tabs. See
+Center comes first but is only available once **both** a credential pair is present and the _Recall
+plans instead of Google Sheet tabs_ switch is on, under Planning Center in app settings — a token on
+its own does not change what an existing button does. Everything else keeps recalling sheet tabs. See
 `apps/server/src/services/pco-service/README.md`.
+
+A plan can also be imported by hand from that panel, which is the same destructive operation as a
+recall and carries the same refusal while a show is running.
 
 A plan carries no column mapping, so a PCO recall keeps the project's custom fields and ignores the
 import map entirely.

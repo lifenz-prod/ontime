@@ -5,8 +5,11 @@
  * so that deciding *which* service type and *which* plan stays pure and testable.
  */
 
+import type { PcoKnownItem, PcoPlanSummary, PcoRules, PcoTimerRule } from 'ontime-types';
+
 import { PcoError, planDateKey } from './PcoClient.js';
-import type { PcoPlan, PcoServiceType } from './pcoTypes.js';
+import { matchesRule } from './pcoRules.js';
+import type { PcoItem, PcoPlan, PcoServiceType } from './pcoTypes.js';
 
 /** the parts of the configuration that identify a service type */
 export type ServiceTypeSelector = {
@@ -14,6 +17,8 @@ export type ServiceTypeSelector = {
   pinnedServiceTypeId?: string | null;
   serviceTypeId?: string | null;
   serviceTypeName?: string | null;
+  /** ids kept on the import tab; the first is used when nothing else is configured */
+  pinnedServiceTypes?: { id: string }[];
 };
 
 /**
@@ -54,12 +59,21 @@ export function resolveServiceType(serviceTypes: PcoServiceType[], selector: Ser
     );
   }
 
+  // a pinned service type is a choice already made in the settings panel
+  const firstPinned = selector.pinnedServiceTypes?.[0]?.id;
+  if (firstPinned) {
+    const found = serviceTypes.find((candidate) => candidate.id === String(firstPinned));
+    if (found) {
+      return found;
+    }
+  }
+
   if (serviceTypes.length === 1) {
     return serviceTypes[0];
   }
 
   throw new PcoError(
-    `Planning Center has ${serviceTypes.length} service types, set serviceTypeId or serviceTypeName in pco-rules.json. ${describeServiceTypes(serviceTypes)}`,
+    `Planning Center has ${serviceTypes.length} service types, pin one on the Planning Center tab or set serviceTypeId in pco-rules.json. ${describeServiceTypes(serviceTypes)}`,
   );
 }
 
@@ -116,4 +130,121 @@ export function findPlanBySourceName(plans: PcoPlan[], name: string): PcoPlan | 
   const names = planSourceNames(plans);
   const index = names.findIndex((candidate) => candidate.toLowerCase() === target);
   return index === -1 ? undefined : plans[index];
+}
+
+/* -------------------------------------------------------------------------- */
+/* what the settings UI reads                                                  */
+/* -------------------------------------------------------------------------- */
+
+/** milliseconds since midnight rendered as HH:MM, for a plan's own local stamp */
+function clockFromSortDate(sortDate: string | null): string | null {
+  // sort_date is local wall clock with a spurious Z, so the time part is read as written
+  const time = sortDate?.split('T')[1];
+  return time ? time.slice(0, 5) : null;
+}
+
+/** One plan as the import tab shows it */
+export function planSummary(plan: PcoPlan, serviceType: { id: string; name: string }): PcoPlanSummary {
+  return {
+    serviceTypeId: serviceType.id,
+    serviceTypeName: serviceType.name.trim(),
+    planId: plan.id,
+    date: planSourceName(plan),
+    dates: plan.attributes.dates,
+    title: plan.attributes.title,
+    seriesTitle: plan.attributes.series_title,
+    itemsCount: plan.attributes.items_count,
+    firstServiceTime: clockFromSortDate(plan.attributes.sort_date),
+  };
+}
+
+/** the rule that would claim an item, so the panel can show what is already covered */
+export function ruleMatching(rules: PcoTimerRule[], candidate: PcoKnownItem): string | null {
+  const found = rules.find((rule) =>
+    matchesRule(rule.match, {
+      title: candidate.title,
+      itemType: candidate.itemType,
+      servicePosition: candidate.servicePosition,
+    }),
+  );
+  return found?.name ?? null;
+}
+
+/**
+ * Collapses the items of several plans into the distinct titles a run sheet uses,
+ * so the settings panel can offer what is actually on the sheets rather than asking
+ * for a regex.
+ *
+ * Titles are grouped case insensitively and after `titleStrip`, because
+ * "Doors Open // 9am" and "Doors Open // 11am" are one thing to configure, not two.
+ * The most common spelling wins the label.
+ */
+export function knownItemsFromPlans(plans: PcoItem[][], rules: PcoRules): PcoKnownItem[] {
+  const stripMatcher = rules.titleStrip ? new RegExp(rules.titleStrip, 'i') : null;
+  const normalise = (title: string): string => {
+    const stripped = stripMatcher ? title.replace(stripMatcher, '') : title;
+    return stripped.trim();
+  };
+
+  type Tally = {
+    labels: Map<string, number>;
+    itemType: PcoKnownItem['itemType'];
+    servicePosition: PcoKnownItem['servicePosition'];
+    plans: Set<number>;
+    lengths: number[];
+  };
+  const tallies = new Map<string, Tally>();
+
+  plans.forEach((items, planIndex) => {
+    for (const item of items) {
+      const label = normalise(item.attributes.title ?? '');
+      if (!label) {
+        continue;
+      }
+      const key = label.toLowerCase();
+      const tally = tallies.get(key) ?? {
+        labels: new Map(),
+        itemType: item.attributes.item_type,
+        servicePosition: item.attributes.service_position,
+        plans: new Set<number>(),
+        lengths: [],
+      };
+      tally.labels.set(label, (tally.labels.get(label) ?? 0) + 1);
+      tally.plans.add(planIndex);
+      if (item.attributes.length) {
+        tally.lengths.push(item.attributes.length);
+      }
+      tallies.set(key, tally);
+    }
+  });
+
+  const known: PcoKnownItem[] = [...tallies.values()].map((tally) => {
+    const [label] = [...tally.labels.entries()].sort((a, b) => b[1] - a[1])[0];
+    const title = label;
+    const item: PcoKnownItem = {
+      title,
+      itemType: tally.itemType,
+      servicePosition: tally.servicePosition,
+      planCount: tally.plans.size,
+      typicalLength: tally.lengths.length > 0 ? median(tally.lengths) : null,
+      matchedBy: null,
+      ignored: false,
+    };
+    const candidate = { title, itemType: item.itemType, servicePosition: item.servicePosition };
+
+    return {
+      ...item,
+      matchedBy: ruleMatching(rules.timerRules, item),
+      ignored: rules.ignoreItems.some((match) => matchesRule(match, candidate)),
+    };
+  });
+
+  // the things on every sheet first, then alphabetically, so the list is stable
+  return known.sort((a, b) => b.planCount - a.planCount || a.title.localeCompare(b.title));
+}
+
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? Math.round((sorted[middle - 1] + sorted[middle]) / 2) : sorted[middle];
 }

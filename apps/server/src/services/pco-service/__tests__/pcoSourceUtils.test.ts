@@ -1,7 +1,16 @@
+import type { PcoRules } from 'ontime-types';
 import { describe, expect, it } from 'vitest';
 
-import type { PcoPlan, PcoServiceType } from '../pcoTypes.js';
-import { findPlanBySourceName, planSourceName, planSourceNames, resolveServiceType } from '../pcoSourceUtils.js';
+import { defaultPcoRules } from '../pcoRules.js';
+import type { PcoItem, PcoPlan, PcoServiceType } from '../pcoTypes.js';
+import {
+  findPlanBySourceName,
+  knownItemsFromPlans,
+  planSourceName,
+  planSourceNames,
+  planSummary,
+  resolveServiceType,
+} from '../pcoSourceUtils.js';
 
 import { plan as centralAmPlan } from './fixtures/centralAm.js';
 
@@ -69,7 +78,7 @@ describe('resolveServiceType', () => {
   });
 
   it('refuses to guess between several unconfigured service types', () => {
-    expect(() => resolveServiceType(serviceTypes, {})).toThrowError(/set serviceTypeId or serviceTypeName/);
+    expect(() => resolveServiceType(serviceTypes, {})).toThrowError(/pin one on the Planning Center tab/);
   });
 
   it('reports an organisation with no service types', () => {
@@ -131,5 +140,129 @@ describe('findPlanBySourceName', () => {
 
   it('returns nothing for a name it does not hold', () => {
     expect(findPlanBySourceName(plans, '2026-09-06')).toBeUndefined();
+  });
+});
+
+describe('resolveServiceType with pinned types', () => {
+  const serviceTypes = [serviceType('101', 'Central AM'), serviceType('202', 'Central PM')];
+
+  it('falls back to the first pinned service type', () => {
+    const found = resolveServiceType(serviceTypes, { pinnedServiceTypes: [{ id: '202' }, { id: '101' }] });
+    expect(found.id).toBe('202');
+  });
+
+  it('still prefers an explicitly configured id', () => {
+    const found = resolveServiceType(serviceTypes, { serviceTypeId: '101', pinnedServiceTypes: [{ id: '202' }] });
+    expect(found.id).toBe('101');
+  });
+
+  it('ignores a pinned type that no longer exists', () => {
+    expect(() => resolveServiceType(serviceTypes, { pinnedServiceTypes: [{ id: '999' }] })).toThrowError(
+      /pin one on the Planning Center tab/,
+    );
+  });
+});
+
+describe('planSummary', () => {
+  it('describes a plan the way the import tab shows it', () => {
+    const summary = planSummary(centralAmPlan, { id: '156118', name: 'Central AM ' });
+
+    expect(summary).toMatchObject({
+      serviceTypeId: '156118',
+      serviceTypeName: 'Central AM',
+      planId: centralAmPlan.id,
+      date: '2026-08-23',
+      dates: '23 August 2026',
+      firstServiceTime: '09:00',
+    });
+  });
+
+  it('reads the clock off the plan without converting it', () => {
+    // sort_date is local wall clock, so an evening service reads as the evening
+    expect(planSummary(planOn('1', '2026-08-23T18:00:00Z'), { id: '1', name: 'PM' }).firstServiceTime).toBe('18:00');
+  });
+
+  it('has no time when the plan carries no sort_date', () => {
+    expect(planSummary(planOn('1', null, '23 August 2026'), { id: '1', name: 'AM' }).firstServiceTime).toBeNull();
+  });
+});
+
+describe('knownItemsFromPlans', () => {
+  const item = (
+    title: string,
+    length: number,
+    itemType: PcoItem['attributes']['item_type'] = 'item',
+    servicePosition: PcoItem['attributes']['service_position'] = 'during',
+  ): PcoItem => ({
+    type: 'Item',
+    id: `i-${title}-${length}`,
+    attributes: {
+      title,
+      description: '',
+      html_details: null,
+      length,
+      sequence: 1,
+      item_type: itemType,
+      service_position: servicePosition,
+    },
+  });
+
+  const rules: PcoRules = { ...defaultPcoRules };
+
+  it('collapses the per-service title variants into one thing to configure', () => {
+    const known = knownItemsFromPlans([[item('Doors Open // 9am', 740), item('Doors Open // 11am', 800)]], rules);
+
+    expect(known).toHaveLength(1);
+    expect(known[0].title).toBe('Doors Open');
+  });
+
+  it('counts the plans an item appears in, not the number of items', () => {
+    const known = knownItemsFromPlans(
+      [
+        [item('Welcome', 60), item('Welcome', 60)],
+        [item('Welcome', 60)],
+        [item('Meet & Greet', 60)],
+      ],
+      rules,
+    );
+
+    expect(known.find((entry) => entry.title === 'Welcome')?.planCount).toBe(2);
+    expect(known.find((entry) => entry.title === 'Meet & Greet')?.planCount).toBe(1);
+  });
+
+  it('puts what happens every week first', () => {
+    const known = knownItemsFromPlans([[item('Rare Thing', 60), item('Welcome', 60)], [item('Welcome', 60)]], rules);
+
+    expect(known.map((entry) => entry.title)).toEqual(['Welcome', 'Rare Thing']);
+  });
+
+  it('reports a typical length, ignoring the weeks with none', () => {
+    const known = knownItemsFromPlans([[item('Message', 2700)], [item('Message', 0)], [item('Message', 2900)]], rules);
+
+    expect(known[0].typicalLength).toBe(2800);
+  });
+
+  it('has no typical length when nothing is ever timed', () => {
+    expect(knownItemsFromPlans([[item('End', 0)]], rules)[0].typicalLength).toBeNull();
+  });
+
+  it('names the rule already claiming an item', () => {
+    const known = knownItemsFromPlans([[item('Message (Incl. Ministry)', 2700), item('Welcome', 60)]], rules);
+
+    // the shipped rule makes anything titled message a fixed-duration countdown
+    expect(known.find((entry) => entry.title.startsWith('Message'))?.matchedBy).toBe(
+      'message is a fixed-duration countdown',
+    );
+    expect(known.find((entry) => entry.title === 'Welcome')?.matchedBy).toBeNull();
+  });
+
+  it('keeps the item type and position, so a rule can narrow to them', () => {
+    const known = knownItemsFromPlans([[item('PRAISE & WORSHIP', 0, 'header', 'during')]], rules);
+
+    expect(known[0]).toMatchObject({ itemType: 'header', servicePosition: 'during' });
+  });
+
+  it('skips items with no title at all', () => {
+    expect(knownItemsFromPlans([[item('', 60), item('Welcome', 60)]], rules)).toHaveLength(1);
   });
 });
