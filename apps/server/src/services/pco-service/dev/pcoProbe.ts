@@ -169,8 +169,7 @@ async function main(): Promise<void> {
 
   /* 3. times, items, per-time overrides */
   const planTimes = await client.getPlanTimes(serviceType.id, plan.id);
-  const items = await client.getItems(serviceType.id, plan.id);
-  const itemTimes = await client.getItemTimes(serviceType.id, plan.id, items);
+  const { items, itemTimes, itemNotes } = await client.getPlanContent(serviceType.id, plan.id);
 
   console.log(`\nPlan times (${planTimes.length})`);
   console.log('----------');
@@ -183,7 +182,7 @@ async function main(): Promise<void> {
     }
   }
 
-  console.log(`\nItems (${items.length}), item times (${itemTimes.length})`);
+  console.log(`\nItems (${items.length}), item times (${itemTimes.length}), item notes (${itemNotes.length})`);
   console.log('-----');
   for (const item of items) {
     console.log(
@@ -194,7 +193,7 @@ async function main(): Promise<void> {
 
   if (args.raw) {
     const target = typeof args.raw === 'string' ? args.raw : 'pco-raw.json';
-    writeFileSync(target, JSON.stringify({ plan, planTimes, items, itemTimes }, null, 2));
+    writeFileSync(target, JSON.stringify({ plan, planTimes, items, itemTimes, itemNotes }, null, 2));
     console.log(`\nRaw payloads written to ${target}`);
   }
 
