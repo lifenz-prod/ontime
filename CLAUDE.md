@@ -100,7 +100,7 @@ Note: only `build.yml` (desktop binaries + GitHub Release) is wired up and verif
 
 ## Working conventions
 
-- **Make changes in the main repo** (`/Users/alanaiken/Documents/GitHub/ontime`), not in worktrees — the running app is served from here, so worktree edits don't take effect until merged.
+- **Make changes in the main repo** (`/Volumes/ALANS T7/Coding/ontime`), not in worktrees — the running app is served from here, so worktree edits don't take effect until merged.
 - Shared types belong in `packages/types`; shared pure logic in `packages/utils` — don't duplicate these in apps.
 - Linting/formatting: ESLint + Prettier (`.eslintrc`, `.prettierrc`). Keep CI green: lint, typecheck, and tests across workspaces.
 - License: AGPL-3.0-only.

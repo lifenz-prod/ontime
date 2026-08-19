@@ -50,3 +50,7 @@ ontime-data/
 
 # vite config build artifacts
 **/vite.config.*.timestamp-*.mjs
+# local credentials (Planning Center etc)
+.env
+.env.local
+!.env.example
