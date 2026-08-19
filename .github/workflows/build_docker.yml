@@ -1,13 +1,41 @@
 name: Docker Image CI Ontime
 
+# Triggered by the tag push, not by `release: published`.
+#
+# The GitHub Release is created by build.yml using GITHUB_TOKEN, and GitHub
+# deliberately does not let a GITHUB_TOKEN-created event start another
+# workflow. Listening for `release: published` therefore never fired. Tagging
+# is the same signal and does fire, so we key off the tag and derive the
+# channel from its name: a tag containing `-` (v4.0.1-beta.5) is a prerelease.
 on:
-  release:
-    types: [published]
+  push:
+    tags: [ "*" ]
   workflow_dispatch:
 
 jobs:
+  # `secrets` is not available in a job-level `if`, so presence is checked in a
+  # step and passed down as an output. Without this the job would fail on every
+  # tag for anyone who has not set up Docker Hub.
+  check_secrets:
+    runs-on: ubuntu-latest
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      - id: check
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          if [ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ]; then
+            echo 'configured=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'configured=false' >> "$GITHUB_OUTPUT"
+            echo '::notice::DOCKERHUB_USERNAME / DOCKERHUB_TOKEN are not set, skipping the Docker publish'
+          fi
 
   publish_docker:
+    needs: check_secrets
+    if: needs.check_secrets.outputs.configured == 'true' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     env:
       CI: ''
@@ -25,7 +53,7 @@ jobs:
       uses: docker/setup-buildx-action@v2.5.0
 
     - name: Build and push stable release
-      if: github.event.release.prerelease == false
+      if: ${{ !contains(github.ref_name, '-') }}
       uses: docker/build-push-action@v4.0.0
       with:
         context: .
@@ -33,10 +61,10 @@ jobs:
         platforms: linux/amd64,linux/arm64,linux/arm/v7
         # Push is a shorthand for --output=type=registry
         push: true
-        tags: ${{ secrets.DOCKERHUB_USERNAME }}/ontime:${{ github.event.release.tag_name }} , ${{ secrets.DOCKERHUB_USERNAME }}/ontime:latest
+        tags: ${{ secrets.DOCKERHUB_USERNAME }}/ontime:${{ github.ref_name }} , ${{ secrets.DOCKERHUB_USERNAME }}/ontime:latest
 
     - name: Build and push pre-release
-      if: github.event.release.prerelease == true
+      if: ${{ contains(github.ref_name, '-') }}
       uses: docker/build-push-action@v4.0.0
       with:
         context: .
@@ -44,5 +72,4 @@ jobs:
         platforms: linux/amd64,linux/arm64,linux/arm/v7
         # Push is a shorthand for --output=type=registry
         push: true
-        tags: ${{ secrets.DOCKERHUB_USERNAME }}/ontime:${{ github.event.release.tag_name }} , ${{ secrets.DOCKERHUB_USERNAME }}/ontime:nightly
-
+        tags: ${{ secrets.DOCKERHUB_USERNAME }}/ontime:${{ github.ref_name }} , ${{ secrets.DOCKERHUB_USERNAME }}/ontime:nightly
