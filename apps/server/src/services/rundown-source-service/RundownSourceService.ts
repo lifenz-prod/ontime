@@ -14,7 +14,6 @@ import { logger } from '../../classes/Logger.js';
 import { eventStore } from '../../stores/EventStore.js';
 import { patchCurrentProject } from '../project-service/ProjectService.js';
 import { getCustomFields } from '../rundown-service/rundownCache.js';
-import { runtimeService } from '../runtime-service/RuntimeService.js';
 import { getState } from '../../stores/runtimeState.js';
 
 import { getActiveProvider, type RundownSourceProviderApi } from './rundownSourceProviders.js';
@@ -114,7 +113,7 @@ export function assertRecallAllowed() {
 }
 
 /**
- * Recalls a rundown into the current project and arms its first event
+ * Recalls a rundown into the current project, leaving playback untouched
  * @param target 1 based index or name of the source
  */
 export async function loadRundownSource(target: number | string): Promise<RundownSource> {
@@ -159,12 +158,6 @@ export async function loadRundownSource(target: number | string): Promise<Rundow
       customFields: nextCustomFields,
       ...(serviceProfiles ? { serviceProfiles } : {}),
     });
-
-    // arm the first event so the operator only needs to press go
-    const didLoad = runtimeService.loadByIndex(0);
-    if (!didLoad) {
-      logger.warning(LogOrigin.Server, `Recalled "${source.name}" but found no event to load`);
-    }
 
     publish({ loaded: source.name, loading: false, error: null });
     logger.info(LogOrigin.Server, `Recalled rundown "${source.name}" with ${rundown.length} entries`);

@@ -59,8 +59,8 @@ export function resolveSourceTarget(sources: RundownSource[], target: number | s
 /**
  * Whether the current playback state means a recall would interrupt a live show.
  *
- * `armed` is deliberately allowed: a recall leaves playback armed, so refusing it
- * would stop an operator recalling twice in a row.
+ * `armed` is deliberately allowed: nothing is running yet, so replacing the rundown
+ * interrupts no one. A recall does not arm anything itself.
  */
 export function playbackBlocksRecall(playback: Playback): boolean {
   return playback === Playback.Play || playback === Playback.Pause || playback === Playback.Roll;

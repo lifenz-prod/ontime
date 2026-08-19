@@ -48,7 +48,7 @@ Three actions are available on all three transports.
 | ---------------- | ------------------------------- | ------------------------------------------------------ |
 | `sources`        | none                            | returns the state shown above                          |
 | `refreshsources` | none                            | re-reads the list from the provider                    |
-| `loadsource`     | index, name, `{index}`/`{name}` | recalls a rundown and arms its first event, see below  |
+| `loadsource`     | index, name, `{index}`/`{name}` | recalls a rundown, see below                           |
 
 `loadsource` accepts a 1 based index or a name. Names are matched case insensitively. Numbers sent as
 text are treated as an index, since OSC and HTTP frequently carry them that way.
@@ -84,7 +84,7 @@ GET /api/sources
 1. reads the rundown from the provider, using the column mapping of the last import made from the UI
 2. replaces the rundown, custom fields and service profiles, exactly as the settings panel import does
 3. regenerates the dual-service instances, if the project is configured for them
-4. loads the first event, so the operator only needs to press GO
+4. leaves playback stopped with no event loaded, the operator loads what they need
 
 Steps 2 and 3 mean a recall **stops playback and replaces the current rundown**, the same destructive
 operation as importing from the settings panel. To keep a stray button press from ending a live service,
@@ -94,9 +94,9 @@ a recall is **refused while playback is `play`, `pause` or `roll`**:
 Refusing to recall a rundown while playback is play, stop playback first
 ```
 
-`armed` and `stop` are allowed. `armed` has to be, because a recall leaves playback armed — refusing it
-would stop an operator recalling twice in a row. There is no override: press STOP first if you really
-mean to replace a running show.
+`armed` and `stop` are allowed: nothing is running yet, so replacing the rundown interrupts no one.
+A recall never starts or arms anything itself — it leaves playback stopped. There is no override: press
+STOP first if you really mean to replace a running show.
 
 Refreshing the list is never guarded, it only reads.
 

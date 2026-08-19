@@ -75,8 +75,7 @@ describe('playbackBlocksRecall()', () => {
     expect(playbackBlocksRecall(Playback.Stop)).toBe(false);
   });
 
-  it('allows a recall when an event is only armed, so two recalls in a row work', () => {
-    // a recall itself leaves playback armed
+  it('allows a recall when an event is only armed, nothing is running yet', () => {
     expect(playbackBlocksRecall(Playback.Armed)).toBe(false);
   });
 });
