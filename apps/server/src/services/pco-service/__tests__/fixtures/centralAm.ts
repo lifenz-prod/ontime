@@ -1,23 +1,30 @@
 /**
- * The real Central AM plan for Sunday 23 August 2026, transcribed from the
- * Planning Center run sheet, shaped as the API returns it.
+ * The real Central AM plan for Sunday 23 August 2026, shaped as the API returns
+ * it. Names are anonymised; every length, sequence, position and timestamp below
+ * has been checked against the live plan (89267631).
  *
- * Times are NZST (UTC+12 in August), so 9am local arrives as 21:00Z the day
- * before. Plan times deliberately span two dates so the day selector is exercised.
+ * `PlanTime.starts_at` is a true UTC instant, so 9am NZST (UTC+12 in August)
+ * arrives as 21:00Z the day before. Plan times deliberately span two dates so the
+ * day selector is exercised.
  *
- * Two things this fixture pins down, both taken straight off the sheet:
+ * `Plan.sort_date` is NOT a UTC instant, despite the Z: PCO writes the
+ * organisation's local wall clock there. Hence 09:00Z for a service whose
+ * `starts_at` is 21:00Z. See `planDateKey`.
+ *
+ * Two things this fixture pins down, both read off the plan:
  *
  * 1. `service_position: 'pre'` items back-time as one run ending at 9:00 --
- *    briefing 15:00 + prayer 25:00 + doors 12:20 + online 1:00 + video 1:40
- *    = 55:00, and 9:00 - 55:00 = 8:05, the briefing time in the header title.
+ *    prayer 25:00 + doors 12:20 + online 1:00 + video 1:40 = 40:00, and
+ *    9:00 - 40:00 = 8:20, where the prayer meeting starts.
  *
  * 2. Doors Open exists TWICE, once per service, each excluded from the other.
  *    The 11am variant is 1:00 longer because the 9am carries an extra "Online
  *    Pre Service Message" that the 11am does not. Both land on :58:20.
  *
- * ASSUMPTION worth checking against the live API: that the "SERVICE BRIEFING
- * 8:05AM" header carries a 15:00 length rather than the briefing being a
- * separate PlanTime. The arithmetic works either way for everything below it.
+ * The "SERVICE BRIEFING 8:05AM" header carries no length and sits in `during`,
+ * at sequence 1. The 8:05 briefing is therefore nowhere in the data -- it exists
+ * only as text in that title, 15 minutes ahead of the prayer meeting. Representing
+ * it as a real entry is what `rules.inferredEntries` is for.
  */
 
 import type { PcoItem, PcoItemTime, PcoPlan, PcoPlanTime } from '../../pcoTypes.js';
@@ -26,9 +33,10 @@ export const plan: PcoPlan = {
   type: 'Plan',
   id: '71234567',
   attributes: {
-    dates: 'August 23, 2026',
+    dates: '23 August 2026',
     short_dates: 'Aug 23',
-    sort_date: '2026-08-22T21:00:00Z',
+    // local wall clock with a spurious Z, as PCO writes it
+    sort_date: '2026-08-23T09:00:00Z',
     series_title: null,
     title: 'Central AM',
     total_length: 4320,
@@ -84,13 +92,15 @@ const item = (
 });
 
 export const items: PcoItem[] = [
+  // the briefing header opens the sheet but belongs to `during` and has no length
+  item('i-01', 1, 'SERVICE BRIEFING 8:05AM', '0:00', 'header'),
+
   // -- pre-service, back-timed to 9:00 --------------------------------------
-  item('i-01', 1, 'SERVICE BRIEFING 8:05AM', '15:00', 'header', 'pre'),
   item('i-02', 2, 'Prayer Meeting', '25:00', 'item', 'pre', 'Ps A. Speaker'),
   item('i-03', 3, 'Doors Open // 11am', '13:20', 'item', 'pre'),
   item('i-04', 4, 'Doors Open // 9am', '12:20', 'item', 'pre'),
   item('i-05', 5, 'Online Pre Service Message', '1:00', 'item', 'pre'),
-  item('i-06', 6, 'Pre Service Video', '1:40', 'media', 'pre'),
+  item('i-06', 6, 'Pre Service Video', '1:40', 'song', 'pre'),
 
   // -- the service itself, forward from 9:00 --------------------------------
   item('i-07', 7, 'PRAISE & WORSHIP', '0:00', 'header'),
@@ -105,9 +115,10 @@ export const items: PcoItem[] = [
   item('i-16', 16, 'MESSAGE', '0:00', 'header'),
   item('i-17', 17, 'Message (Incl. Ministry & Altar Call)', '45:00', 'item', 'during', 'Ps C. Speaker'),
   item('i-18', 18, 'Fall Like Rain', '0:00', 'song', 'during', 'WL - D. Leader'),
-  item('i-19', 19, 'EOS Announcements', '1:00', 'item', 'during', 'Bibles'),
-  item('i-20', 20, 'End', '0:00'),
-  item('i-21', 21, 'END', '0:00', 'header'),
+  item('i-19', 19, 'Here I Am To Worship / Worthy Of It All TAG', '0:00', 'song', 'during', 'WL - D. Leader'),
+  item('i-20', 20, 'EOS Announcements', '1:00', 'item', 'during', 'Bibles'),
+  item('i-21', 21, 'End', '0:00'),
+  item('i-22', 22, 'END', '0:00', 'header'),
 ];
 
 const excludedFrom = (id: string, itemId: string, planTimeId: string, length: number): PcoItemTime => ({

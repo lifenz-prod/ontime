@@ -2,9 +2,10 @@ import type { MaybeString } from '../../utils/utils.type.js';
 
 /**
  * Identifies where a recallable rundown comes from.
- * Currently only Google Sheets, kept open for further providers.
+ * `gsheet` reads the worksheet tabs of the linked Google Sheet,
+ * `pco` reads the upcoming plans of a Planning Center service type.
  */
-export type RundownSourceProvider = 'gsheet';
+export type RundownSourceProvider = 'gsheet' | 'pco';
 
 /**
  * A rundown which can be recalled by index or by name,

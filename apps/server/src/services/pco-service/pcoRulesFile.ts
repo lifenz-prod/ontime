@@ -29,8 +29,23 @@ export function ensurePcoRulesFile(): string {
 }
 
 /**
- * Loads the rules, falling back to the defaults on a missing or malformed file.
- * A bad file is logged rather than thrown, so a typo cannot take the server down.
+ * Reads the rules without creating anything.
+ *
+ * Separate from `loadPcoRules` because the rundown source provider asks whether
+ * Planning Center is enabled on every refresh, and that question must not leave a
+ * config file behind in the data directory of somebody who does not use PCO.
+ */
+export function readPcoRules(): PcoRules {
+  if (!existsSync(pcoRulesPath)) {
+    return { ...defaultPcoRules };
+  }
+  return loadPcoRules();
+}
+
+/**
+ * Loads the rules, seeding and falling back to the defaults on a missing or
+ * malformed file. A bad file is logged rather than thrown, so a typo cannot take
+ * the server down.
  */
 export function loadPcoRules(): PcoRules {
   try {

@@ -8,6 +8,7 @@
 
 import type { CustomFields, MaybeString, OntimeRundown, RundownSourceProvider, ServiceProfiles } from 'ontime-types';
 
+import { fetchPcoSource, getResolvedServiceTypeId, isPcoEnabled, listPcoSources } from '../pco-service/PcoService.js';
 import { download, getImportMap, getLinkedSheetId, hasAuth, listWorksheets } from '../sheet-service/SheetService.js';
 
 export type FetchedSource = {
@@ -44,7 +45,22 @@ const gsheetProvider: RundownSourceProviderApi = {
   },
 };
 
-const providers: RundownSourceProviderApi[] = [gsheetProvider];
+/**
+ * Planning Center plans, one source per upcoming plan, soonest first.
+ *
+ * Ahead of the sheet in the list because it only becomes available once
+ * `enabled` is set in pco-rules.json, which is an explicit choice to recall plans
+ * instead of worksheet tabs. Credentials alone do not switch anything over.
+ */
+const pcoProvider: RundownSourceProviderApi = {
+  id: 'pco',
+  isAvailable: () => isPcoEnabled(),
+  getContainerId: () => getResolvedServiceTypeId(),
+  list: () => listPcoSources(),
+  fetch: (name: string) => fetchPcoSource(name),
+};
+
+const providers: RundownSourceProviderApi[] = [pcoProvider, gsheetProvider];
 
 /**
  * Returns the provider which can currently serve sources

@@ -5,9 +5,11 @@ including the PRE section and both Sunday services.
 
 ## Status
 
-Feasibility spike. The API client, the rundown builder, and the rules config are
-complete and unit tested against a fixture shaped like a real Central AM plan.
-Not yet wired to an HTTP route or the settings UI.
+Usable, without a settings UI. The API client, the rundown builder and the rules
+config are unit tested against a fixture shaped like a real Central AM plan, and
+the connector is registered as a **rundown source provider**, so a plan can be
+recalled into the project over OSC, websocket or HTTP. Configuration is a token in
+the environment plus `pco-rules.json`; there is no settings panel yet.
 
 ## What PCO gives us, and what it does not
 
@@ -21,9 +23,17 @@ Not yet wired to an HTTP route or the settings UI.
 | Per-service differences | `ItemTime.exclude` / `.length` / `.length_offset` |
 
 **Items carry durations, not absolute start times.** Every time is computed from
-a `PlanTime.starts_at`. This is why the builder needs a timezone: PCO timestamps
+a `PlanTime.starts_at`. This is why the builder needs a timezone: those timestamps
 are UTC, and Ontime works in local time of day (9am NZST arrives as `21:00Z` the
 previous day).
+
+**`Plan.sort_date` is the exception, and it lies.** It carries a `Z` and is not a
+UTC instant: PCO writes the organisation's local wall clock into it. On the same
+Sunday, Central AM's 9am plan reads `2026-08-23T09:00:00Z` while its service time
+reads `2026-08-22T21:00:00Z`, and Central PM's 6pm plan reads
+`2026-08-23T18:00:00Z`. So `sort_date` is read as written and never converted --
+converting it moves every afternoon service to the next day. Only `starts_at` goes
+through `pcoTime.ts`.
 
 **`service_position` decides the direction of travel.** This is not a detail:
 
@@ -33,11 +43,17 @@ previous day).
 | `during` | accumulates **forward** from the service start                   |
 | `post`   | continues after the last `during` item                           |
 
-Verified against the 23 August Central AM sheet to the second: briefing 15:00 +
-prayer 25:00 + doors 12:20 + online message 1:00 + pre-service video 1:40 =
-55:00, and `9:00 - 55:00 = 8:05`, which is the time written into the
-_SERVICE BRIEFING 8:05AM_ header title. Accumulating those forward instead would
-put doors open at 9:00.
+Verified against the live 23 August Central AM plan to the second: prayer 25:00 +
+doors 12:20 + online message 1:00 + pre-service video 1:40 = 40:00, and
+`9:00 - 40:00 = 8:20`, where the prayer meeting starts. Accumulating those forward
+instead would put doors open at 9:00.
+
+**Headers are not necessarily where they look.** The plan opens with a
+_SERVICE BRIEFING 8:05AM_ header, and that header is a `during` item carrying no
+length — so it lands in the master section rather than at the top of PRE, and the
+8:05 briefing itself is nowhere in the data. Nothing in PCO says when it happens
+except those four characters of title text. Representing it as a real entry is a
+job for `inferredEntries`, which is what that mechanism is for.
 
 **One item list serves every time in a plan.** PCO does not hold a separate run
 sheet per service. That is what makes the 9am/11am relationship a pure time
@@ -81,6 +97,52 @@ rundown is a single day, so the day is chosen explicitly:
 first day that actually holds a service time, so the Wednesday rehearsal is never
 mistaken for the service day. Asking for a day with no services is an error, not
 a silent empty rundown.
+
+## Recalling a plan
+
+The connector is a provider behind the rundown-source API, the same one that
+recalls a worksheet tab from the linked Google Sheet. See
+`apps/spec/rundown-sources.md` for the commands; nothing about them is
+PCO-specific.
+
+One source per upcoming plan, soonest first, each named by the **date it runs on**:
+
+```
+1  2026-08-23
+2  2026-08-30
+3  2026-09-06
+```
+
+```
+/ontime/loadsource 1                  # next Sunday's plan
+/ontime/loadsource "2026-09-06"       # a specific one
+```
+
+The date is read in the configured timezone, not sliced off the timestamp: PCO
+stamps a 9am Auckland service `21:00Z` the day before, so the raw date would name
+Sunday's plan after Saturday. Two plans on one date are distinguished by plan id,
+`2026-08-23 (71234567)`.
+
+A recall builds the rundown, then replaces the project's rundown and service
+profiles and regenerates the 11am. It is **refused while playback is running** and
+custom fields are left alone, because a plan carries no column mapping. Divergence
+between the two service times is written to the log rather than flattened silently.
+
+### Turning it on
+
+Two separate switches, on purpose:
+
+1. `PCO_APP_ID` / `PCO_SECRET` in the environment — the ability to read PCO.
+2. `"enabled": true` in `pco-rules.json` — the decision to recall plans **instead
+   of** Google Sheet tabs. A token sitting in the environment does not change what
+   an existing Companion button does.
+
+With both set, the provider serves the source list ahead of the sheet. Which
+service type it pulls from is `PCO_SERVICE_TYPE_ID`, else `serviceTypeId`, else
+`serviceTypeName` (a case-insensitive substring, so `central am` finds
+_Central AM Service_), else the organisation's only service type. Anything
+ambiguous is an error listing the ids to choose from — this organisation has
+hundreds of service types, so guessing would be worse than failing.
 
 ## Rules config
 
@@ -139,8 +201,11 @@ builder or any calling code.
 
 ## Not done yet
 
-- HTTP route + client UI (would sit beside `api-data/sheets` and the
-  service-profiles settings panel)
-- Applying the generated rundown to the project, rather than printing it
-- Honouring `ItemTime` divergence instead of only warning about it
-- OAuth 2, if this ever needs to serve more than one organisation
+- Settings UI: credentials, service type and the rules file are all edited by hand.
+  A panel beside the Google Sheet one would sit on top of `PcoService`, which
+  already answers everything it would need to show.
+- Building a plan for a chosen day. `buildRundownFromPlan` takes a `targetDate` and
+  reports `availableDays`, but a recall always builds the plan's first service day,
+  because a source is addressed by one name.
+- Honouring `ItemTime` divergence instead of only warning about it.
+- OAuth 2, if this ever needs to serve more than one organisation.

@@ -18,7 +18,8 @@ import { describe, expect, it } from 'vitest';
 
 import { regenerateInstances } from '../../rundown-service/serviceInstanceUtils.js';
 import { defaultPcoRules, type PcoRules } from '../pcoRules.js';
-import { buildRundownFromPlan, groupPlanTimesByDay, localTimeOfDayMs } from '../pcoRundownBuilder.js';
+import { buildRundownFromPlan, groupPlanTimesByDay } from '../pcoRundownBuilder.js';
+import { localTimeOfDayMs } from '../pcoTime.js';
 
 import { items, itemTimes, plan, planTimes } from './fixtures/centralAm.js';
 
@@ -106,13 +107,14 @@ describe('pre-service items back-time to the service start', () => {
     expect(eventNamed(build().rundown, 'Pre Service Video').timeEnd).toBe(at(9));
   });
 
-  it('puts the briefing block at 8:05, matching the time in its own title', () => {
-    // 15:00 briefing + 25:00 prayer + 12:20 doors + 1:00 online + 1:40 video = 55:00
+  it('starts the pre run 40:00 before the service, where the sheet puts it', () => {
+    // 25:00 prayer + 12:20 doors + 1:00 online + 1:40 video = 40:00, so 8:20.
+    // The 8:05 briefing is not in the data at all, only in a header's title text.
     const { rundown } = build();
     const briefing = rundown.find((entry) => titleOf(entry).startsWith('SERVICE BRIEFING'));
 
     expect(briefing && isOntimeBlock(briefing)).toBe(true);
-    // the block itself carries no time, but the entry after it proves the anchor
+    // the block itself carries no time, but the first pre entry proves the anchor
     expect(eventNamed(rundown, 'Prayer Meeting').timeStart).toBe(at(9) - at(0, 40));
   });
 });
@@ -147,12 +149,11 @@ describe('sectioning', () => {
     expect(titleOf(result.rundown[index])).toBe('9am');
   });
 
-  it('keeps only the briefing and the prayer meeting in PRE', () => {
+  it('keeps only the prayer meeting in PRE', () => {
+    // the briefing header is a `during` item, so it lands in the master section
+    // rather than in PRE, even though it opens the sheet
     const result = build();
-    expect(titles(result.rundown).slice(0, boundaryIndexOf(result))).toEqual([
-      'SERVICE BRIEFING 8:05AM',
-      'Prayer Meeting',
-    ]);
+    expect(titles(result.rundown).slice(0, boundaryIndexOf(result))).toEqual(['Prayer Meeting']);
   });
 
   it('puts doors, walk-in and the pre-service video in the master section, not PRE', () => {

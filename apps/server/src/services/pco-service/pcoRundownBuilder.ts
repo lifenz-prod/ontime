@@ -31,6 +31,7 @@ import { dayInMs, generateId } from 'ontime-utils';
 import { event as eventDef } from '../../models/eventsDefinition.js';
 
 import { compileMatcher, matchesRule, type PcoInferredEntry, type PcoRuleEffect, type PcoRules } from './pcoRules.js';
+import { localDateKey, localDayLabel, localTimeOfDayMs } from './pcoTime.js';
 import type { PcoItem, PcoItemTime, PcoPlan, PcoPlanTime } from './pcoTypes.js';
 
 /** one calendar day of a plan, in the configured timezone */
@@ -67,47 +68,6 @@ export type PcoBuildInput = {
 /* -------------------------------------------------------------------------- */
 /* timezone helpers                                                            */
 /* -------------------------------------------------------------------------- */
-
-/**
- * PCO timestamps are UTC. Ontime works in local time of day. Both conversions
- * go through Intl so the org's timezone is honoured without a date library.
- */
-function zonedParts(iso: string, timezone: string): Record<string, string> {
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-    weekday: 'long',
-  });
-  const parts: Record<string, string> = {};
-  for (const { type, value } of formatter.formatToParts(new Date(iso))) {
-    parts[type] = value;
-  }
-  return parts;
-}
-
-export function localDateKey(iso: string, timezone: string): string {
-  const { year, month, day } = zonedParts(iso, timezone);
-  return `${year}-${month}-${day}`;
-}
-
-export function localTimeOfDayMs(iso: string, timezone: string): number {
-  const { hour, minute, second } = zonedParts(iso, timezone);
-  // Intl renders midnight as "24" in some locales
-  const hours = Number(hour) % 24;
-  return ((hours * 60 + Number(minute)) * 60 + Number(second)) * 1000;
-}
-
-function localDayLabel(iso: string, timezone: string): string {
-  const { weekday, day, month, year } = zonedParts(iso, timezone);
-  const monthName = new Intl.DateTimeFormat('en-NZ', { timeZone: timezone, month: 'long' }).format(new Date(iso));
-  return `${weekday}, ${Number(day)} ${monthName} ${year} (${year}-${month}-${day})`;
-}
 
 /** keeps a time of day inside a single day */
 function wrapTimeOfDay(ms: number): number {

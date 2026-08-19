@@ -161,7 +161,10 @@ export class PcoClient {
         includedById.set(`${resource.type}:${resource.id}`, resource);
       }
 
-      if (page.links?.next) {
+      // an empty page ends the walk even when a next cursor is offered: PCO keeps
+      // handing out `links.next` past the end of some lists, and following it to
+      // MAX_PAGES burns through the rate limit and costs minutes
+      if (page.links?.next && page.data.length > 0) {
         nextUrl = page.links.next;
         continue;
       }
@@ -290,8 +293,22 @@ const MONTHS = [
 
 /**
  * The plan's date as YYYY-MM-DD.
- * `sort_date` is authoritative; the `dates` string is a last resort because it is
- * localised prose ("August 23, 2026").
+ *
+ * `sort_date` is authoritative and is read AS WRITTEN, not converted. It looks like
+ * a UTC instant and is not one: PCO stamps it with the organisation's local wall
+ * clock and appends a spurious `Z`. Verified against two live service types on the
+ * same Sunday --
+ *
+ *   Central AM  sort_date 2026-08-23T09:00:00Z   service starts_at 2026-08-22T21:00:00Z
+ *   Central PM  sort_date 2026-08-23T18:00:00Z   service starts_at 2026-08-23T06:00:00Z
+ *
+ * -- both of which are 9am and 6pm Auckland on the 23rd. Putting `sort_date`
+ * through a timezone conversion moves the evening service to the 24th, so do not
+ * "fix" this by converting it. `PlanTime.starts_at` above IS a real UTC instant and
+ * is converted, in pcoTime.ts.
+ *
+ * The `dates` string is a last resort, and is also already local prose
+ * ("August 23, 2026").
  */
 export function planDateKey(plan: PcoPlan): string | null {
   const sortDate = plan.attributes.sort_date;

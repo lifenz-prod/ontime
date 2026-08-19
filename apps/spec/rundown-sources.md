@@ -1,8 +1,9 @@
 # Rundown sources
 
 A **rundown source** is a rundown which lives outside the project file and can be recalled into it on
-demand. Today the sources are the worksheet tabs of the linked Google Sheet, so a Companion button can
-pull up "Rehearsal" or "Christmas Eve" without anyone opening the settings panel.
+demand. The sources are the worksheet tabs of the linked Google Sheet, or the upcoming plans of a
+Planning Center service type, so a Companion button can pull up "Rehearsal", "Christmas Eve" or next
+Sunday's run sheet without anyone opening the settings panel.
 
 The feature has two halves:
 
@@ -18,24 +19,26 @@ The runtime store gained a `rundownSources` key. Like every other store key it i
 {
   "type": "ontime-rundownSources",
   "payload": {
-    "provider": "gsheet",         // which origin populated the list, null when nothing is connected
-    "containerId": "1a2b3c...",   // the google sheet ID
+    "provider": "gsheet", // which origin populated the list, null when nothing is connected
+    "containerId": "1a2b3c...", // the google sheet ID
     "sources": [
       { "index": 1, "name": "Sunday 9am + 11am" },
       { "index": 2, "name": "Rehearsal" },
-      { "index": 3, "name": "Christmas Eve" }
+      { "index": 3, "name": "Christmas Eve" },
     ],
-    "loaded": "Rehearsal",        // name of the source last recalled, null before the first recall
-    "loading": false,             // a refresh or a recall is in flight
-    "error": null,                // reason the last operation failed, cleared on success
-    "revision": 4                 // increments on every successful refresh
-  }
+    "loaded": "Rehearsal", // name of the source last recalled, null before the first recall
+    "loading": false, // a refresh or a recall is in flight
+    "error": null, // reason the last operation failed, cleared on success
+    "revision": 4, // increments on every successful refresh
+  },
 }
 ```
 
-`index` is 1 based and follows the tab order in the sheet. It is the address used for recall, so
-**reordering tabs in Google Sheets reshuffles the indices** — recall by name if the buttons need to
-survive that.
+`index` is 1 based and follows the order the provider lists in: tab order for a sheet, soonest first for
+Planning Center. It is the address used for recall, so **reordering tabs in Google Sheets reshuffles the
+indices** — recall by name if the buttons need to survive that. Planning Center is the other way round:
+index 1 is always the next plan and its name changes every week, so a "load next Sunday" button wants
+the index and a specific date wants the name.
 
 The list is read once at startup and refreshed on demand. It is empty when no source is connected,
 with the reason in `error`.
@@ -44,11 +47,11 @@ with the reason in `error`.
 
 Three actions are available on all three transports.
 
-| Action           | Payload                         | Effect                                                 |
-| ---------------- | ------------------------------- | ------------------------------------------------------ |
-| `sources`        | none                            | returns the state shown above                          |
-| `refreshsources` | none                            | re-reads the list from the provider                    |
-| `loadsource`     | index, name, `{index}`/`{name}` | recalls a rundown, see below                           |
+| Action           | Payload                         | Effect                              |
+| ---------------- | ------------------------------- | ----------------------------------- |
+| `sources`        | none                            | returns the state shown above       |
+| `refreshsources` | none                            | re-reads the list from the provider |
+| `loadsource`     | index, name, `{index}`/`{name}` | recalls a rundown, see below        |
 
 `loadsource` accepts a 1 based index or a name. Names are matched case insensitively. Numbers sent as
 text are treated as an index, since OSC and HTTP frequently carry them that way.
@@ -113,6 +116,22 @@ falls back to the defaults in `defaultImportMap`.
 
 In practice this means **doing one manual import from the settings panel after changing the column
 layout**, so the recall picks up the same mapping.
+
+## The providers
+
+| provider | container          | sources                           | named by                                   |
+| -------- | ------------------ | --------------------------------- | ------------------------------------------ |
+| `gsheet` | the linked sheet   | its worksheet tabs                | the tab name                               |
+| `pco`    | a PCO service type | its upcoming plans, soonest first | the date the plan runs on, eg `2026-08-23` |
+
+One provider is active at a time and the first available one wins, so the order matters. Planning
+Center comes first but is only available once **both** a credential pair is in the environment and
+`"enabled": true` is set in `pco-rules.json` — a token on its own does not change what an existing
+button does. Everything else keeps recalling sheet tabs. See
+`apps/server/src/services/pco-service/README.md`.
+
+A plan carries no column mapping, so a PCO recall keeps the project's custom fields and ignores the
+import map entirely.
 
 ## Adding another origin
 

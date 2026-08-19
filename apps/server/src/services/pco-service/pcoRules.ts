@@ -60,10 +60,21 @@ export type PcoInferredEntry = {
 };
 
 export type PcoRules = {
+  /**
+   * Whether the connector serves the project's rundown sources.
+   *
+   * Off by default, and deliberately not implied by the presence of credentials:
+   * putting a token in the environment is not on its own a decision to stop
+   * recalling Google Sheet tabs. Turning this on makes Planning Center the active
+   * source provider, ahead of the linked sheet.
+   */
+  enabled: boolean;
   /** IANA zone used to turn PCO's UTC timestamps into an Ontime time of day */
   timezone: string;
-  /** PCO service type to pull from; discovered via the API and written back here */
+  /** PCO service type to pull plans from, as shown by the probe or the server log */
   serviceTypeId: string | null;
+  /** alternative to serviceTypeId: the service type's name in PCO, matched case insensitively */
+  serviceTypeName: string | null;
   /**
    * The PRE section runs from the top of the plan up to and including the item
    * whose title matches this. The Ontime boundary block is inserted right after,
@@ -113,8 +124,10 @@ export type PcoRules = {
 };
 
 export const defaultPcoRules: PcoRules = {
+  enabled: false,
   timezone: 'Pacific/Auckland',
   serviceTypeId: null,
+  serviceTypeName: null,
 
   preBoundaryTitleMatch: 'prayer meeting',
   preAnchor: 'back-from-service',
@@ -186,6 +199,9 @@ export function matchesRule(
   return Boolean(match.itemType || match.servicePosition || match.titleMatch);
 }
 
+/** keys a user file may explicitly blank out, rather than falling back to the default */
+const nullableRuleKeys = new Set<keyof PcoRules>(['serviceTypeId', 'serviceTypeName']);
+
 /** Shallow merge of a user file over the defaults, ignoring keys we do not know */
 export function mergePcoRules(partial: unknown): PcoRules {
   if (!partial || typeof partial !== 'object' || Array.isArray(partial)) {
@@ -197,9 +213,10 @@ export function mergePcoRules(partial: unknown): PcoRules {
   for (const key of Object.keys(defaultPcoRules) as (keyof PcoRules)[]) {
     const value = source[key];
     if (value === undefined || value === null) {
-      // serviceTypeId is legitimately null, everything else keeps its default
-      if (key === 'serviceTypeId' && value === null) {
-        merged.serviceTypeId = null;
+      // the service type keys are legitimately null, everything else keeps its default
+      if (value === null && nullableRuleKeys.has(key)) {
+        // @ts-expect-error -- narrowed by nullableRuleKeys
+        merged[key] = null;
       }
       continue;
     }
