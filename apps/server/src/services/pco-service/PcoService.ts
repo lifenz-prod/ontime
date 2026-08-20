@@ -22,6 +22,8 @@
 import {
   LogOrigin,
   type MaybeString,
+  type PcoCredentialSource,
+  type PcoCredentialsRequest,
   type PcoImportRequest,
   type PcoImportResult,
   type PcoKnownItems,
@@ -45,20 +47,28 @@ import { getState } from '../../stores/runtimeState.js';
 import { playbackBlocksRecall } from '../rundown-source-service/rundownSourceUtils.js';
 
 import { PcoClient, PcoError, type PcoCredentials } from './PcoClient.js';
+import {
+  clearStoredCredentials,
+  readStoredCredentials,
+  writeStoredCredentials,
+} from './pcoCredentialsFile.js';
 import type { PcoItem, PcoServiceType } from './pcoTypes.js';
 import { ensurePcoRulesFile, readPcoRules } from './pcoRulesFile.js';
 import { buildRundownFromPlan, type PcoBuildResult } from './pcoRundownBuilder.js';
 import {
-  findPlanBySourceName,
+  findPinnedBySourceName,
   knownItemsFromPlans,
-  planSourceNames,
+  maskCredentialId,
+  pinnedSourceNames,
+  planSourceName,
   planSummary,
   resolveServiceType,
 } from './pcoSourceUtils.js';
+import { localDateKey } from './pcoTime.js';
 import { savePcoRules } from './pcoRulesFile.js';
 
-/** how many upcoming plans are offered as sources; a service type publishes months ahead */
-const PLAN_LIST_LIMIT = 12;
+/** how many upcoming plans the import tab lists per service type */
+const PLANS_PER_SERVICE_TYPE = 8;
 
 const missingCredentialsMessage =
   'Planning Center credentials are not set. Add PCO_APP_ID and PCO_SECRET from a Personal Access Token ' +
@@ -82,6 +92,8 @@ let serviceTypeCache: { at: number; serviceTypes: PcoServiceType[] } | null = nu
 export type PcoConfig = {
   rules: PcoRules;
   credentials: PcoCredentials | null;
+  /** where the credentials came from, null when there are none */
+  credentialSource: PcoCredentialSource | null;
   /** id pinned through the environment, which wins over the rules file */
   pinnedServiceTypeId: MaybeString;
 };
@@ -133,14 +145,27 @@ export function getPcoConfig(): PcoConfig {
   const applicationId = process.env.PCO_APP_ID;
   const secret = process.env.PCO_SECRET;
 
-  if (applicationId && secret) {
+  /**
+   * Saved credentials win over the environment.
+   *
+   * The panel is the operator's tool: a token typed there and saved has to take
+   * effect, and silently deferring to a stale variable somebody exported months ago
+   * would look like the save had failed. The status reports which source is in use,
+   * so the precedence is visible rather than a surprise.
+   */
+  const stored = readStoredCredentials();
+  const fromEnvironment = applicationId && secret ? { applicationId, secret } : null;
+  const credentials = stored ?? fromEnvironment;
+
+  if (credentials) {
     ensurePcoRulesFile();
   }
   const rules = readPcoRules();
 
   return {
     rules: timezone ? { ...rules, timezone } : rules,
-    credentials: applicationId && secret ? { applicationId, secret } : null,
+    credentials,
+    credentialSource: credentials ? (stored ? 'stored' : 'environment') : null,
     pinnedServiceTypeId: process.env.PCO_SERVICE_TYPE_ID || null,
   };
 }
@@ -150,10 +175,11 @@ export function hasPcoCredentials(): boolean {
 }
 
 /**
- * Whether the connector should serve the project's rundown sources.
+ * Whether the pinned service types should be offered as rundown sources.
  *
- * Both halves are deliberate: `enabled` in pco-rules.json is the decision to use
- * Planning Center instead of the linked sheet, the credentials are the ability to.
+ * Both halves are deliberate: `enabled` is the decision to answer recalls, the
+ * credentials are the ability to. Being on takes nothing away from the linked
+ * sheet -- both providers are listed.
  */
 export function isPcoEnabled(): boolean {
   const { rules, credentials } = getPcoConfig();
@@ -173,6 +199,11 @@ function configKey(config: PcoConfig): string {
     config.rules.serviceTypeName,
     config.rules.pinnedServiceTypes.map((pinned) => pinned.id).join(','),
   ].join('|');
+}
+
+/** today's date in the organisation's timezone, which is what "next plan" is relative to */
+function todayFor(config: PcoConfig): string {
+  return localDateKey(new Date().toISOString(), config.rules.timezone);
 }
 
 function getClient(config: PcoConfig): PcoClient {
@@ -205,15 +236,14 @@ async function useServiceType(client: PcoClient, config: PcoConfig): Promise<{ i
 }
 
 /**
- * The plans which can be recalled, soonest first, so index 1 is the next service.
+ * The recallable sources: one per pinned service type.
+ *
+ * Not one per plan. A button that says "Central AM" still means the right thing
+ * next Sunday; a button holding a date is dead by Monday. Which plan it resolves to
+ * is decided at recall time, in `fetchPcoSource`.
  */
 export async function listPcoSources(): Promise<string[]> {
-  const config = getPcoConfig();
-  const client = getClient(config);
-  const serviceType = await useServiceType(client, config);
-
-  const plans = await client.getFuturePlans(serviceType.id, PLAN_LIST_LIMIT);
-  return planSourceNames(plans);
+  return pinnedSourceNames(getPcoConfig().rules.pinnedServiceTypes);
 }
 
 /**
@@ -226,21 +256,28 @@ export async function listPcoSources(): Promise<string[]> {
 export async function fetchPcoSource(name: string): Promise<Pick<PcoBuildResult, 'rundown' | 'serviceProfiles'>> {
   const config = getPcoConfig();
   const client = getClient(config);
-  const serviceType = await useServiceType(client, config);
 
-  const plans = await client.getFuturePlans(serviceType.id, PLAN_LIST_LIMIT);
-  const plan = findPlanBySourceName(plans, name);
-
-  if (!plan) {
+  const pinned = findPinnedBySourceName(config.rules.pinnedServiceTypes, name);
+  if (!pinned) {
     throw new PcoError(
-      `No Planning Center plan named "${name}" in "${serviceType.name}". ` +
-        `Available: ${planSourceNames(plans).join(', ') || 'none'}`,
+      `No Planning Center service type named "${name}" is pinned. ` +
+        `Available: ${pinnedSourceNames(config.rules.pinnedServiceTypes).join(', ') || 'none'}`,
     );
   }
 
+  // the soonest plan from today, so a Sunday morning recall loads that morning
+  const from = todayFor(config);
+  const [plan] = await client.getPlansFrom(pinned.id, from, 1);
+
+  if (!plan) {
+    throw new PcoError(`"${pinned.name}" has no plan on or after ${from}`);
+  }
+
+  logger.info(LogOrigin.Server, `Planning Center "${pinned.name}" resolved to the plan on ${planSourceName(plan)}`);
+
   const [planTimes, content] = await Promise.all([
-    client.getPlanTimes(serviceType.id, plan.id),
-    client.getPlanContent(serviceType.id, plan.id),
+    client.getPlanTimes(pinned.id, plan.id),
+    client.getPlanContent(pinned.id, plan.id),
   ]);
 
   const result = buildRundownFromPlan({
@@ -307,6 +344,8 @@ export async function getPcoStatus(): Promise<PcoStatus> {
 
   const status: PcoStatus = {
     hasCredentials: config.credentials !== null,
+    credentialSource: config.credentialSource,
+    applicationIdHint: config.credentials ? maskCredentialId(config.credentials.applicationId) : null,
     enabled: config.rules.enabled,
     connected: false,
     serviceTypeCount: null,
@@ -345,7 +384,10 @@ export async function getPcoStatus(): Promise<PcoStatus> {
  * Failures are per service type: a pinned type that has been archived should not
  * take the whole list down, so it is logged and skipped.
  */
-export async function listPcoPlans(serviceTypeIds?: string[], perServiceType = 8): Promise<PcoPlanSummary[]> {
+export async function listPcoPlans(
+  serviceTypeIds?: string[],
+  perServiceType = PLANS_PER_SERVICE_TYPE,
+): Promise<PcoPlanSummary[]> {
   const config = getPcoConfig();
   const client = getClient(config);
 
@@ -360,6 +402,8 @@ export async function listPcoPlans(serviceTypeIds?: string[], perServiceType = 8
   const serviceTypes = await listServiceTypesFor(client);
   const summaries: PcoPlanSummary[] = [];
 
+  const from = todayFor(config);
+
   for (const serviceTypeId of wanted) {
     const serviceType = serviceTypes.find((candidate) => candidate.id === serviceTypeId);
     if (!serviceType) {
@@ -368,7 +412,7 @@ export async function listPcoPlans(serviceTypeIds?: string[], perServiceType = 8
     }
 
     try {
-      const plans = await client.getFuturePlans(serviceTypeId, perServiceType);
+      const plans = await client.getPlansFrom(serviceTypeId, from, perServiceType);
       for (const plan of plans) {
         summaries.push(planSummary(plan, { id: serviceTypeId, name: serviceType.attributes.name }));
       }
@@ -402,7 +446,7 @@ export async function getPcoKnownItems(serviceTypeId?: string, plansToSample = 4
     ? { id: serviceType.id, name: serviceType.attributes.name.trim() }
     : await useServiceType(client, config);
 
-  const plans = await client.getFuturePlans(resolved.id, plansToSample);
+  const plans = await client.getPlansFrom(resolved.id, todayFor(config), plansToSample);
   const contents: PcoItem[][] = [];
 
   for (const plan of plans) {
@@ -483,4 +527,35 @@ export function setPcoRules(rules: PcoRules): PcoRules {
   savePcoRules(rules);
   resetPcoCache();
   return getPcoConfig().rules;
+}
+
+/**
+ * Checks a token pair against Planning Center, then saves it.
+ *
+ * Verified before it is written on purpose: a typo in a token is invisible -- there
+ * is nothing to look at afterwards to tell whether it was right -- and saving a bad
+ * pair would leave the panel reporting credentials that cannot be used.
+ * @throws when Planning Center rejects the pair, in which case nothing is written
+ */
+export async function setPcoCredentials(request: PcoCredentialsRequest): Promise<void> {
+  const applicationId = request.applicationId.trim();
+  const secret = request.secret.trim();
+
+  if (!applicationId || !secret) {
+    throw new PcoError('Both the application id and the secret are required', 400);
+  }
+
+  await new PcoClient({ applicationId, secret }).checkAuth();
+
+  writeStoredCredentials({ applicationId, secret });
+  resetPcoCache();
+}
+
+/**
+ * Forgets the saved pair. Any pair in the environment takes over again, which the
+ * status reports, so removing here does not necessarily leave the connector unusable.
+ */
+export function removePcoCredentials(): void {
+  clearStoredCredentials();
+  resetPcoCache();
 }

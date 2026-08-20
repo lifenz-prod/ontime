@@ -108,54 +108,77 @@ a silent empty rundown.
 
 ## Recalling a plan
 
-The connector is a provider behind the rundown-source API, the same one that
-recalls a worksheet tab from the linked Google Sheet. See
-`apps/spec/rundown-sources.md` for the commands; nothing about them is
-PCO-specific.
+The connector is a provider behind the rundown-source API, the same one that recalls
+a worksheet tab from the linked Google Sheet, and both are listed at once. See
+`apps/spec/rundown-sources.md` for the commands.
 
-One source per upcoming plan, soonest first, each named by the **date it runs on**:
+**One source per pinned service type**, named after the service type:
 
 ```
-1  2026-08-23
-2  2026-08-30
-3  2026-09-06
+1  Central AM
+2  Central PM
 ```
 
 ```
-/ontime/loadsource 1                  # next Sunday's plan
-/ontime/loadsource "2026-09-06"       # a specific one
+/ontime/loadsource/pco "Central AM"   # this Sunday's Central AM
+/ontime/loadsource/pco 1              # the same, by position
 ```
 
-The date is read in the configured timezone, not sliced off the timestamp: PCO
-stamps a 9am Auckland service `21:00Z` the day before, so the raw date would name
-Sunday's plan after Saturday. Two plans on one date are distinguished by plan id,
-`2026-08-23 (71234567)`.
+Not one source per plan, which is what this used to be. A button labelled
+_Central AM_ still means the right thing next Sunday; a button holding `2026-08-23`
+is dead by Monday. Which plan it resolves to is decided when the recall runs: the
+soonest plan dated **today or later**.
+
+That boundary is the whole question on a Sunday morning, so it does not rely on
+PCO's `filter=future`, whose treatment of today's plan is undocumented. It queries
+`filter=after&after=<today>` instead, which is inclusive — verified live:
+`after=2026-08-23` returns the plan dated 2026-08-23. Today is read in the
+configured timezone.
+
+Two campuses can pin service types with the same name, in which case the source name
+is qualified by its campus group, and by the service type id if even that collides.
 
 A recall builds the rundown, then replaces the project's rundown and service
 profiles and regenerates the 11am. It is **refused while playback is running** and
 custom fields are left alone, because a plan carries no column mapping. Divergence
 between the two service times is written to the log rather than flattened silently.
 
+### Credentials
+
+A Personal Access Token pair from
+<https://api.planningcenteronline.com/oauth/applications>, needing read access to
+Services. Three places it can come from, in this order:
+
+1. **The settings panel.** Saved to `pco-credentials.json` in the Ontime data
+   directory, written 0600. This is what makes the connector deployable to another
+   campus: nobody has to touch a file on the machine.
+2. `PCO_APP_ID` / `PCO_SECRET` in the environment.
+3. A `.env` in the Ontime data directory or the working directory.
+
+Saved credentials win over the environment, because a token typed into the panel has
+to take effect — deferring to a variable somebody exported months ago would look
+like the save had failed. The panel reports which source is in use, so the
+precedence is visible rather than a surprise.
+
+The secret is write-only: it is never sent back to the browser, never logged, and
+what the panel shows instead is a masked application id. It is checked against
+Planning Center before it is stored, because a typo in a token leaves nothing to
+look at afterwards. It is kept in the data directory and **not** in the project
+file, which gets exported and passed around.
+
 ### Turning it on
 
-Two separate switches, on purpose:
+Credentials are the ability; the **Offer plans to Companion and OSC** switch on the
+settings panel (`enabled` in `pco-rules.json`) is the decision. With both, the
+pinned service types join the recallable rundown sources — _alongside_ the Google
+Sheet tabs, taking nothing away from them.
 
-1. `PCO_APP_ID` / `PCO_SECRET` — the ability to read PCO. Read from the environment,
-   or from a `.env` in the Ontime **data directory**, next to `pco-rules.json`: an
-   installed copy has no shell to export a variable from. A real environment
-   variable wins over the file.
-2. **Recall plans instead of Google Sheet tabs**, the switch on the settings panel
-   (`enabled` in `pco-rules.json`) — the decision to serve `loadsource` from
-   Planning Center. A token sitting in the environment does not change what an
-   existing Companion button does.
-
-With both set, the provider serves the source list ahead of the sheet. Which
-service type it pulls from is `PCO_SERVICE_TYPE_ID`, else `serviceTypeId`, else
-`serviceTypeName` (a case-insensitive substring, so `central am` finds
-_Central AM Service_), else the first **pinned** service type, else the
-organisation's only one. Anything ambiguous is an error listing the ids to choose
-from — this organisation has 329 service types, so guessing would be worse than
-failing.
+Which service type a bare recall resolves to is `PCO_SERVICE_TYPE_ID`, else
+`serviceTypeId`, else `serviceTypeName` (a case-insensitive substring, so
+`central am` finds _Central AM Service_), else the first **pinned** service type,
+else the organisation's only one. Anything ambiguous is an error listing the ids to
+choose from — this organisation has 329 service types, so guessing would be worse
+than failing.
 
 ## The settings panel
 
@@ -163,12 +186,17 @@ Two entries under _Planning Center_ in app settings, both editing the same
 `pco-rules.json`. Every control saves immediately: a dirty form on either would
 have to write the whole file back, silently reverting the other.
 
-**Import from Planning Center** — connection state, the switch above, the pinned
-service types, and the upcoming plans across them with an Import button per plan.
-Pinning exists because of the 329: the picker is a search, and what gets used is
-kept. A pin carries an optional campus heading, which groups the plan list.
-Importing replaces the rundown and the service profiles, and is refused while a
-show is running.
+**Import from Planning Center** — connection state, the credentials, the switch
+above, the pinned service types, and the upcoming plans across them with an Import
+button per plan. Pinning exists because of the 329: the picker is a search, and what
+gets used is kept. A pin carries an optional campus heading, which groups the plan
+list and disambiguates a shared service type name. The pins are also exactly what a
+recall can address, so pinning is how a campus decides what its Companion buttons
+can reach. Importing replaces the rundown and the service profiles, and is refused
+while a show is running.
+
+Unlike a recall, an import here names a specific dated plan, which is what makes it
+useful for building next month's service ahead of time.
 
 **Import defaults** — the default timing applied to every event, then the items
 Planning Center actually carries, read from the next few run sheets of a pinned
@@ -252,9 +280,6 @@ builder or any calling code.
 
 ## Not done yet
 
-- Credentials in the UI. They are environment or `.env` only, so setting them up
-  still means touching a file. The panel reports whether they are present, never
-  their value.
 - Building a plan for a chosen day. `buildRundownFromPlan` takes a `targetDate` and
   reports `availableDays`, and the import route accepts one, but neither the panel
   nor a recall offers the choice yet.

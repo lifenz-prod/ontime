@@ -88,12 +88,11 @@ export type PcoPinnedServiceType = {
 
 export type PcoRules = {
   /**
-   * Whether the connector serves the project's rundown sources.
+   * Whether the pinned service types are offered as recallable rundown sources.
    *
-   * Off by default, and deliberately not implied by the presence of credentials:
-   * putting a token in the environment is not on its own a decision to stop
-   * recalling Google Sheet tabs. Turning this on makes Planning Center the active
-   * source provider, ahead of the linked sheet.
+   * Additive: Planning Center is listed alongside the Google Sheet tabs, and
+   * neither hides the other. Off by default all the same, so a machine that holds
+   * credentials for some other reason does not start answering recalls.
    */
   enabled: boolean;
   /** IANA zone used to turn PCO's UTC timestamps into an Ontime time of day */
@@ -162,6 +161,21 @@ export type PcoServiceTypeSummary = {
 };
 
 /**
+ * Where a token pair came from.
+ *
+ * `stored` is the settings panel, kept in the Ontime data directory. `environment`
+ * is PCO_APP_ID / PCO_SECRET, including a .env file. Saved credentials win, because
+ * typing a token into the panel has to take effect.
+ */
+export type PcoCredentialSource = 'stored' | 'environment';
+
+/** what the panel sends when someone enters a token pair. Never returned */
+export type PcoCredentialsRequest = {
+  applicationId: string;
+  secret: string;
+};
+
+/**
  * Whether the connector can be used, and what it is pointed at.
  *
  * Reaching Planning Center and having chosen a service type are two different
@@ -169,8 +183,12 @@ export type PcoServiceTypeSummary = {
  * service types is connected but unconfigured, which is not a failure.
  */
 export type PcoStatus = {
-  /** PCO_APP_ID and PCO_SECRET are both set */
+  /** a token pair is available, from the environment or saved in Ontime */
   hasCredentials: boolean;
+  /** where the pair in use came from, null when there is none */
+  credentialSource: PcoCredentialSource | null;
+  /** the application id, masked. Never the secret */
+  applicationIdHint: string | null;
   /** `enabled` in the rules file: Planning Center serves rundown sources */
   enabled: boolean;
   /** the API answered */

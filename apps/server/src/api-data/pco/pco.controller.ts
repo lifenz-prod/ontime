@@ -19,6 +19,8 @@ import {
   importPcoPlan,
   listPcoPlans,
   listPcoServiceTypes,
+  removePcoCredentials,
+  setPcoCredentials,
   setPcoRules,
 } from '../../services/pco-service/PcoService.js';
 import { mergePcoRules } from '../../services/pco-service/pcoRules.js';
@@ -101,5 +103,29 @@ export async function postImport(req: Request, res: Response<PcoImportResult | E
     // a refusal to interrupt a running show is a conflict, not a bad request
     const running = getErrorMessage(error).startsWith('Refusing to import');
     sendFailure(res, error, running ? 409 : 400);
+  }
+}
+
+/**
+ * Saves a token pair after checking it against Planning Center.
+ *
+ * Nothing about the pair comes back: the response is the new status, which reports
+ * presence and a masked application id. The secret only ever travels inwards.
+ */
+export async function postCredentials(req: Request, res: Response<PcoStatus | ErrorResponse>) {
+  try {
+    await setPcoCredentials({ applicationId: req.body.applicationId, secret: req.body.secret });
+    res.status(200).send(await getPcoStatus());
+  } catch (error) {
+    sendFailure(res, error);
+  }
+}
+
+export async function deleteCredentials(_req: Request, res: Response<PcoStatus | ErrorResponse>) {
+  try {
+    removePcoCredentials();
+    res.status(200).send(await getPcoStatus());
+  } catch (error) {
+    sendFailure(res, error);
   }
 }

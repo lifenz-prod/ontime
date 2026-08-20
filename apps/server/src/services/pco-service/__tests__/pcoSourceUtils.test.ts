@@ -1,11 +1,14 @@
-import type { PcoRules } from 'ontime-types';
+import type { PcoPinnedServiceType, PcoRules } from 'ontime-types';
 import { describe, expect, it } from 'vitest';
 
 import { defaultPcoRules } from '../pcoRules.js';
 import type { PcoItem, PcoPlan, PcoServiceType } from '../pcoTypes.js';
 import {
+  findPinnedBySourceName,
   findPlanBySourceName,
   knownItemsFromPlans,
+  maskCredentialId,
+  pinnedSourceNames,
   planSourceName,
   planSourceNames,
   planSummary,
@@ -264,5 +267,86 @@ describe('knownItemsFromPlans', () => {
 
   it('skips items with no title at all', () => {
     expect(knownItemsFromPlans([[item('', 60), item('Welcome', 60)]], rules)).toHaveLength(1);
+  });
+});
+
+describe('pinnedSourceNames', () => {
+  const pinned = (id: string, name: string, group: string | null = null): PcoPinnedServiceType => ({
+    id,
+    name,
+    group,
+  });
+
+  it('names a source after the service type, not a date', () => {
+    // the point of addressing by favourite: the button still works next Sunday
+    expect(pinnedSourceNames([pinned('1', 'Central AM'), pinned('2', 'Central PM')])).toEqual([
+      'Central AM',
+      'Central PM',
+    ]);
+  });
+
+  it('trims the names PCO pads', () => {
+    expect(pinnedSourceNames([pinned('1', 'Central PM ')])).toEqual(['Central PM']);
+  });
+
+  it('qualifies a name two campuses share with its group', () => {
+    const names = pinnedSourceNames([pinned('1', 'Sunday AM', 'Central'), pinned('2', 'Sunday AM', 'North')]);
+    expect(names).toEqual(['Central Sunday AM', 'North Sunday AM']);
+  });
+
+  it('leaves a unique name alone even when it has a group', () => {
+    expect(pinnedSourceNames([pinned('1', 'Central AM', 'Central')])).toEqual(['Central AM']);
+  });
+
+  it('falls back to the id when even the group does not separate them', () => {
+    const names = pinnedSourceNames([pinned('1', 'Sunday AM', 'Central'), pinned('2', 'Sunday AM', 'Central')]);
+    expect(names).toEqual(['Central Sunday AM', 'Central Sunday AM (2)']);
+  });
+
+  it('separates duplicates when neither carries a group', () => {
+    const names = pinnedSourceNames([pinned('1', 'Sunday AM'), pinned('2', 'Sunday AM')]);
+    expect(names).toEqual(['Sunday AM', 'Sunday AM (2)']);
+  });
+});
+
+describe('findPinnedBySourceName', () => {
+  const pinned: PcoPinnedServiceType[] = [
+    { id: '156118', name: 'Central AM', group: 'Central' },
+    { id: '158458', name: 'Central PM', group: 'Central' },
+  ];
+
+  it('finds the service type behind a source name', () => {
+    expect(findPinnedBySourceName(pinned, 'Central PM')?.id).toBe('158458');
+  });
+
+  it('ignores case and surrounding whitespace, as a recall payload may carry either', () => {
+    expect(findPinnedBySourceName(pinned, ' central am ')?.id).toBe('156118');
+  });
+
+  it('finds a qualified duplicate by its qualified name', () => {
+    const shared: PcoPinnedServiceType[] = [
+      { id: '1', name: 'Sunday AM', group: 'Central' },
+      { id: '2', name: 'Sunday AM', group: 'North' },
+    ];
+    expect(findPinnedBySourceName(shared, 'North Sunday AM')?.id).toBe('2');
+  });
+
+  it('returns nothing for a service type which is not pinned', () => {
+    expect(findPinnedBySourceName(pinned, 'North AM')).toBeUndefined();
+  });
+});
+
+describe('maskCredentialId', () => {
+  it('shows enough of a long id to recognise it, not enough to use it', () => {
+    expect(maskCredentialId('abcdef1234567890abcdef')).toBe('abcd…cdef');
+  });
+
+  it('hides a short id completely rather than revealing most of it', () => {
+    expect(maskCredentialId('abcdef')).toBe('••••••');
+    expect(maskCredentialId('abcdefghijkl')).toBe('••••••••••••');
+  });
+
+  it('never returns an empty label', () => {
+    expect(maskCredentialId('')).toBe('••••');
   });
 });

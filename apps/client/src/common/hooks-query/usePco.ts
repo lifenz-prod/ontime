@@ -2,7 +2,16 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import type { PcoKnownItems, PcoPlanSummary, PcoRules, PcoServiceTypeSummary, PcoStatus } from 'ontime-types';
 
 import { PCO_KNOWN_ITEMS, PCO_PLANS, PCO_RULES, PCO_SERVICE_TYPES, PCO_STATUS } from '../api/constants';
-import { editPcoRules, getPcoKnownItems, getPcoPlans, getPcoRules, getPcoServiceTypes, getPcoStatus } from '../api/pco';
+import {
+  deletePcoCredentials,
+  editPcoRules,
+  getPcoKnownItems,
+  getPcoPlans,
+  getPcoRules,
+  getPcoServiceTypes,
+  getPcoStatus,
+  setPcoCredentials,
+} from '../api/pco';
 import { logAxiosError } from '../api/utils';
 import { ontimeQueryClient } from '../queryClient';
 
@@ -99,4 +108,37 @@ export function usePcoRulesMutation() {
   });
 
   return { isPending, mutateAsync };
+}
+
+/**
+ * Saving or removing a token pair.
+ *
+ * The pair is never put in the query cache: the mutation carries it to the server
+ * and the response is the status, which holds only presence and a masked id.
+ */
+export function usePcoCredentialsMutation() {
+  const onSettled = () => {
+    ontimeQueryClient.invalidateQueries({ queryKey: PCO_STATUS });
+    ontimeQueryClient.invalidateQueries({ queryKey: PCO_SERVICE_TYPES });
+  };
+
+  const save = useMutation({
+    mutationFn: setPcoCredentials,
+    onError: (error) => logAxiosError('Error saving Planning Center credentials', error),
+    onSuccess: (status) => ontimeQueryClient.setQueryData(PCO_STATUS, status),
+    onSettled,
+  });
+
+  const remove = useMutation({
+    mutationFn: deletePcoCredentials,
+    onError: (error) => logAxiosError('Error removing Planning Center credentials', error),
+    onSuccess: (status) => ontimeQueryClient.setQueryData(PCO_STATUS, status),
+    onSettled,
+  });
+
+  return {
+    save: save.mutateAsync,
+    remove: remove.mutateAsync,
+    isPending: save.isPending || remove.isPending,
+  };
 }

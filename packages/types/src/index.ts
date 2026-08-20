@@ -43,6 +43,8 @@ export type { Settings } from './definitions/core/Settings.type.js';
 
 // ---> QLab
 export type {
+  PcoCredentialSource,
+  PcoCredentialsRequest,
   PcoImportRequest,
   PcoImportResult,
   PcoInferredEntry,
@@ -119,6 +121,7 @@ export {
 } from './definitions/runtime/RuntimeStore.js';
 export type {
   RundownSource,
+  RundownSourceOrigin,
   RundownSourceProvider,
   RundownSourcesState,
 } from './definitions/runtime/RundownSources.type.js';

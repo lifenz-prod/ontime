@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type {
+  PcoCredentialsRequest,
   PcoImportRequest,
   PcoImportResult,
   PcoKnownItems,
@@ -51,5 +52,19 @@ export async function editPcoRules(rules: PcoRules): Promise<PcoRules> {
 /** replaces the project rundown with the plan; refused while a show is running */
 export async function importPcoPlan(request: PcoImportRequest): Promise<PcoImportResult> {
   const res = await axios.post(`${pcoPath}/import`, request);
+  return res.data;
+}
+
+/**
+ * Saves a token pair. The response is the new status: a secret only travels
+ * inwards, and nothing that could be used to authenticate comes back.
+ */
+export async function setPcoCredentials(credentials: PcoCredentialsRequest): Promise<PcoStatus> {
+  const res = await axios.post(`${pcoPath}/credentials`, credentials);
+  return res.data;
+}
+
+export async function deletePcoCredentials(): Promise<PcoStatus> {
+  const res = await axios.delete(`${pcoPath}/credentials`);
   return res.data;
 }

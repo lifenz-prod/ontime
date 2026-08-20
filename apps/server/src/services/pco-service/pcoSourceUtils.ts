@@ -5,7 +5,7 @@
  * so that deciding *which* service type and *which* plan stays pure and testable.
  */
 
-import type { PcoKnownItem, PcoPlanSummary, PcoRules, PcoTimerRule } from 'ontime-types';
+import type { PcoKnownItem, PcoPinnedServiceType, PcoPlanSummary, PcoRules, PcoTimerRule } from 'ontime-types';
 
 import { PcoError, planDateKey } from './PcoClient.js';
 import { matchesRule } from './pcoRules.js';
@@ -247,4 +247,68 @@ function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   const middle = Math.floor(sorted.length / 2);
   return sorted.length % 2 === 0 ? Math.round((sorted[middle - 1] + sorted[middle]) / 2) : sorted[middle];
+}
+
+/**
+ * An application id with its middle removed, so the panel can show which token is
+ * in use without showing enough to use it. Short ids are hidden entirely rather
+ * than partly revealed.
+ */
+export function maskCredentialId(applicationId: string): string {
+  const id = applicationId.trim();
+  if (id.length <= 12) {
+    return '•'.repeat(Math.max(id.length, 4));
+  }
+  return `${id.slice(0, 4)}…${id.slice(-4)}`;
+}
+
+/* -------------------------------------------------------------------------- */
+/* pinned service types as recallable sources                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The names the pinned service types are recalled by.
+ *
+ * A service type name, not a plan date. This is the point of addressing Planning
+ * Center by favourite: "Central AM" means the next Central AM service, so a
+ * Companion button keeps working next week, where a button holding 2026-08-23 is
+ * dead by Monday.
+ *
+ * Two campuses can pin service types with the same name, so a duplicate is
+ * qualified by its group.
+ */
+export function pinnedSourceNames(pinned: PcoPinnedServiceType[]): string[] {
+  const counts = new Map<string, number>();
+  for (const entry of pinned) {
+    const key = entry.name.trim().toLowerCase();
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  const taken = new Set<string>();
+
+  return pinned.map((entry) => {
+    const name = entry.name.trim();
+    const duplicated = (counts.get(name.toLowerCase()) ?? 0) > 1;
+    const qualified = duplicated && entry.group?.trim() ? `${entry.group.trim()} ${name}` : name;
+
+    if (!taken.has(qualified.toLowerCase())) {
+      taken.add(qualified.toLowerCase());
+      return qualified;
+    }
+    // still not unique: fall back to the id, which always is
+    const unique = `${qualified} (${entry.id})`;
+    taken.add(unique.toLowerCase());
+    return unique;
+  });
+}
+
+/** Finds the pinned service type a source name addresses */
+export function findPinnedBySourceName(
+  pinned: PcoPinnedServiceType[],
+  name: string,
+): PcoPinnedServiceType | undefined {
+  const target = name.trim().toLowerCase();
+  const names = pinnedSourceNames(pinned);
+  const index = names.findIndex((candidate) => candidate.toLowerCase() === target);
+  return index === -1 ? undefined : pinned[index];
 }

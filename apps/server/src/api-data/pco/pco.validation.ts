@@ -48,3 +48,10 @@ export const validatePcoImport = [
 
   report,
 ];
+
+export const validatePcoCredentials = [
+  body('applicationId').isString().trim().notEmpty(),
+  body('secret').isString().trim().notEmpty(),
+
+  report,
+];

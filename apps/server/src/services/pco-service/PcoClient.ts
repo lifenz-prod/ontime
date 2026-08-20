@@ -180,7 +180,17 @@ export class PcoClient {
     return { data, included: [...includedById.values()], pages: pages + 1 };
   }
 
-  /** Cheap call used to verify a credential pair works */
+  /**
+   * Cheapest authenticated call there is: one page, one row.
+   * Used to check a token pair before saving it, where walking 329 service types
+   * would make the settings panel sit there for four seconds to learn nothing more.
+   * @throws PcoError when the pair is rejected
+   */
+  async checkAuth(): Promise<void> {
+    await this.request<PcoCollection<PcoServiceType>>('/service_types', { per_page: 1 });
+  }
+
+  /** Verifies a pair and returns what it can see */
   async verify(): Promise<{ serviceTypes: PcoServiceType[] }> {
     return { serviceTypes: await this.getServiceTypes() };
   }
@@ -197,6 +207,25 @@ export class PcoClient {
   async getFuturePlans(serviceTypeId: string, limit = 10): Promise<PcoPlan[]> {
     const { data } = await this.requestAll<PcoPlan>(`/service_types/${serviceTypeId}/plans`, {
       filter: 'future',
+      order: 'sort_date',
+    });
+    return data.slice(0, limit);
+  }
+
+  /**
+   * Plans from a calendar date onwards, soonest first.
+   *
+   * Preferred over `filter=future` for "the next plan", because the boundary is the
+   * whole question on a Sunday morning: `after` is inclusive, verified live --
+   * `after=2026-08-23` returns the plan dated 2026-08-23 -- whereas whether
+   * `future` still counts today's plan is not something the API documents.
+   *
+   * @param fromDateKey YYYY-MM-DD in the organisation's timezone
+   */
+  async getPlansFrom(serviceTypeId: string, fromDateKey: string, limit = 10): Promise<PcoPlan[]> {
+    const { data } = await this.requestAll<PcoPlan>(`/service_types/${serviceTypeId}/plans`, {
+      filter: 'after',
+      after: fromDateKey,
       order: 'sort_date',
     });
     return data.slice(0, limit);

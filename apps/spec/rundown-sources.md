@@ -1,9 +1,12 @@
 # Rundown sources
 
 A **rundown source** is a rundown which lives outside the project file and can be recalled into it on
-demand. The sources are the worksheet tabs of the linked Google Sheet, or the upcoming plans of a
-Planning Center service type, so a Companion button can pull up "Rehearsal", "Christmas Eve" or next
-Sunday's run sheet without anyone opening the settings panel.
+demand. The sources are the worksheet tabs of the linked Google Sheet and the pinned service types of
+the Planning Center organisation, so a Companion button can pull up "Rehearsal", "Christmas Eve" or
+this Sunday's Central AM run sheet without anyone opening the settings panel.
+
+**Both origins are listed at once.** They are separate providers contributing to one list, and neither
+takes anything away from the other: turning Planning Center on does not stop worksheet recall.
 
 The feature has two halves:
 
@@ -19,14 +22,18 @@ The runtime store gained a `rundownSources` key. Like every other store key it i
 {
   "type": "ontime-rundownSources",
   "payload": {
-    "provider": "gsheet", // which origin populated the list, null when nothing is connected
-    "containerId": "1a2b3c...", // the google sheet ID
     "sources": [
-      { "index": 1, "name": "Sunday 9am + 11am" },
-      { "index": 2, "name": "Rehearsal" },
-      { "index": 3, "name": "Christmas Eve" },
+      { "index": 1, "providerIndex": 1, "name": "Sunday 9am + 11am", "provider": "gsheet" },
+      { "index": 2, "providerIndex": 2, "name": "Rehearsal", "provider": "gsheet" },
+      { "index": 3, "providerIndex": 1, "name": "Central AM", "provider": "pco" },
+      { "index": 4, "providerIndex": 2, "name": "Central PM", "provider": "pco" },
     ],
-    "loaded": "Rehearsal", // name of the source last recalled, null before the first recall
+    "providers": [
+      { "id": "gsheet", "containerId": "1a2b3c...", "count": 2, "error": null },
+      { "id": "pco", "containerId": null, "count": 2, "error": null },
+    ],
+    "loaded": "Central AM", // name of the source last recalled, null before the first recall
+    "loadedProvider": "pco", // which origin it came from
     "loading": false, // a refresh or a recall is in flight
     "error": null, // reason the last operation failed, cleared on success
     "revision": 4, // increments on every successful refresh
@@ -34,34 +41,62 @@ The runtime store gained a `rundownSources` key. Like every other store key it i
 }
 ```
 
-`index` is 1 based and follows the order the provider lists in: tab order for a sheet, soonest first for
-Planning Center. It is the address used for recall, so **reordering tabs in Google Sheets reshuffles the
-indices** — recall by name if the buttons need to survive that. Planning Center is the other way round:
-index 1 is always the next plan and its name changes every week, so a "load next Sunday" button wants
-the index and a specific date wants the name.
+Two addresses, and the difference matters when building buttons:
 
-The list is read once at startup and refreshed on demand. It is empty when no source is connected,
-with the reason in `error`.
+- `index` is the position in the whole list. Sheet tabs come first, so an existing worksheet index still
+  points at the same tab.
+- `providerIndex` is the position within one provider, and is the **stable** one. Adding a worksheet tab
+  shifts every `index` after it but changes nothing inside Planning Center, so a button aimed at one
+  provider should use this together with the provider name.
+
+Names are the other option, and for Planning Center they are the better one: a source is named after the
+service type, so "Central AM" keeps meaning the next Central AM service and a button built on it does
+not expire. Reordering tabs in Google Sheets reshuffles indices, so name those too if the buttons need
+to survive it.
+
+A provider that fails to list is recorded against itself in `providers[].error` and skipped — a revoked
+Google token does not hide the Planning Center services, or the reverse. The top level `error` is only
+set when nothing could be listed at all.
+
+The list is read once at startup and refreshed on demand.
 
 ## Commands
 
 Three actions are available on all three transports.
 
-| Action           | Payload                         | Effect                              |
-| ---------------- | ------------------------------- | ----------------------------------- |
-| `sources`        | none                            | returns the state shown above       |
-| `refreshsources` | none                            | re-reads the list from the provider |
-| `loadsource`     | index, name, `{index}`/`{name}` | recalls a rundown, see below        |
+| Action           | Payload                       | Effect                               |
+| ---------------- | ----------------------------- | ------------------------------------ |
+| `sources`        | none                          | returns the state shown above        |
+| `refreshsources` | none                          | re-reads the list from all providers |
+| `loadsource`     | index, name, or either scoped | recalls a rundown, see below         |
 
 `loadsource` accepts a 1 based index or a name. Names are matched case insensitively. Numbers sent as
 text are treated as an index, since OSC and HTTP frequently carry them that way.
 
+It also accepts a **provider scope**, which is how a button says which origin it means. Scoped, an index
+counts within that provider:
+
+- `{ "provider": "pco", "name": "Central AM" }` or `{ "provider": "pco", "index": 1 }`
+- `"pco:Central AM"` — a prefix, for transports that can only carry one string
+- a provider path segment, `/ontime/loadsource/pco 1`
+
+A name that exists in **both** providers is refused rather than guessed at, since replacing the rundown
+from the wrong origin is worse than doing nothing:
+
+```
+"Rehearsal" exists in gsheet and pco, say which one: eg. gsheet:Rehearsal
+```
+
 ### OSC
 
 ```
-/ontime/loadsource 3                  # by index
+/ontime/loadsource 3                  # by index across the whole list
 /ontime/loadsource "Rehearsal"        # by name
 /ontime/loadsource/index 3            # equivalent to the first
+/ontime/loadsource/pco 1              # first Planning Center source
+/ontime/loadsource/pco "Central AM"   # by name, unambiguously
+/ontime/loadsource "pco:Central AM"   # same, as one string
+/ontime/loadsource/gsheet "Rehearsal"
 /ontime/refreshsources
 ```
 
@@ -70,6 +105,8 @@ text are treated as an index, since OSC and HTTP frequently carry them that way.
 ```jsonc
 { "type": "loadsource", "payload": 3 }
 { "type": "loadsource", "payload": "Rehearsal" }
+{ "type": "loadsource", "payload": { "provider": "pco", "name": "Central AM" } }
+{ "type": "loadsource", "payload": { "provider": "pco", "index": 1 } }
 { "type": "sources" }
 ```
 
@@ -78,13 +115,16 @@ text are treated as an index, since OSC and HTTP frequently carry them that way.
 ```
 GET /api/loadsource/3
 GET /api/loadsource?name=Rehearsal
+GET /api/loadsource/pco/1
+GET /api/loadsource/pco?name=Central%20AM
 GET /api/refreshsources
 GET /api/sources
 ```
 
 ## What a recall does
 
-1. reads the rundown from the provider, using the column mapping of the last import made from the UI
+1. reads the rundown from the provider it came from, using the column mapping of the last import made
+   from the UI when that provider is the sheet
 2. replaces the rundown, custom fields and service profiles, exactly as the settings panel import does
 3. regenerates the dual-service instances, if the project is configured for them
 4. leaves playback stopped with no event loaded, the operator loads what they need
@@ -119,19 +159,25 @@ layout**, so the recall picks up the same mapping.
 
 ## The providers
 
-| provider | container          | sources                           | named by                                   |
-| -------- | ------------------ | --------------------------------- | ------------------------------------------ |
-| `gsheet` | the linked sheet   | its worksheet tabs                | the tab name                               |
-| `pco`    | a PCO service type | its upcoming plans, soonest first | the date the plan runs on, eg `2026-08-23` |
+| provider | container        | sources                      | named by              | resolves to               |
+| -------- | ---------------- | ---------------------------- | --------------------- | ------------------------- |
+| `gsheet` | the linked sheet | its worksheet tabs           | the tab name          | that tab                  |
+| `pco`    | the organisation | its **pinned** service types | the service type name | its next plan, from today |
 
-One provider is active at a time and the first available one wins, so the order matters. Planning
-Center comes first but is only available once **both** a credential pair is present and the _Recall
-plans instead of Google Sheet tabs_ switch is on, under Planning Center in app settings — a token on
-its own does not change what an existing button does. Everything else keeps recalling sheet tabs. See
+Planning Center is addressed by service type, not by plan. A recall resolves the soonest plan dated
+today or later at the moment it runs, so "Central AM" pressed on a Sunday morning loads that morning's
+run sheet, and the same button still works next week. Only **pinned** service types are listed — the
+organisation this was built for has 329 of them, and the pins are the ones it actually uses, set on the
+Planning Center tab in app settings.
+
+Both providers list whenever they can. Planning Center needs a credential pair and the _Offer plans to
+Companion and OSC_ switch; the sheet needs an authenticated Google account and a linked sheet. Sheet
+tabs are listed first so existing indices do not move. See
 `apps/server/src/services/pco-service/README.md`.
 
-A plan can also be imported by hand from that panel, which is the same destructive operation as a
-recall and carries the same refusal while a show is running.
+A specific dated plan can be imported by hand from that panel, which is the same destructive operation
+as a recall and carries the same refusal while a show is running. Recall itself always means "the next
+one" — a Companion button holding a date would be dead by Monday.
 
 A plan carries no column mapping, so a PCO recall keeps the project's custom fields and ignores the
 import map entirely.

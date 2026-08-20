@@ -46,11 +46,11 @@ const gsheetProvider: RundownSourceProviderApi = {
 };
 
 /**
- * Planning Center plans, one source per upcoming plan, soonest first.
+ * Planning Center, one source per pinned service type.
  *
- * Ahead of the sheet in the list because it only becomes available once
- * `enabled` is set in pco-rules.json, which is an explicit choice to recall plans
- * instead of worksheet tabs. Credentials alone do not switch anything over.
+ * The name is the service type, not a plan date, and the plan is chosen at recall
+ * time: "Central AM" keeps meaning the next Central AM service, so a button built
+ * on it survives the week.
  */
 const pcoProvider: RundownSourceProviderApi = {
   id: 'pco',
@@ -60,11 +60,25 @@ const pcoProvider: RundownSourceProviderApi = {
   fetch: (name: string) => fetchPcoSource(name),
 };
 
-const providers: RundownSourceProviderApi[] = [pcoProvider, gsheetProvider];
+/**
+ * Order defines the order sources are listed in, and the sheet comes first so that
+ * an existing worksheet index keeps pointing at the same tab now that Planning
+ * Center contributes to the same list.
+ */
+const providers: RundownSourceProviderApi[] = [gsheetProvider, pcoProvider];
 
 /**
- * Returns the provider which can currently serve sources
+ * Every provider that can currently serve sources.
+ *
+ * They coexist: a linked sheet and Planning Center are both listed, and a recall
+ * says which one it means. This used to return a single winner, which meant turning
+ * Planning Center on silently stopped worksheet recall.
  */
-export function getActiveProvider(): RundownSourceProviderApi | null {
-  return providers.find((provider) => provider.isAvailable()) ?? null;
+export function getAvailableProviders(): RundownSourceProviderApi[] {
+  return providers.filter((provider) => provider.isAvailable());
+}
+
+/** one provider by id, for a scoped recall */
+export function getProvider(id: RundownSourceProvider): RundownSourceProviderApi | undefined {
+  return providers.find((provider) => provider.id === id);
 }

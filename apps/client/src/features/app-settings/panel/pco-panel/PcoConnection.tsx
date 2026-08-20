@@ -7,6 +7,8 @@ import { maybeAxiosError } from '../../../../common/api/utils';
 import { usePcoServiceTypes, usePcoStatus } from '../../../../common/hooks-query/usePco';
 import * as Panel from '../../panel-utils/PanelUtils';
 
+import PcoCredentials from './PcoCredentials';
+
 import style from './PcoPanel.module.scss';
 
 interface PcoConnectionProps {
@@ -80,11 +82,11 @@ export default function PcoConnection({ rules, patchRules, isSaving }: PcoConnec
 
   const connectionDescription =
     !status || !status.hasCredentials
-      ? 'Credentials are read from the environment'
-      : (status.error ??
+      ? 'Enter a token pair below to connect'
+      : status.error ??
         (status.serviceTypeCount === null
-          ? 'Credentials are read from the environment'
-          : `${status.serviceTypeCount} service types in this organisation`));
+          ? 'Checking what this token can see'
+          : `${status.serviceTypeCount} service types in this organisation`);
 
   // nothing is asserted until the status is known
   const dotState = !status ? '' : !status.hasCredentials || status.error ? style.bad : style.ok;
@@ -121,8 +123,8 @@ export default function PcoConnection({ rules, patchRules, isSaving }: PcoConnec
           </Panel.ListItem>
           <Panel.ListItem>
             <Panel.Field
-              title='Recall plans instead of Google Sheet tabs'
-              description='Makes Planning Center the source for loadsource over OSC, websocket and HTTP. Off leaves sheet recall untouched.'
+              title='Offer plans to Companion and OSC'
+              description='Adds the pinned service types below to the recallable rundown sources, alongside the Google Sheet tabs. Neither replaces the other.'
             />
             <Switch
               variant='ontime'
@@ -134,12 +136,7 @@ export default function PcoConnection({ rules, patchRules, isSaving }: PcoConnec
           </Panel.ListItem>
         </Panel.ListGroup>
 
-        {status && !status.hasCredentials && (
-          <Panel.BlockQuote>
-            Set PCO_APP_ID and PCO_SECRET in the environment, from a Personal Access Token created at
-            api.planningcenteronline.com/oauth/applications, then restart Ontime.
-          </Panel.BlockQuote>
-        )}
+        <PcoCredentials status={status} />
 
         <Panel.Title>
           Service types

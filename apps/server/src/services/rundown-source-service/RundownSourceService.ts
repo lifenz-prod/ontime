@@ -5,9 +5,19 @@
  * The list is published to the runtime store as `rundownSources` so that
  * integrations (eg. Companion over websocket) can populate a selector,
  * and recall is triggered through the integration API with `loadsource`.
+ *
+ * Providers coexist. A linked Google Sheet contributes its worksheet tabs and
+ * Planning Center contributes its pinned service types, both in one list, each
+ * source saying where it came from. A recall can name a provider to be
+ * unambiguous, and should when a button is meant to hit one of them.
  */
 
-import { LogOrigin, type RundownSource, type RundownSourcesState } from 'ontime-types';
+import {
+  LogOrigin,
+  type RundownSource,
+  type RundownSourceOrigin,
+  type RundownSourcesState,
+} from 'ontime-types';
 import { getErrorMessage } from 'ontime-utils';
 
 import { logger } from '../../classes/Logger.js';
@@ -16,14 +26,14 @@ import { patchCurrentProject } from '../project-service/ProjectService.js';
 import { getCustomFields } from '../rundown-service/rundownCache.js';
 import { getState } from '../../stores/runtimeState.js';
 
-import { getActiveProvider, type RundownSourceProviderApi } from './rundownSourceProviders.js';
-import { playbackBlocksRecall, resolveSourceTarget } from './rundownSourceUtils.js';
+import { getAvailableProviders, getProvider, type RundownSourceProviderApi } from './rundownSourceProviders.js';
+import { playbackBlocksRecall, resolveSourceTarget, type SourceTarget } from './rundownSourceUtils.js';
 
 let state: RundownSourcesState = {
-  provider: null,
-  containerId: null,
   sources: [],
+  providers: [],
   loaded: null,
+  loadedProvider: null,
   loading: false,
   error: null,
   revision: 0,
@@ -54,17 +64,46 @@ export function getRundownSourcesState(): RundownSourcesState {
 }
 
 /**
- * Reads the list from the provider and publishes it
- * The caller is responsible for the busy guard
+ * Reads every available provider and publishes one merged list.
+ *
+ * A provider that fails is recorded against itself and skipped, so a revoked
+ * Google token does not hide the Planning Center services, or the reverse. The
+ * whole thing only fails when nothing could be listed at all.
+ *
+ * The caller is responsible for the busy guard.
  */
-async function listFrom(provider: RundownSourceProviderApi): Promise<void> {
-  const names = await provider.list();
-  const sources: RundownSource[] = names.map((name, index) => ({ index: index + 1, name }));
+async function listFrom(providers: RundownSourceProviderApi[]): Promise<void> {
+  const sources: RundownSource[] = [];
+  const origins: RundownSourceOrigin[] = [];
+  const failures: string[] = [];
+
+  for (const provider of providers) {
+    try {
+      const names = await provider.list();
+      names.forEach((name, position) => {
+        sources.push({
+          index: sources.length + 1,
+          providerIndex: position + 1,
+          name,
+          provider: provider.id,
+        });
+      });
+      origins.push({ id: provider.id, containerId: provider.getContainerId(), count: names.length, error: null });
+    } catch (error) {
+      const message = getErrorMessage(error);
+      origins.push({ id: provider.id, containerId: provider.getContainerId(), count: 0, error: message });
+      failures.push(`${provider.id}: ${message}`);
+      logger.warning(LogOrigin.Server, `Could not list ${provider.id} rundown sources: ${message}`);
+    }
+  }
+
+  if (sources.length === 0 && failures.length > 0) {
+    throw new Error(failures.join('; '));
+  }
 
   publish({
-    provider: provider.id,
-    containerId: provider.getContainerId(),
     sources,
+    providers: origins,
     loading: false,
     error: null,
     revision: state.revision + 1,
@@ -72,13 +111,13 @@ async function listFrom(provider: RundownSourceProviderApi): Promise<void> {
 }
 
 /**
- * Reads the list of available rundowns from the active provider
+ * Reads the list of available rundowns from every connected provider
  */
 export async function refreshRundownSources(): Promise<RundownSourcesState> {
-  const provider = getActiveProvider();
+  const providers = getAvailableProviders();
 
-  if (!provider) {
-    publish({ provider: null, containerId: null, sources: [], loading: false, error: noProviderMessage });
+  if (providers.length === 0) {
+    publish({ sources: [], providers: [], loading: false, error: noProviderMessage });
     throw new Error(noProviderMessage);
   }
 
@@ -86,7 +125,7 @@ export async function refreshRundownSources(): Promise<RundownSourcesState> {
   publish({ loading: true, error: null });
 
   try {
-    await listFrom(provider);
+    await listFrom(providers);
     return state;
   } catch (error) {
     const message = getErrorMessage(error);
@@ -114,15 +153,15 @@ export function assertRecallAllowed() {
 
 /**
  * Recalls a rundown into the current project, leaving playback untouched
- * @param target 1 based index or name of the source
+ * @param address a position or name, optionally scoped to one provider
  */
-export async function loadRundownSource(target: number | string): Promise<RundownSource> {
+export async function loadRundownSource(address: SourceTarget): Promise<RundownSource> {
   assertRecallAllowed();
 
-  const provider = getActiveProvider();
+  const providers = getAvailableProviders();
 
-  if (!provider) {
-    publish({ provider: null, containerId: null, sources: [], loading: false, error: noProviderMessage });
+  if (providers.length === 0) {
+    publish({ sources: [], providers: [], loading: false, error: noProviderMessage });
     throw new Error(noProviderMessage);
   }
 
@@ -132,17 +171,23 @@ export async function loadRundownSource(target: number | string): Promise<Rundow
 
   try {
     // the list may be stale or empty on a cold start, refresh before giving up on a target
-    if (!resolveSourceTarget(state.sources, target)) {
-      await listFrom(provider);
+    if (!resolveSourceTarget(state.sources, address)) {
+      await listFrom(providers);
       publish({ loading: true });
     }
 
-    const source = resolveSourceTarget(state.sources, target);
+    const source = resolveSourceTarget(state.sources, address);
     if (!source) {
-      throw new Error(`Rundown source not found: ${target} (${state.sources.length} available)`);
+      const scope = address.provider ? ` in ${address.provider}` : '';
+      throw new Error(`Rundown source not found: ${address.target}${scope} (${state.sources.length} available)`);
     }
 
-    logger.info(LogOrigin.Server, `Recalling rundown "${source.name}"`);
+    const provider = getProvider(source.provider);
+    if (!provider) {
+      throw new Error(`No provider for ${source.provider}`);
+    }
+
+    logger.info(LogOrigin.Server, `Recalling ${source.provider} rundown "${source.name}"`);
 
     const { rundown, customFields, serviceProfiles } = await provider.fetch(source.name);
     if (rundown.length < 1) {
@@ -159,7 +204,7 @@ export async function loadRundownSource(target: number | string): Promise<Rundow
       ...(serviceProfiles ? { serviceProfiles } : {}),
     });
 
-    publish({ loaded: source.name, loading: false, error: null });
+    publish({ loaded: source.name, loadedProvider: source.provider, loading: false, error: null });
     logger.info(LogOrigin.Server, `Recalled rundown "${source.name}" with ${rundown.length} entries`);
 
     return source;

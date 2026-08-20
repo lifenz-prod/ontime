@@ -17,10 +17,10 @@ export const qlabStatePlaceholder: RuntimeStore['qlab'] = {
 };
 
 export const rundownSourcesPlaceholder: RuntimeStore['rundownSources'] = {
-  provider: null,
-  containerId: null,
   sources: [],
+  providers: [],
   loaded: null,
+  loadedProvider: null,
   loading: false,
   error: null,
   revision: 0,
