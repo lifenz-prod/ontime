@@ -5,7 +5,16 @@
  * so that deciding *which* service type and *which* plan stays pure and testable.
  */
 
-import type { PcoKnownItem, PcoPinnedServiceType, PcoPlanSummary, PcoRules, PcoTimerRule } from 'ontime-types';
+import type {
+  PcoItemDisposition,
+  PcoItemType,
+  PcoKnownItem,
+  PcoPinnedServiceType,
+  PcoPlanSummary,
+  PcoRules,
+  PcoServicePosition,
+  PcoTimerRule,
+} from 'ontime-types';
 
 import { PcoError, planDateKey } from './PcoClient.js';
 import { matchesRule } from './pcoRules.js';
@@ -158,6 +167,32 @@ export function planSummary(plan: PcoPlan, serviceType: { id: string; name: stri
   };
 }
 
+/**
+ * What the import would do with an item.
+ *
+ * The order mirrors the builder: a section fold claims an item first, then a merge
+ * into the entry above, then the ignore list. Only what survives all three is an
+ * entry, and only an entry can carry the settings the panel offers.
+ */
+export function dispositionOf(
+  rules: PcoRules,
+  candidate: { title: string; itemType: PcoItemType; servicePosition: PcoServicePosition },
+): PcoItemDisposition {
+  if (rules.collapseSections.some((rule) => matchesRule(rule.match, candidate))) {
+    return 'collapsed';
+  }
+  if (rules.mergeIntoPrevious.some((match) => matchesRule(match, candidate))) {
+    return 'merged';
+  }
+  if (rules.ignoreItems.some((match) => matchesRule(match, candidate))) {
+    return 'ignored';
+  }
+  if (candidate.itemType === 'header') {
+    return rules.headersBecome === 'block' ? 'block' : rules.headersBecome === 'nothing' ? 'ignored' : 'event';
+  }
+  return 'event';
+}
+
 /** the rule that would claim an item, so the panel can show what is already covered */
 export function ruleMatching(rules: PcoTimerRule[], candidate: PcoKnownItem): string | null {
   const found = rules.find((rule) =>
@@ -228,14 +263,14 @@ export function knownItemsFromPlans(plans: PcoItem[][], rules: PcoRules): PcoKno
       planCount: tally.plans.size,
       typicalLength: tally.lengths.length > 0 ? median(tally.lengths) : null,
       matchedBy: null,
-      ignored: false,
+      disposition: 'event',
     };
     const candidate = { title, itemType: item.itemType, servicePosition: item.servicePosition };
 
     return {
       ...item,
       matchedBy: ruleMatching(rules.timerRules, item),
-      ignored: rules.ignoreItems.some((match) => matchesRule(match, candidate)),
+      disposition: dispositionOf(rules, candidate),
     };
   });
 
@@ -303,10 +338,7 @@ export function pinnedSourceNames(pinned: PcoPinnedServiceType[]): string[] {
 }
 
 /** Finds the pinned service type a source name addresses */
-export function findPinnedBySourceName(
-  pinned: PcoPinnedServiceType[],
-  name: string,
-): PcoPinnedServiceType | undefined {
+export function findPinnedBySourceName(pinned: PcoPinnedServiceType[], name: string): PcoPinnedServiceType | undefined {
   const target = name.trim().toLowerCase();
   const names = pinnedSourceNames(pinned);
   const index = names.findIndex((candidate) => candidate.toLowerCase() === target);

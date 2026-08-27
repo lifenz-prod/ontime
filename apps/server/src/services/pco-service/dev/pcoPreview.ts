@@ -1,10 +1,14 @@
 /**
- * Offline preview of the connector, built from the Central AM fixture.
+ * Offline preview of the connector, built from a Central AM fixture.
  * No credentials needed -- useful for seeing the output shape and for checking
  * a rules file before pointing it at the real API.
  *
+ * The default fixture is the whole run sheet, the one the shipped rules are
+ * asserted against. `--sheet trimmed` uses the smaller fixture instead.
+ *
  * From apps/server:
  *   pnpm tsx src/services/pco-service/dev/pcoPreview.ts
+ *   pnpm tsx src/services/pco-service/dev/pcoPreview.ts --sheet trimmed
  *   pnpm tsx src/services/pco-service/dev/pcoPreview.ts --rules ./my-rules.json
  */
 
@@ -14,7 +18,13 @@ import { isOntimeBlock, isOntimeEvent, OntimeRundown, type PcoRules } from 'onti
 import { millisToString } from 'ontime-utils';
 
 import { regenerateInstances } from '../../rundown-service/serviceInstanceUtils.js';
-import { items, itemTimes, plan, planTimes } from '../__tests__/fixtures/centralAm.js';
+import {
+  items as trimmedItems,
+  itemTimes as trimmedItemTimes,
+  plan,
+  planTimes,
+} from '../__tests__/fixtures/centralAm.js';
+import { items as fullItems, itemTimes as fullItemTimes } from '../__tests__/fixtures/centralAmFullSheet.js';
 import { buildRundownFromPlan } from '../pcoRundownBuilder.js';
 import { defaultPcoRules, mergePcoRules } from '../pcoRules.js';
 
@@ -28,13 +38,19 @@ function show(rundown: OntimeRundown, label: string): void {
       console.log(`\n  == ${entry.title || '(untitled)'} ==`);
     } else if (isOntimeEvent(entry)) {
       const kind = entry.countToEnd ? 'to-time' : entry.timerType;
+      // an arrow means the entry's start is linked to the one above it
+      const link = entry.linkStart ? '|>' : '  ';
       console.log(
         `  ${entry.cue.padStart(3)}  ${clock(entry.timeStart)}-${clock(entry.timeEnd)}  ` +
-          `${millisToString(entry.duration).padStart(8)}  ${kind.padEnd(9)}  ${entry.title}`,
+          `${millisToString(entry.duration).padStart(8)}  ${kind.padEnd(9)} ${link} ${entry.title}`,
       );
     }
   }
 }
+
+const useTrimmed = process.argv[process.argv.indexOf('--sheet') + 1] === 'trimmed';
+const items = useTrimmed ? trimmedItems : fullItems;
+const itemTimes = useTrimmed ? trimmedItemTimes : fullItemTimes;
 
 const rulesArg = process.argv.indexOf('--rules');
 const rules: PcoRules =

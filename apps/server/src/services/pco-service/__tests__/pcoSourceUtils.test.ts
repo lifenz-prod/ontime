@@ -221,11 +221,7 @@ describe('knownItemsFromPlans', () => {
 
   it('counts the plans an item appears in, not the number of items', () => {
     const known = knownItemsFromPlans(
-      [
-        [item('Welcome', 60), item('Welcome', 60)],
-        [item('Welcome', 60)],
-        [item('Meet & Greet', 60)],
-      ],
+      [[item('Welcome', 60), item('Welcome', 60)], [item('Welcome', 60)], [item('Meet & Greet', 60)]],
       rules,
     );
 
@@ -348,5 +344,52 @@ describe('maskCredentialId', () => {
 
   it('never returns an empty label', () => {
     expect(maskCredentialId('')).toBe('••••');
+  });
+});
+
+describe('what the import will do with each item', () => {
+  const item = (title: string, itemType: PcoItem['attributes']['item_type'] = 'item'): [PcoItem[]] => [
+    [
+      {
+        type: 'Item',
+        id: `i-${title}`,
+        attributes: {
+          title,
+          description: '',
+          html_details: null,
+          length: 60,
+          sequence: 1,
+          item_type: itemType,
+          service_position: 'during',
+        },
+      },
+    ],
+  ];
+
+  const dispositionFor = (
+    title: string,
+    itemType: PcoItem['attributes']['item_type'] = 'item',
+    rules = defaultPcoRules,
+  ) => knownItemsFromPlans(item(title, itemType), rules)[0].disposition;
+
+  it('reads the shipped rules back as plain words', () => {
+    expect(dispositionFor('PRAISE & WORSHIP', 'header')).toBe('collapsed');
+    expect(dispositionFor('Online Pre Service Message')).toBe('merged');
+    expect(dispositionFor('Prayer Meeting')).toBe('ignored');
+    expect(dispositionFor('Welcome')).toBe('event');
+  });
+
+  it('follows what headings are set to become', () => {
+    // the panel must not offer timer settings on something that imports as a divider
+    expect(dispositionFor('MESSAGE', 'header')).toBe('ignored');
+    expect(dispositionFor('MESSAGE', 'header', { ...defaultPcoRules, headersBecome: 'block' })).toBe('block');
+    expect(dispositionFor('MESSAGE', 'header', { ...defaultPcoRules, headersBecome: 'event' })).toBe('event');
+  });
+
+  it('lets a fold claim a heading a rule would otherwise drop', () => {
+    // the builder folds before it ignores, and this has to say the same thing
+    expect(
+      dispositionFor('PRAISE & WORSHIP', 'header', { ...defaultPcoRules, ignoreItems: [{ itemType: 'header' }] }),
+    ).toBe('collapsed');
   });
 });

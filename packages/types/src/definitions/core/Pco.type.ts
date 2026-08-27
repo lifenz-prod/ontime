@@ -19,9 +19,21 @@ import type { TimeStrategy } from '../TimeStrategy.type.js';
 /** where in the service an item sits; only `during` counts toward a plan's total length */
 export type PcoServicePosition = 'pre' | 'during' | 'post';
 export type PcoItemType = 'song' | 'header' | 'media' | 'item';
+/** what a run sheet heading turns into; see `PcoRules.headersBecome` */
+export type PcoHeaderHandling = 'block' | 'event' | 'nothing';
 
 /** properties applied to a generated Ontime event */
 export type PcoRuleEffect = {
+  /**
+   * Replaces the event's title.
+   *
+   * Run sheet titles are written for the people reading the sheet, not for a
+   * timer screen: "Message (Incl. Altar Call) // One Way Link" is one column wide
+   * in Planning Center and far too long in Ontime. Only ever set this on a rule --
+   * a rename in `defaultEffect` would retitle the whole rundown, so the builder
+   * ignores it there.
+   */
+  title?: string;
   timerType?: TimerType;
   /** Ontime's "Countdown to Time" - the event counts down to a wall clock time */
   countToEnd?: boolean;
@@ -54,6 +66,32 @@ export type PcoTimerRule = {
   name: string;
   match: PcoRuleMatch;
   effect: PcoRuleEffect;
+};
+
+/**
+ * A whole run sheet section folded into one Ontime event.
+ *
+ * A worship set is five songs on the sheet and one 22 minute segment to the person
+ * calling the show: nobody cues the third song, they cue the end of worship. The
+ * fold keeps the section's total length, so everything after it still lands where
+ * the sheet says.
+ *
+ * The section runs from the matched item to the item before the next header, which
+ * is how Planning Center delimits a section in the first place.
+ */
+export type PcoCollapseRule = {
+  /** label shown in the settings panel and in import warnings */
+  name: string;
+  /** the item that opens the section -- normally its header */
+  match: PcoRuleMatch;
+  /** what the folded event is called. Defaults to the matched item's own title */
+  title?: string;
+  effect?: PcoRuleEffect;
+  /**
+   * Put the titles of what was folded in into the event's note, so the set list
+   * survives the fold. Defaults to true.
+   */
+  listContents?: boolean;
 };
 
 /**
@@ -124,9 +162,35 @@ export type PcoRules = {
   preAnchor: 'plan-time' | 'back-from-service';
   /** display names for the service instances, chronological; falls back to PCO plan time names */
   serviceNames: string[];
-  /** PCO `header` items become Ontime blocks instead of events */
-  headersAsBlocks: boolean;
-  /** items matching any of these never reach the rundown */
+  /**
+   * What a Planning Center `header` turns into.
+   *
+   * 'nothing' drops it, which is usually right: a header is a heading on a printed
+   * run sheet, and a rundown being called has no use for one. 'block' makes it an
+   * Ontime block, a divider carrying no time. 'event' gives it a row of its own,
+   * which only helps when the headers carry length.
+   *
+   * A header delimits a section for `collapseSections` whichever of these is set.
+   */
+  headersBecome: PcoHeaderHandling;
+  /**
+   * Sections folded into a single event. Applied before `ignoreItems`, so a header
+   * that opens a folded section survives a rule that drops every other header.
+   */
+  collapseSections: PcoCollapseRule[];
+  /**
+   * Items that give their length to the entry above them instead of getting a row
+   * of their own.
+   *
+   * Not the same as ignoring: an ignored item takes its time out of the run sheet,
+   * and everything after it moves. A pre-service run back-times to the service, so
+   * ignoring one minute of it would push the published doors time a minute later.
+   */
+  mergeIntoPrevious: PcoRuleMatch[];
+  /**
+   * Items matching any of these never reach the rundown, and their length goes
+   * with them. Applied after `collapseSections` and `mergeIntoPrevious`.
+   */
   ignoreItems: PcoRuleMatch[];
   /**
    * Regex removed from item titles. Plans express per-service variants in the
@@ -144,6 +208,19 @@ export type PcoRules = {
    * and the mirror generates the rest.
    */
   respectMasterExclusions: boolean;
+  /**
+   * Once something in a section holds its own duration, everything after it in
+   * that section holds its own too.
+   *
+   * The message is a fixed-duration countdown, so it can overrun. Anything after
+   * it counting down to a wall clock time would absorb that overrun and shrink --
+   * a two minute announcement quietly becoming thirty seconds. With this on, the
+   * rest of the section keeps its lengths and moves instead.
+   *
+   * Per section, because a section always starts where the run sheet says it does:
+   * PRE is its own run, and the mirror clones the master.
+   */
+  fixedDurationCarriesForward: boolean;
   /** applied to every event, then overridden by the first matching timer rule */
   defaultEffect: PcoRuleEffect;
   /** first match wins */
@@ -224,6 +301,22 @@ export type PcoPlanSummary = {
 };
 
 /**
+ * What the import does with an item, so the settings panel can say so rather than
+ * offering controls that could not take effect.
+ */
+export type PcoItemDisposition =
+  /** its own Ontime event */
+  | 'event'
+  /** an Ontime block: a divider, which takes no timer settings */
+  | 'block'
+  /** folded into one event with the rest of its section */
+  | 'collapsed'
+  /** its length given to the entry above it */
+  | 'merged'
+  /** never imported */
+  | 'ignored';
+
+/**
  * An item title seen across a service type's plans, so the settings panel can
  * offer what is actually on the run sheets instead of asking for a regex.
  */
@@ -237,8 +330,8 @@ export type PcoKnownItem = {
   typicalLength: number | null;
   /** the rule name currently matching this item, null when nothing does */
   matchedBy: string | null;
-  /** dropped by `ignoreItems`, so no rule here can do anything */
-  ignored: boolean;
+  /** what the import currently does with it, which decides whether a rule here can do anything */
+  disposition: PcoItemDisposition;
 };
 
 export type PcoKnownItems = {

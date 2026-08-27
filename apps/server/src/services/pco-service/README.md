@@ -48,20 +48,23 @@ doors 12:20 + online message 1:00 + pre-service video 1:40 = 40:00, and
 `9:00 - 40:00 = 8:20`, where the prayer meeting starts. Accumulating those forward
 instead would put doors open at 9:00.
 
-**Headers are not necessarily where they look.** The plan opens with a
-_SERVICE BRIEFING 8:05AM_ header, and that header is a `during` item carrying no
-length — so it would land in the master section rather than at the top of PRE, and
-the 8:05 briefing itself is nowhere in the data. Nothing in PCO says when it
-happens except those four characters of title text.
+**The plan starts at doors.** Everything earlier — power on, soundcheck, the
+briefing, the prayer meeting — belongs to the production team, and PCO records
+none of it. The only trace is two headers titled _SERVICE BRIEFING 8:05am_ and
+_LINK BRIEF 8:10am_, both `during` items carrying no length, so even those two
+would land mid-service naming a time already past.
 
-So the shipped rules do two things with it: `ignoreItems` drops the header, which
-would otherwise be a divider stranded mid-service naming a time already past, and
-an `inferredEntries` entry puts the briefing back as a real 15 minute event
-anchored to `pre-start`. On the 23 August plan that lands it at 8:05, the time the
-header claims. Anchoring rather than hardcoding is the point: the pre run
-back-times to the service, so a service that moves takes the briefing with it. The
-15 minutes is the only number not derived from the plan — it is the gap between
-the title's 8:05 and the 8:20 the lengths add up to.
+The whole morning is therefore `inferredEntries`: a contiguous run anchored to
+`pre-start`, entered as lengths and chained so the last one hands over to the run
+sheet's first item. Anchoring rather than hardcoding is the point — the pre run
+back-times to the service, so a service that moves takes the morning with it. On
+a 9:00 service with 15:00 of pre-service items that puts doors at 8:45 and power
+on at 5:30, and the two times those headers claim fall exactly where they say.
+
+The prayer meeting is on the sheet as a 25:00 `pre` item _and_ in the production
+run as two entries (the meeting, then the pack-down), so `ignoreItems` drops the
+PCO copy. That is also why the pre-service run starts at doors rather than at
+8:20: the run sheet's own `pre` items are just doors and the pre-service video.
 
 **One item list serves every time in a plan.** PCO does not hold a separate run
 sheet per service. That is what makes the 9am/11am relationship a pure time
@@ -69,6 +72,13 @@ offset, which is exactly the shape `serviceInstanceUtils.regenerateInstances`
 already expects. Where PCO _can_ express a real difference — an item excluded
 from one service, or given a different length there — the builder surfaces it as
 a warning rather than silently flattening it. See `findDivergence`.
+
+Two things are deliberately left out of that report: PRE, which runs once and is
+never mirrored, and items merged into the entry above them. The plan shape that
+makes merging useful is the one where PCO holds a separate item per service — the
+9am doors plus the online message it carries, and an 11am doors a minute longer to
+match — so reporting the merged item there would call the mirror wrong when its
+total is exactly right.
 
 ## Output shape
 
@@ -78,6 +88,14 @@ a warning rather than silently flattening it. See `findDivergence`.
 [ service entries ... ]    the master section
 ```
 
+Every entry is linked to the one above it, which is what makes the rundown move
+as one when something runs long. Two are not, and neither needs a rule: the first
+entry of the morning has nothing above it, and the mirrored service's first entry
+links to something outside its own section, which `regenerateInstances` drops
+rather than dragging the 11am back to the end of the 9am. Links are only written
+where the times already meet, so a link never moves an entry — a gap, which
+`preAnchor: 'plan-time'` can leave, stays a gap.
+
 The 11am is **not** written by this connector. It is derived by
 `regenerateInstances` from `ServiceProfile.offset`, computed as the gap between
 the plan's first and second service times. That keeps "9am is master, 11am is
@@ -86,8 +104,12 @@ re-derived" true for imports as well as for hand edits.
 ## Sectioning
 
 The PRE section runs from the top of the plan up to **and including** the item
-matching `preBoundaryTitleMatch` (default `prayer meeting`). The boundary block
-goes immediately after it.
+matching `preBoundaryTitleMatch`. The boundary block goes immediately after it.
+
+The shipped value is blank, which means no PCO item closes PRE: everything the
+plan holds is part of the master service, and PRE is entirely the inferred
+production run above. A blank pattern is a decision rather than a failure, so it
+does not warn; a pattern that matches nothing still does.
 
 `preAnchor` decides where the pre-service run starts:
 
@@ -198,12 +220,22 @@ while a show is running.
 Unlike a recall, an import here names a specific dated plan, which is what makes it
 useful for building next month's service ahead of time.
 
-**Import defaults** — the default timing applied to every event, then the items
-Planning Center actually carries, read from the next few run sheets of a pinned
-service type. Each row offers timing, hide timer, aux timer and skip, and writes a
-rule matching that title. Rows for things that cannot be affected — a header that
-imports as a block, an item dropped by `ignoreItems` — say so and are disabled
-rather than offering a control that would do nothing.
+**Import defaults** — three things, in the order the morning runs.
+
+The default timing applied to every event, and what run sheet headings become.
+
+Then _Before the run sheet_: the production run, as a table of steps and lengths.
+Offsets are never typed in — each step follows the one before and the last hands
+over to the plan's first item, so a length changed anywhere re-times everything
+ahead of it and the chain cannot drift. The table owns the `pre-start` inferred
+entries and leaves any other anchor alone.
+
+Then the items Planning Center actually carries, read from the next few run sheets
+of a pinned service type. Each row offers timing, hide timer, aux timer and skip,
+and writes a rule matching that title. A row that cannot take those settings says
+why and is disabled rather than offering a control that would do nothing — it
+imports as a block, or is folded in with its section, or is merged into the entry
+above, or is not imported at all.
 
 A rule written by the panel matches `titleContains`, a literal case-insensitive
 substring, because a run sheet title is not a regex and nobody should have to
@@ -221,26 +253,53 @@ so a later change to that default carries.
 
 ## Rules config
 
-Timer types and the implicit parts of the morning live in
-`<ontime data dir>/pco-rules.json`, which is **merged over** `defaultPcoRules` —
-so it only needs the keys it wants to change, and anything it leaves out follows
-the shipped defaults even as those change between versions. On first use the file
-is seeded with just the switch and the service type for that reason.
-`pco-rules.example.json` in this directory lists every option with the shipped
-values.
+`<data dir>/pco-rules.json` is merged over `defaultPcoRules`, so the file only
+needs the keys it changes. Anything absent follows the shipped defaults, which do
+move between versions — that is deliberate, and why the seeded file holds only
+the switch and the service type rather than a snapshot of everything.
 
-- `defaultEffect` — applied to every event. Ships as count-down + `countToEnd`
-  (Ontime's "Countdown to Time") + `lock-end`.
-- `timerRules` — first match wins, layered over `defaultEffect`. Ships with one
-  rule making anything titled _message_ or _sermon_ a fixed-duration countdown.
+An item is claimed by the first of these that matches it:
+
+1. `collapseSections` — a whole section folded into one event. The section runs
+   from the matched item (normally its header) to the item before the next
+   header, which is how PCO delimits one. The fold keeps the section's total
+   length, and lists what it folded in as the event's note so the set list is not
+   lost. A header claimed by a fold survives a rule that drops every other
+   header.
+2. `mergeIntoPrevious` — the item gives its length to the entry above it instead
+   of taking a row. Not the same as ignoring: the pre-service run back-times to
+   the service, so ignoring one minute of it would move the published doors time
+   a minute later. Merging it does not.
+3. `ignoreItems` — never reaches the rundown, and its length goes with it.
+
+What survives becomes an entry, and the rest of the file shapes it:
+
+- `headersBecome` — `nothing` (shipped), `block` or `event`. A header still
+  delimits a section for `collapseSections` whichever this is.
+- `defaultEffect` — applied to every event, then overridden by the first matching
+  `timerRules` entry. A `title` here is ignored: a rename belongs to one rule,
+  and in the defaults it would retitle the whole rundown.
+- `fixedDurationCarriesForward` — once an entry in a section holds its own
+  duration, every later entry in that section holds its own too. The message is a
+  fixed-duration countdown and can overrun; anything after it counting down to a
+  wall clock time would absorb that overrun and shrink, so a two minute
+  announcement quietly becomes thirty seconds. Scoped per section, because a
+  section starts where the run sheet says it starts.
+- `timerRules` — first match wins. `titleContains` is a literal, case-insensitive
+  substring and is what the settings panel writes; `titleMatch` is a regex for
+  rules written by hand. An effect can set the timer type, the strategy, the
+  colour, the switches, and `title` to rename the event.
 - `inferredEntries` — entries the run sheet implies but never states, positioned
   by an anchor (`pre-start`, `service-start`, `service-end`) plus a signed
-  offset, so they track the plan when times move.
-- `ignoreItems` — items that never reach the rundown.
+  offset. The settings panel owns the `pre-start` chain as a table of lengths and
+  recomputes the offsets; entries on other anchors are left alone.
+- `titleStrip` — regex removed from every title, which is how
+  `Doors Open // 9am` becomes `Doors Open`.
+- `respectMasterExclusions` — drop items PCO excludes from the master service, so
+  the mirror is the only thing that generates the other service.
+- `serviceNames` — the block names, chronologically.
 
-The one shipped `inferredEntries` value is the service briefing described above.
-Doors, walk-in and the pre-service video are **not** inferred — they are real
-`pre` items on the sheet.
+`pco-rules.example.json` next to this file carries a full example.
 
 ## Verifying against a real plan
 

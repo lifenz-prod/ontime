@@ -1,4 +1,4 @@
-import { type PcoRules, type PcoTimerRule, TimerType, TimeStrategy } from 'ontime-types';
+import { type PcoInferredEntry, type PcoRules, type PcoTimerRule, TimerType, TimeStrategy } from 'ontime-types';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -9,8 +9,11 @@ import {
   handWrittenRules,
   isEffectEmpty,
   isPanelRule,
+  moveRunStep,
+  runSteps,
   timingOf,
   withEffectForTitle,
+  withRunSteps,
 } from '../pcoRuleUtils';
 
 const shippedRule: PcoTimerRule = {
@@ -158,11 +161,67 @@ describe('describeEffect', () => {
   it('reads the choices back in plain words', () => {
     expect(describeEffect({ countToEnd: false, hideTimer: true })).toBe('Fixed duration · Hide timer');
   });
+
+  it('says when a rule renames an event', () => {
+    expect(describeEffect({ title: 'Message - LINK' })).toBe('rename to "Message - LINK"');
+  });
 });
 
 describe('isEffectEmpty', () => {
   it('treats an effect of only undefined values as empty', () => {
     expect(isEffectEmpty({ hideTimer: undefined })).toBe(true);
     expect(isEffectEmpty({ hideTimer: true })).toBe(false);
+  });
+});
+
+describe('the pre-service run', () => {
+  const minute = 60 * 1000;
+
+  const step = (title: string, minutes: number): PcoInferredEntry => ({
+    name: title,
+    title,
+    section: 'pre',
+    anchor: 'pre-start',
+    offset: 0,
+    duration: minutes * minute,
+  });
+
+  const rulesWithRun = (steps: PcoInferredEntry[], others: PcoInferredEntry[] = []) =>
+    ({ inferredEntries: [...steps, ...others] }) as PcoRules;
+
+  it('chains the steps so the last one ends where the run sheet starts', () => {
+    const { inferredEntries } = withRunSteps(rulesWithRun([]), [step('Call Time', 5), step('Soundcheck', 20)]);
+
+    expect(inferredEntries.map((entry) => entry.offset)).toEqual([-25 * minute, -20 * minute]);
+  });
+
+  it('re-times everything ahead of a step that gets longer', () => {
+    const steps = [step('Call Time', 5), step('Soundcheck', 20)];
+    const longer = [{ ...steps[0] }, { ...steps[1], duration: 30 * minute }];
+
+    expect(withRunSteps(rulesWithRun(steps), longer).inferredEntries.map((entry) => entry.offset)).toEqual([
+      -35 * minute,
+      -30 * minute,
+    ]);
+  });
+
+  it('leaves an entry anchored somewhere else alone', () => {
+    // the table only owns the chain; a hand-written entry is not part of it
+    const other: PcoInferredEntry = { ...step('Debrief', 10), anchor: 'service-end', section: 'service', offset: 0 };
+    const rules = rulesWithRun([step('Call Time', 5)], [other]);
+
+    expect(runSteps(rules)).toHaveLength(1);
+    expect(withRunSteps(rules, runSteps(rules)).inferredEntries).toContainEqual(other);
+  });
+
+  it('moves a step within the run', () => {
+    const steps = [step('A', 5), step('B', 5), step('C', 5)];
+    expect(moveRunStep(steps, 2, 0).map((entry) => entry.title)).toEqual(['C', 'A', 'B']);
+  });
+
+  it('refuses a move that would fall off either end', () => {
+    const steps = [step('A', 5), step('B', 5)];
+    expect(moveRunStep(steps, 0, -1)).toBe(steps);
+    expect(moveRunStep(steps, 1, 2)).toBe(steps);
   });
 });

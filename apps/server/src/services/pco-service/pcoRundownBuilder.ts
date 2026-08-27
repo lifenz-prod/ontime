@@ -19,6 +19,7 @@ import {
   isOntimeEvent,
   type PcoInferredEntry,
   type PcoRuleEffect,
+  type PcoRuleMatch,
   type PcoRules,
   OntimeBlock,
   OntimeEvent,
@@ -130,19 +131,31 @@ function itemCandidate(item: PcoItem) {
   };
 }
 
+/**
+ * The default effect, without a rename.
+ *
+ * A rename says something about one item. Left in `defaultEffect` it would retitle
+ * every event in the rundown, so it is dropped here rather than trusted.
+ */
+function baseEffect(rules: PcoRules): PcoRuleEffect {
+  const { title: _renamesEverything, ...rest } = rules.defaultEffect;
+  return rest;
+}
+
 /** default effect, then the first matching rule on top */
 function resolveEffect(item: PcoItem, rules: PcoRules): { effect: PcoRuleEffect; ruleName: string | null } {
   const candidate = itemCandidate(item);
   for (const rule of rules.timerRules) {
     if (matchesRule(rule.match, candidate)) {
-      return { effect: { ...rules.defaultEffect, ...rule.effect }, ruleName: rule.name };
+      return { effect: { ...baseEffect(rules), ...rule.effect }, ruleName: rule.name };
     }
   }
-  return { effect: { ...rules.defaultEffect }, ruleName: null };
+  return { effect: baseEffect(rules), ruleName: null };
 }
 
 function applyEffect(event: OntimeEvent, effect: PcoRuleEffect): OntimeEvent {
   const next = { ...event };
+  if (effect.title !== undefined) next.title = effect.title;
   if (effect.timerType !== undefined) next.timerType = effect.timerType as TimerType;
   if (effect.countToEnd !== undefined) next.countToEnd = effect.countToEnd;
   if (effect.timeStrategy !== undefined) next.timeStrategy = effect.timeStrategy as TimeStrategy;
@@ -336,14 +349,10 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
   const exclusions = buildExclusionLookup(itemTimes);
   const ordered = [...items].sort((a, b) => (a.attributes.sequence ?? 0) - (b.attributes.sequence ?? 0));
 
-  const afterIgnores = ordered.filter(
-    (item) => !rules.ignoreItems.some((rule) => matchesRule(rule, itemCandidate(item))),
-  );
-
   // items PCO excludes from the master belong to another service; keeping them
   // would put them in the master AND have the mirror duplicate them
   const droppedForMaster: string[] = [];
-  const kept = afterIgnores.filter((item) => {
+  const kept = ordered.filter((item) => {
     if (rules.respectMasterExclusions && exclusions.isExcludedFrom(item.id, masterTime.id)) {
       droppedForMaster.push(item.attributes.title ?? item.id);
       return false;
@@ -357,9 +366,103 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
         `${droppedForMaster.map((title) => `"${title}"`).join(', ')}. The mirror regenerates the other service.`,
     );
   }
-  if (kept.length === 0) {
-    warnings.push('No items survived the filters; the rundown will only contain inferred entries.');
-  }
+
+  /* --- items -> entries-to-be ----------------------------------------------
+   * Not one entry per item. A section can be folded into a single event, an item
+   * can hand its length to the one above it, and a heading can be dropped. All of
+   * that is resolved here, while the run sheet's own structure is still visible,
+   * so that laying out the times is only ever "take each length in turn".
+   *
+   * An item is claimed by the first of these that matches it: a section fold, a
+   * merge into the entry above, then the ignore list.
+   */
+
+  type BuildUnit = {
+    title: string;
+    note: string;
+    duration: number;
+    effect: PcoRuleEffect;
+    /** a divider rather than a timed entry */
+    isBlock: boolean;
+    /** every item this accounts for, which is what scopes the divergence report */
+    itemIds: string[];
+  };
+
+  const durationOf = (item: PcoItem): number => Math.max(0, (item.attributes.length ?? 0) * 1000);
+  const stripper = compileMatcher(rules.titleStrip);
+  const titleOf = (item: PcoItem): string => {
+    const raw = item.attributes.title ?? '';
+    return stripper ? raw.replace(stripper, '').trim() : raw;
+  };
+  const matchesAny = (matches: PcoRuleMatch[], item: PcoItem): boolean =>
+    matches.some((match) => matchesRule(match, itemCandidate(item)));
+
+  const zeroLength: string[] = [];
+  const strandedMerges: string[] = [];
+  /** items folded into the entry above them, which the divergence report leaves alone */
+  const mergedItemIds = new Set<string>();
+  /** generated entry id -> the PCO items behind it */
+  const entryToItems = new Map<string, string[]>();
+
+  const toUnits = (sectionItems: PcoItem[]): BuildUnit[] => {
+    const units: BuildUnit[] = [];
+
+    for (let index = 0; index < sectionItems.length; index++) {
+      const item = sectionItems[index];
+      const collapse = rules.collapseSections.find((rule) => matchesRule(rule.match, itemCandidate(item)));
+
+      if (collapse) {
+        // the section runs to the item before the next heading, which is how the
+        // run sheet delimits one in the first place
+        const members: PcoItem[] = [];
+        while (index + 1 < sectionItems.length && sectionItems[index + 1].attributes.item_type !== 'header') {
+          index += 1;
+          members.push(sectionItems[index]);
+        }
+        units.push({
+          title: collapse.title?.trim() || titleOf(item),
+          // the set list is the entire content of the section, and folding it away
+          // silently is the one thing the person calling the show cannot undo
+          note: collapse.listContents === false ? '' : members.map(titleOf).filter(Boolean).join('\n'),
+          duration: members.reduce((total, member) => total + durationOf(member), durationOf(item)),
+          effect: { ...resolveEffect(item, rules).effect, ...collapse.effect },
+          isBlock: false,
+          itemIds: [item.id, ...members.map((member) => member.id)],
+        });
+        continue;
+      }
+
+      if (matchesAny(rules.mergeIntoPrevious, item)) {
+        const previous = units.at(-1);
+        if (previous && !previous.isBlock) {
+          previous.duration += durationOf(item);
+          previous.itemIds.push(item.id);
+          mergedItemIds.add(item.id);
+          continue;
+        }
+        // nothing above it to give the time to, so it keeps a row of its own
+        strandedMerges.push(titleOf(item) || 'untitled');
+      } else if (matchesAny(rules.ignoreItems, item)) {
+        continue;
+      }
+
+      const isHeader = item.attributes.item_type === 'header';
+      if (isHeader && rules.headersBecome === 'nothing') {
+        continue;
+      }
+
+      units.push({
+        title: titleOf(item),
+        note: item.attributes.description ?? '',
+        duration: durationOf(item),
+        effect: resolveEffect(item, rules).effect,
+        isBlock: isHeader && rules.headersBecome === 'block',
+        itemIds: [item.id],
+      });
+    }
+
+    return units;
+  };
 
   /* --- times ---------------------------------------------------------------
    * Planning Center places items by service_position, not by one running total:
@@ -372,63 +475,51 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
 
   type Positioned = { sortKey: number; entry: OntimeRundownEntry };
 
-  const durationOf = (item: PcoItem): number => Math.max(0, (item.attributes.length ?? 0) * 1000);
-  const isHeaderBlock = (item: PcoItem): boolean => rules.headersAsBlocks && item.attributes.item_type === 'header';
-  const stripper = compileMatcher(rules.titleStrip);
-  const titleOf = (item: PcoItem): string => {
-    const raw = item.attributes.title ?? '';
-    return stripper ? raw.replace(stripper, '').trim() : raw;
-  };
-
-  const zeroLength: string[] = [];
-  /** generated entry id -> the PCO item it came from, used to scope divergence warnings */
-  const entryToItem = new Map<string, string>();
-
-  const layOutItems = (sectionItems: PcoItem[], start: number): { entries: Positioned[]; end: number } => {
+  const layOutUnits = (units: BuildUnit[], start: number): { entries: Positioned[]; end: number } => {
     const entries: Positioned[] = [];
     let cursor = start;
 
-    for (const item of sectionItems) {
-      const duration = durationOf(item);
-      const title = titleOf(item);
-
-      if (isHeaderBlock(item)) {
+    for (const unit of units) {
+      if (unit.isBlock) {
         // a divider, not a timed entry -- but its length still shifts what follows
-        const block: OntimeBlock = { type: SupportedEvent.Block, id: generateId(), title };
-        entryToItem.set(block.id, item.id);
+        const block: OntimeBlock = { type: SupportedEvent.Block, id: generateId(), title: unit.title };
+        entryToItems.set(block.id, unit.itemIds);
         entries.push({ sortKey: cursor, entry: block });
-        cursor += duration;
+        cursor += unit.duration;
         continue;
       }
 
-      if (duration === 0) {
-        zeroLength.push(title || 'untitled');
+      if (unit.duration === 0) {
+        zeroLength.push(unit.title || 'untitled');
       }
-      const { effect } = resolveEffect(item, rules);
       const event = makeEvent({
-        title,
-        note: item.attributes.description ?? '',
+        title: unit.title,
+        note: unit.note,
         timeStart: cursor,
-        duration,
-        effect,
+        duration: unit.duration,
+        effect: unit.effect,
       });
-      entryToItem.set(event.id, item.id);
+      entryToItems.set(event.id, unit.itemIds);
       entries.push({ sortKey: cursor, entry: event });
-      cursor += duration;
+      cursor += unit.duration;
     }
 
     return { entries, end: cursor };
   };
 
-  const inPosition = (position: PcoItem['attributes']['service_position']) =>
-    kept.filter((item) => item.attributes.service_position === position);
+  const unitsInPosition = (position: PcoItem['attributes']['service_position']): BuildUnit[] =>
+    toUnits(kept.filter((item) => item.attributes.service_position === position));
 
-  const preItems = inPosition('pre');
-  const duringItems = inPosition('during');
-  const postItems = inPosition('post');
+  const preUnits = unitsInPosition('pre');
+  const duringUnits = unitsInPosition('during');
+  const postUnits = unitsInPosition('post');
+
+  if (preUnits.length + duringUnits.length + postUnits.length === 0) {
+    warnings.push('No items survived the filters; the rundown will only contain inferred entries.');
+  }
 
   // where the pre-service run begins
-  const preTotal = preItems.reduce((total, item) => total + durationOf(item), 0);
+  const preTotal = preUnits.reduce((total, unit) => total + unit.duration, 0);
   const preAnchorTime = day.otherTimes[0];
   let preStartOfDay: number;
 
@@ -438,17 +529,20 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
     preStartOfDay = masterStartOfDay - preTotal;
   }
 
-  const pre = layOutItems(preItems, preStartOfDay);
-  const during = layOutItems(duringItems, masterStartOfDay);
-  const post = layOutItems(postItems, during.end);
+  const pre = layOutUnits(preUnits, preStartOfDay);
+  const during = layOutUnits(duringUnits, masterStartOfDay);
+  const post = layOutUnits(postUnits, during.end);
   const serviceEndOfDay = post.end;
 
-  if (rules.preAnchor === 'back-from-service' && preItems.length > 0) {
-    // a sanity check the sheet itself can be measured against
-    const lastPre = pre.entries[pre.entries.length - 1];
-    if (lastPre && lastPre.sortKey + durationOf(preItems[preItems.length - 1]) !== masterStartOfDay) {
-      warnings.push('The pre-service items do not add up to the service start; check the lengths in Planning Center.');
-    }
+  if (rules.preAnchor === 'plan-time' && preUnits.length > 0 && pre.end !== masterStartOfDay) {
+    // back-timing makes this true by construction; anchoring to a plan time does not
+    warnings.push('The pre-service items do not add up to the service start; check the lengths in Planning Center.');
+  }
+  if (strandedMerges.length > 0) {
+    warnings.push(
+      `Nothing above them to merge into, so imported on their own: ` +
+        `${strandedMerges.map((title) => `"${title}"`).join(', ')}.`,
+    );
   }
   if (zeroLength.length > 0) {
     warnings.push(`No length in Planning Center, imported as 0:00: ${zeroLength.map((t) => `"${t}"`).join(', ')}.`);
@@ -471,7 +565,7 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
       }
     }
   }
-  if (preEndIndex === -1) {
+  if (preEndIndex === -1 && rules.preBoundaryTitleMatch) {
     warnings.push(
       `No item matched the PRE boundary /${rules.preBoundaryTitleMatch}/i, so every item was treated as part of the service section.`,
     );
@@ -502,7 +596,7 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
         note: '',
         timeStart,
         duration: inferred.duration,
-        effect: { ...rules.defaultEffect, ...inferred.effect },
+        effect: { ...baseEffect(rules), ...inferred.effect },
       }),
     };
 
@@ -513,6 +607,35 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
       target.push(positioned);
     } else {
       target.splice(at, 0, positioned);
+    }
+  }
+
+  /* --- what an overrun does to the rest of a section ------------------------
+   * The message is a fixed-duration countdown, so it can overrun. Anything after
+   * it counting down to a wall clock time would absorb that overrun and shrink --
+   * a two minute announcement quietly becoming thirty seconds. So once a section
+   * holds something that can move what follows, what follows keeps its own length
+   * and moves instead.
+   *
+   * Per section: PRE is its own run, and the mirror clones the master, so a
+   * section always starts where the run sheet says it starts.
+   */
+
+  if (rules.fixedDurationCarriesForward) {
+    for (const section of [preSection, serviceSection]) {
+      let holding = false;
+      for (const { entry } of section) {
+        if (!isOntimeEvent(entry)) {
+          continue;
+        }
+        if (holding) {
+          entry.timerType = TimerType.CountDown;
+          entry.countToEnd = false;
+          entry.timeStrategy = TimeStrategy.LockDuration;
+        } else if (entry.countToEnd === false) {
+          holding = true;
+        }
+      }
     }
   }
 
@@ -530,19 +653,49 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
     ...serviceSection.map(({ entry }) => entry),
   ];
 
-  // cue numbers are positional, so they are assigned once the order is final
+  // cue numbers and links are positional, so they wait until the order is final
   let cueNumber = 1;
+  let previousEvent: OntimeEvent | null = null;
+
   for (const entry of rundown) {
-    if (isOntimeEvent(entry)) {
-      entry.cue = String(cueNumber++);
+    if (!isOntimeEvent(entry)) {
+      continue;
     }
+    entry.cue = String(cueNumber++);
+
+    /**
+     * Every entry is linked to the one above it, which is what makes the rundown
+     * move as one when something runs long.
+     *
+     * Only where the times already meet, so a link records the relationship the
+     * run sheet already has rather than changing a time: the first entry of the
+     * morning has nothing above it, and a gap -- which `preAnchor: 'plan-time'`
+     * can leave -- is a gap for a reason.
+     *
+     * The mirrored service's first entry ends up unlinked without anything here:
+     * its link points outside the mirrored section, and `regenerateInstances`
+     * drops those rather than dragging the section back to the master's end.
+     */
+    entry.linkStart = previousEvent && previousEvent.timeEnd === entry.timeStart ? previousEvent.id : null;
+    previousEvent = entry;
   }
 
   /* --- what the mirror cannot represent ------------------------------------ */
 
-  // only the master section gets mirrored, so PRE divergence is harmless
+  /**
+   * Only the master section gets mirrored, so PRE divergence is harmless.
+   *
+   * Merged items are left out as well. The plan shape that makes merging useful is
+   * the one where PCO holds a separate item per service -- the 9am doors plus the
+   * online message it carries, and an 11am doors a minute longer to match. There,
+   * reporting the online message's exclusion says the mirror is wrong when the
+   * mirror's total is exactly right, and the item it merged into is reported on its
+   * own merits anyway.
+   */
   const mirroredItemIds = new Set(
-    serviceSection.map(({ entry }) => entryToItem.get(entry.id)).filter((itemId): itemId is string => Boolean(itemId)),
+    serviceSection
+      .flatMap(({ entry }) => entryToItems.get(entry.id) ?? [])
+      .filter((itemId) => !mergedItemIds.has(itemId)),
   );
 
   warnings.push(...findDivergence(kept, itemTimes, day.serviceTimes, mirroredItemIds));

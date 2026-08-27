@@ -43,11 +43,14 @@ export type { Settings } from './definitions/core/Settings.type.js';
 
 // ---> QLab
 export type {
+  PcoCollapseRule,
   PcoCredentialSource,
   PcoCredentialsRequest,
+  PcoHeaderHandling,
   PcoImportRequest,
   PcoImportResult,
   PcoInferredEntry,
+  PcoItemDisposition,
   PcoItemType,
   PcoKnownItem,
   PcoKnownItems,

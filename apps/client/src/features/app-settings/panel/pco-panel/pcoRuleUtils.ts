@@ -1,4 +1,11 @@
-import { type PcoRuleEffect, type PcoRules, type PcoTimerRule, TimerType, TimeStrategy } from 'ontime-types';
+import {
+  type PcoInferredEntry,
+  type PcoRuleEffect,
+  type PcoRules,
+  type PcoTimerRule,
+  TimerType,
+  TimeStrategy,
+} from 'ontime-types';
 
 /**
  * Reading and writing the rules this panel owns.
@@ -143,6 +150,7 @@ export function describeEffect(effect: PcoRuleEffect): string {
   for (const key of toggleKeys) {
     if (effect[key]) parts.push(toggleLabels[key].title);
   }
+  if (effect.title) parts.push(`rename to "${effect.title}"`);
   if (effect.colour) parts.push(`colour ${effect.colour}`);
   if (effect.isPublic !== undefined) parts.push(effect.isPublic ? 'public' : 'not public');
   return parts.length > 0 ? parts.join(' · ') : 'No changes';
@@ -152,4 +160,69 @@ export function removeRuleAt(rules: PcoRules, index: number): PcoRules {
   const timerRules = [...rules.timerRules];
   timerRules.splice(index, 1);
   return { ...rules, timerRules };
+}
+
+/* -------------------------------------------------------------------------- */
+/* the pre-service run                                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A step of the pre-service run: one contiguous chain ending where Planning
+ * Center's first item begins.
+ *
+ * An inferred entry anchored anywhere else was written by hand for some other
+ * reason, and the table below leaves it alone.
+ */
+export function isRunStep(entry: PcoInferredEntry): boolean {
+  return entry.section === 'pre' && entry.anchor === 'pre-start';
+}
+
+export function runSteps(rules: PcoRules): PcoInferredEntry[] {
+  return rules.inferredEntries.filter(isRunStep);
+}
+
+/**
+ * Puts a run back into the rules, re-timing it.
+ *
+ * Offsets are never typed in. Each step follows the one before and the last hands
+ * over to the run sheet, so a length changed anywhere moves everything ahead of it
+ * and the chain cannot drift out of step with itself.
+ */
+export function withRunSteps(rules: PcoRules, steps: PcoInferredEntry[]): PcoRules {
+  let offset = -steps.reduce((total, step) => total + step.duration, 0);
+
+  const chained = steps.map((step) => {
+    const placed: PcoInferredEntry = { ...step, section: 'pre', anchor: 'pre-start', offset };
+    offset += step.duration;
+    return placed;
+  });
+
+  return { ...rules, inferredEntries: [...chained, ...rules.inferredEntries.filter((entry) => !isRunStep(entry))] };
+}
+
+/** how far ahead of the run sheet the whole run starts */
+export function runLength(steps: PcoInferredEntry[]): number {
+  return steps.reduce((total, step) => total + step.duration, 0);
+}
+
+export function newRunStep(): PcoInferredEntry {
+  return {
+    name: 'New step',
+    title: 'New step',
+    section: 'pre',
+    anchor: 'pre-start',
+    offset: 0,
+    duration: 5 * 60 * 1000,
+  };
+}
+
+/** returns the list unchanged when the move would fall off either end */
+export function moveRunStep(steps: PcoInferredEntry[], from: number, to: number): PcoInferredEntry[] {
+  if (to < 0 || to >= steps.length) {
+    return steps;
+  }
+  const next = [...steps];
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  return next;
 }

@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { IoRefresh, IoTrash } from 'react-icons/io5';
 import { Button, IconButton, Select, Switch } from '@chakra-ui/react';
-import type { PcoKnownItem, PcoRuleEffect, PcoRules } from 'ontime-types';
+import type { PcoHeaderHandling, PcoItemDisposition, PcoKnownItem, PcoRuleEffect, PcoRules } from 'ontime-types';
 
 import { maybeAxiosError } from '../../../../common/api/utils';
 import { usePcoKnownItems } from '../../../../common/hooks-query/usePco';
 import * as Panel from '../../panel-utils/PanelUtils';
 
+import PcoPreServiceRun from './PcoPreServiceRun';
 import {
   type TimingChoice,
   applyTiming,
@@ -115,18 +116,38 @@ export default function PcoDefaults({ rules, patchRules, isSaving }: PcoDefaults
           </Panel.ListItem>
           <Panel.ListItem>
             <Panel.Field
-              title='Headers become blocks'
-              description='A Planning Center header turns into an Ontime block instead of an event'
+              title='Hold durations after an overrun'
+              description='Once an event keeps its own length, everything after it in the same section does too, so an overrunning message pushes the announcements instead of eating them'
             />
             <Switch
               variant='ontime'
               size='lg'
-              isChecked={rules.headersAsBlocks}
+              isChecked={rules.fixedDurationCarriesForward}
               isDisabled={isSaving}
-              onChange={(event) => save({ headersAsBlocks: event.target.checked })}
+              onChange={(event) => save({ fixedDurationCarriesForward: event.target.checked })}
             />
           </Panel.ListItem>
+          <Panel.ListItem>
+            <Panel.Field
+              title='Run sheet headings'
+              description='What a Planning Center header becomes. A heading still marks where a section ends whichever this is'
+            />
+            <Select
+              size='sm'
+              width='12rem'
+              variant='ontime'
+              value={rules.headersBecome}
+              isDisabled={isSaving}
+              onChange={(event) => save({ headersBecome: event.target.value as PcoHeaderHandling })}
+            >
+              <option value='nothing'>Leave them out</option>
+              <option value='block'>An Ontime block</option>
+              <option value='event'>An event</option>
+            </Select>
+          </Panel.ListItem>
         </Panel.ListGroup>
+
+        <PcoPreServiceRun rules={rules} save={save} isSaving={isSaving} />
 
         <Panel.Title>
           Run sheet items
@@ -180,7 +201,6 @@ export default function PcoDefaults({ rules, patchRules, isSaving }: PcoDefaults
                       key={item.title}
                       item={item}
                       plansSampled={data.plansSampled}
-                      becomesBlock={item.itemType === 'header' && rules.headersAsBlocks}
                       effect={effectForTitle(rules, item.title)}
                       isSaving={isSaving}
                       onChange={(effect) => setItemEffect(item.title, effect)}
@@ -239,25 +259,32 @@ export default function PcoDefaults({ rules, patchRules, isSaving }: PcoDefaults
 interface KnownItemRowProps {
   item: PcoKnownItem;
   plansSampled: number;
-  /** a header imports as a block when headersAsBlocks is on, and a block takes no effect */
-  becomesBlock: boolean;
   effect: PcoRuleEffect;
   isSaving: boolean;
   onChange: (effect: PcoRuleEffect) => void;
 }
 
-function KnownItemRow({ item, plansSampled, becomesBlock, effect, isSaving, onChange }: KnownItemRowProps) {
+/** why a row cannot take these settings, and null when it can */
+const dispositionReason: Record<PcoItemDisposition, string | null> = {
+  event: null,
+  block: 'imports as a block',
+  collapsed: 'folded in with its section',
+  merged: 'merged into the entry above',
+  ignored: 'not imported',
+};
+
+function KnownItemRow({ item, plansSampled, effect, isSaving, onChange }: KnownItemRowProps) {
   // a pattern rule already covering this item is worth saying, since it wins unless
   // a choice here overrides it
   const coveredElsewhere = item.matchedBy && item.matchedBy !== item.title;
 
   /**
-   * Nothing here can change a section that imports as a block, or an item that is
-   * never imported at all. The controls are disabled rather than hidden, so the row
-   * still reads as part of the run sheet.
+   * Nothing here can change an item that does not become an event of its own. The
+   * controls are disabled rather than hidden, so the row still reads as part of the
+   * run sheet and says why it takes no settings.
    */
-  const inert = item.ignored || becomesBlock;
-  const reason = item.ignored ? 'not imported' : becomesBlock ? 'imports as a block' : null;
+  const reason = dispositionReason[item.disposition];
+  const inert = reason !== null;
 
   return (
     <tr>

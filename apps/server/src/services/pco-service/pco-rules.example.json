@@ -6,21 +6,44 @@
 
   "preBoundaryTitleMatch": "prayer meeting",
   "preAnchor": "back-from-service",
-  "serviceNames": ["9am", "11am"],
-  "headersAsBlocks": true,
+  "serviceNames": ["9AM SERVICE", "11AM SERVICE"],
+  "headersBecome": "nothing",
 
-  "ignoreItems": [{ "titleMatch": "^\\s*service briefing", "itemType": "header" }],
+  "collapseSections": [
+    {
+      "name": "Praise & Worship",
+      "match": { "itemType": "header", "titleContains": "praise & worship" },
+      "title": "Praise & Worship",
+      "listContents": true
+    }
+  ],
+
+  "mergeIntoPrevious": [{ "titleContains": "online pre service message" }],
+  "ignoreItems": [{ "titleContains": "prayer meeting" }],
+
   "titleStrip": "\\s*//\\s*\\d{1,2}\\s*(am|pm)\\s*$",
   "respectMasterExclusions": true,
+  "fixedDurationCarriesForward": true,
 
   "defaultEffect": {
     "timerType": "count-down",
     "countToEnd": true,
     "timeStrategy": "lock-end",
-    "endAction": "none"
+    "endAction": "none",
+    "isPublic": true
   },
 
   "timerRules": [
+    {
+      "name": "linked message",
+      "match": { "titleMatch": "^\\s*(message|sermon)\\b.*\\blink\\b" },
+      "effect": {
+        "title": "Message - LINK",
+        "timerType": "count-down",
+        "countToEnd": false,
+        "timeStrategy": "lock-duration"
+      }
+    },
     {
       "name": "message is a fixed-duration countdown",
       "match": { "titleMatch": "^\\s*(message|sermon)\\b" },
@@ -39,7 +62,15 @@
       "section": "pre",
       "anchor": "pre-start",
       "offset": -900000,
-      "duration": 900000
+      "duration": 300000
+    },
+    {
+      "name": "Link Brief",
+      "title": "Link Brief",
+      "section": "pre",
+      "anchor": "pre-start",
+      "offset": -600000,
+      "duration": 600000
     }
   ]
 }
