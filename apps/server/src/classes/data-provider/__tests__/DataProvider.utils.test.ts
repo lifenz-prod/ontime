@@ -21,6 +21,7 @@ describe('safeMerge', () => {
       operatorKey: null,
       timeFormat: '24',
       language: 'en',
+      endActionDelay: 30,
     },
     viewSettings: {
       overrideStyles: false,
@@ -106,6 +107,7 @@ describe('safeMerge', () => {
       editorKey: null,
       timeFormat: '24',
       language: 'pt',
+      endActionDelay: 30,
     });
   });
 

@@ -11,11 +11,12 @@ import {
   TimerPhase,
   TimerState,
 } from 'ontime-types';
-import { millisToString, validatePlayback } from 'ontime-utils';
+import { MILLIS_PER_SECOND, millisToString, validateEndActionDelay, validatePlayback } from 'ontime-utils';
 
 import { deepEqual } from 'fast-equals';
 
 import { logger } from '../../classes/Logger.js';
+import { getDataProvider } from '../../classes/data-provider/DataProvider.js';
 import * as runtimeState from '../../stores/runtimeState.js';
 import type { RuntimeState } from '../../stores/runtimeState.js';
 import { timerConfig } from '../../config/config.js';
@@ -35,7 +36,12 @@ import {
   getTimedEvents,
 } from '../rundown-service/rundownUtils.js';
 
-import { getForceUpdate, getShouldClockUpdate, getShouldTimerUpdate } from './rundownService.utils.js';
+import {
+  getDelayedAdvance,
+  getForceUpdate,
+  getShouldClockUpdate,
+  getShouldTimerUpdate,
+} from './rundownService.utils.js';
 import { skippedOutOfEvent } from '../timerUtils.js';
 import { triggerAutomations } from '../../api-data/automation/automation.service.js';
 import { applyEffectiveOverlay, getEffectiveEventOverlays } from '../effectiveSchedule.js';
@@ -50,6 +56,8 @@ class RuntimeService {
   private eventTimer: EventTimer;
   private lastIntegrationClockUpdate = -1;
   private lastIntegrationTimerValue = -1;
+  /** id of the event whose delayed advance has already been dispatched or cancelled */
+  private resolvedDelayedAdvance: string | null = null;
 
   /** last time we updated the socket */
   static previousTimerUpdate: number;
@@ -142,6 +150,10 @@ class RuntimeService {
         }
       }
     }
+
+    // 3b. EndAction.PlayNextDelayed lets the event overrun before advancing
+    // it is resolved on every update rather than on finish, so that any change in state cancels it
+    this.checkDelayedAdvance(newState);
 
     // 4. find if we need to update the timer
     const shouldUpdateTimer = getShouldTimerUpdate(this.lastIntegrationTimerValue, newState.timer.current);
@@ -299,6 +311,9 @@ class RuntimeService {
     }
     const previousState = runtimeState.getState();
 
+    // any load invalidates a pending delayed advance, including a reload of the same event
+    this.resolvedDelayedAdvance = null;
+
     const rundown = getRundown();
     const success = runtimeState.load(event, rundown, initialData);
 
@@ -311,6 +326,37 @@ class RuntimeService {
       });
     }
     return success;
+  }
+
+  /**
+   * Handles EndAction.PlayNextDelayed: the event is allowed to overrun by a configurable
+   * amount of time before we advance, so that the rollover is visible in the views.
+   *
+   * We evaluate this on every timer update instead of arming a timeout at finish,
+   * so that loading, stopping, pausing or adding time naturally cancels the pending advance.
+   */
+  private checkDelayedAdvance(state: RuntimeState) {
+    const eventNow = state.eventNow;
+
+    // a pending advance only belongs to the event that armed it
+    if (this.resolvedDelayedAdvance !== null && this.resolvedDelayedAdvance !== eventNow?.id) {
+      this.resolvedDelayedAdvance = null;
+    }
+
+    const action = getDelayedAdvance(state, getDelayedAdvanceTime(), this.resolvedDelayedAdvance);
+    if (action === 'none' || !eventNow) {
+      return;
+    }
+
+    // both advancing and cancelling resolve the pending advance, we only ever act once per loaded event
+    this.resolvedDelayedAdvance = eventNow.id;
+
+    if (action === 'cancel') {
+      logger.info(LogOrigin.Playback, `Delayed advance cancelled for event with ID ${eventNow.id}`);
+      return;
+    }
+
+    setTimeout(this.startNext.bind(this), 0);
   }
 
   public getRuntimeState() {
@@ -869,4 +915,12 @@ function broadcastResult(_target: any, _propertyKey: string, descriptor: Propert
   };
 
   return descriptor;
+}
+
+/**
+ * How long an event is allowed to overrun before EndAction.PlayNextDelayed advances
+ * @returns {number} time in milliseconds
+ */
+function getDelayedAdvanceTime(): number {
+  return validateEndActionDelay(getDataProvider().getSettings().endActionDelay) * MILLIS_PER_SECOND;
 }

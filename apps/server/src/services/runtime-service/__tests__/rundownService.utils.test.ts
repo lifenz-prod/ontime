@@ -1,5 +1,8 @@
+import { EndAction, MaybeNumber, OntimeEvent, Playback } from 'ontime-types';
 import { MILLIS_PER_MINUTE } from 'ontime-utils';
-import { getShouldClockUpdate, getShouldTimerUpdate } from '../rundownService.utils.js';
+
+import type { RuntimeState } from '../../../stores/runtimeState.js';
+import { getDelayedAdvance, getShouldClockUpdate, getShouldTimerUpdate } from '../rundownService.utils.js';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -67,5 +70,74 @@ describe('getShouldTimerUpdate', () => {
     const currentValue = 4999; // 5
     const result = getShouldTimerUpdate(previousValue, currentValue);
     expect(result).toBe(true);
+  });
+});
+
+describe('getDelayedAdvance()', () => {
+  const makeState = (patch: { endAction?: EndAction; current?: MaybeNumber; playback?: Playback }) =>
+    ({
+      eventNow: { id: 'event-1', endAction: patch.endAction ?? EndAction.PlayNextDelayed } as OntimeEvent,
+      timer: {
+        current: patch.current ?? 0,
+        playback: patch.playback ?? Playback.Play,
+      },
+    }) as Pick<RuntimeState, 'eventNow' | 'timer'>;
+
+  it('does nothing for events with a different end action', () => {
+    const state = makeState({ endAction: EndAction.PlayNext, current: -MILLIS_PER_MINUTE });
+    expect(getDelayedAdvance(state, 30000, null)).toBe('none');
+  });
+
+  it('does nothing when there is no loaded event', () => {
+    const state = { eventNow: null, timer: { current: null, playback: Playback.Stop } } as Pick<
+      RuntimeState,
+      'eventNow' | 'timer'
+    >;
+    expect(getDelayedAdvance(state, 30000, null)).toBe('none');
+  });
+
+  it('waits while the event is still running', () => {
+    const state = makeState({ current: 5000 });
+    expect(getDelayedAdvance(state, 30000, null)).toBe('none');
+  });
+
+  it('waits while the overrun is shorter than the delay', () => {
+    const state = makeState({ current: -29000 });
+    expect(getDelayedAdvance(state, 30000, null)).toBe('none');
+  });
+
+  it('advances once the overrun reaches the delay', () => {
+    const state = makeState({ current: -30000 });
+    expect(getDelayedAdvance(state, 30000, null)).toBe('advance');
+  });
+
+  it('advances immediately when there is no delay configured', () => {
+    const state = makeState({ current: 0 });
+    expect(getDelayedAdvance(state, 0, null)).toBe('advance');
+  });
+
+  it('does not advance twice for the same event', () => {
+    const state = makeState({ current: -MILLIS_PER_MINUTE });
+    expect(getDelayedAdvance(state, 30000, 'event-1')).toBe('none');
+  });
+
+  it('cancels when the operator pauses during the overrun', () => {
+    const state = makeState({ current: -5000, playback: Playback.Pause });
+    expect(getDelayedAdvance(state, 30000, null)).toBe('cancel');
+  });
+
+  it('ignores a pause before the event has finished', () => {
+    const state = makeState({ current: 5000, playback: Playback.Pause });
+    expect(getDelayedAdvance(state, 30000, null)).toBe('none');
+  });
+
+  it('does not cancel repeatedly while paused', () => {
+    const state = makeState({ current: -5000, playback: Playback.Pause });
+    expect(getDelayedAdvance(state, 30000, 'event-1')).toBe('none');
+  });
+
+  it('does not advance in roll mode, roll drives its own advance', () => {
+    const state = makeState({ current: -MILLIS_PER_MINUTE, playback: Playback.Roll });
+    expect(getDelayedAdvance(state, 30000, null)).toBe('none');
   });
 });

@@ -8,4 +8,6 @@ export type Settings = {
   operatorKey: null | string;
   timeFormat: TimeFormat;
   language: string;
+  /** seconds an event overruns before the "play next after delay" end action advances */
+  endActionDelay: number;
 };

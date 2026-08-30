@@ -185,6 +185,9 @@ function EndActionIcon(props: { action: EndAction; className: string }) {
   if (action === EndAction.PlayNext) {
     return <IoPlayForward className={maybeActiveClasses} />;
   }
+  if (action === EndAction.PlayNextDelayed) {
+    return <IoPlayForward className={cx([style.delayedAction, className])} />;
+  }
   if (action === EndAction.Stop) {
     return <IoStop className={maybeActiveClasses} />;
   }
