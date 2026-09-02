@@ -54,6 +54,7 @@ export type {
   PcoItemType,
   PcoKnownItem,
   PcoKnownItems,
+  PcoLeadIn,
   PcoPinnedServiceType,
   PcoPlanSummary,
   PcoRuleEffect,

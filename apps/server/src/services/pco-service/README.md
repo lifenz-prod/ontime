@@ -8,8 +8,8 @@ including the PRE section and both Sunday services.
 Usable. The API client, the rundown builder and the rules config are unit tested
 against a fixture shaped like a real Central AM plan. The connector is registered
 as a **rundown source provider**, so a plan can be recalled over OSC, websocket or
-HTTP, and there is a settings panel for importing by hand and for configuring what
-each run sheet item does. Credentials are still environment-only.
+HTTP, and there is a settings panel for importing by hand, entering credentials and
+configuring what each run sheet item does.
 
 ## What PCO gives us, and what it does not
 
@@ -48,23 +48,47 @@ doors 12:20 + online message 1:00 + pre-service video 1:40 = 40:00, and
 `9:00 - 40:00 = 8:20`, where the prayer meeting starts. Accumulating those forward
 instead would put doors open at 9:00.
 
-**The plan starts at doors.** Everything earlier — power on, soundcheck, the
-briefing, the prayer meeting — belongs to the production team, and PCO records
-none of it. The only trace is two headers titled _SERVICE BRIEFING 8:05am_ and
-_LINK BRIEF 8:10am_, both `during` items carrying no length, so even those two
-would land mid-service naming a time already past.
+**The item list starts at doors, but the plan does not.** Everything earlier —
+soundchecks, rehearsals, production checks, the briefings — is on the plan as
+`PlanTime` records rather than as items:
 
-The whole morning is therefore `inferredEntries`: a contiguous run anchored to
-`pre-start`, entered as lengths and chained so the last one hands over to the run
-sheet's first item. Anchoring rather than hardcoding is the point — the pre run
-back-times to the service, so a service that moves takes the morning with it. On
-a 9:00 service with 15:00 of pre-service items that puts doors at 8:45 and power
-on at 5:30, and the two times those headers claim fall exactly where they say.
+| Need                  | PCO source                                             |
+| --------------------- | ------------------------------------------------------ |
+| The production run    | `PlanTime.starts_at`/`ends_at`, `time_type: 'rehearsal'` |
+| The two briefings     | header items stating a time in their **title**          |
+| Power on              | nowhere — the one part that is still stated in config   |
 
-The prayer meeting is on the sheet as a 25:00 `pre` item _and_ in the production
-run as two entries (the meeting, then the pack-down), so `ignoreItems` drops the
-PCO copy. That is also why the pre-service run starts at doors rather than at
-8:20: the run sheet's own `pre` items are just doors and the pre-service video.
+So the morning above the run sheet is read, not transcribed. `deriveRehearsalTimes`
+turns each rehearsal time into an entry at the name, start and length the plan
+gives it; `deriveTimedHeaders` reads _SERVICE BRIEFING 8:05am_ and _BROADCAST
+BRIEF 8:10am_, whose times exist only in their title text. Both halves meet
+exactly: the last rehearsal time ends at 8:05, and the briefs hand over to the run
+sheet's first item at 8:20.
+
+This replaced a hand-entered `inferredEntries` chain, and the reason is what the
+transcription had quietly become. It called the 06:55 slot _Circle Time_ — the
+name from the **midweek** rehearsal, where Sunday's is _Creative Team Prayer_ — it
+still said _Link Brief_ after PCO renamed it _Broadcast Brief_, it had the sync at
+15:00 where the plan says 10:00 with a five minute gap after it, and it had no
+idea the vocalists rehearse alongside the band. None of that was visible from
+inside Ontime.
+
+Three shapes the plan has that a rundown does not, and what happens to them:
+
+- **Gaps.** The sync ends at 06:25 and the call time starts at 06:30. The plan
+  means it, so the gap survives and the two entries do not link.
+- **Overlaps.** The band and the vocalists rehearse in different rooms from 06:35
+  to 06:55. The first keeps the row; the rest go in its note.
+- **Staffing call times.** `other` times — kitchen, carpark, the producer's whole
+  morning, a dozen more — overlap each other and both services and are never
+  entries. They can still anchor a run under `preAnchor: 'plan-time'`.
+
+`leadIn` is the last thing still stated rather than read: an hour of _Power On_
+ending where the first rehearsal time starts, so the first timer has something to
+run against. It moves when the plan moves. Set it to `null` for a morning that
+opens on its first rehearsal time.
+
+The prayer meeting is a 25:00 `pre` item and closes PRE — see Sectioning.
 
 **One item list serves every time in a plan.** PCO does not hold a separate run
 sheet per service. That is what makes the 9am/11am relationship a pure time
@@ -93,8 +117,8 @@ as one when something runs long. Two are not, and neither needs a rule: the firs
 entry of the morning has nothing above it, and the mirrored service's first entry
 links to something outside its own section, which `regenerateInstances` drops
 rather than dragging the 11am back to the end of the 9am. Links are only written
-where the times already meet, so a link never moves an entry — a gap, which
-`preAnchor: 'plan-time'` can leave, stays a gap.
+where the times already meet, so a link never moves an entry — a gap the plan
+leaves between two rehearsal times stays a gap.
 
 The 11am is **not** written by this connector. It is derived by
 `regenerateInstances` from `ServiceProfile.offset`, computed as the gap between
@@ -106,10 +130,15 @@ re-derived" true for imports as well as for hand edits.
 The PRE section runs from the top of the plan up to **and including** the item
 matching `preBoundaryTitleMatch`. The boundary block goes immediately after it.
 
-The shipped value is blank, which means no PCO item closes PRE: everything the
-plan holds is part of the master service, and PRE is entirely the inferred
-production run above. A blank pattern is a decision rather than a failure, so it
-does not warn; a pattern that matches nothing still does.
+The shipped value is `prayer meeting`, and the choice is load-bearing. The prayer
+meeting is the last thing that happens once; doors — the item straight after it —
+is the first thing each service does for itself. Putting the boundary between them
+is what stops the mirror generating a second prayer meeting at 10:20 while still
+letting it generate the 11am's doors.
+
+A blank pattern is a decision rather than a failure, so it does not warn: PRE is
+then only the derived production run, and every PCO item is part of the master. A
+pattern that matches nothing still warns.
 
 `preAnchor` decides where the pre-service run starts:
 
@@ -117,6 +146,10 @@ does not warn; a pattern that matches nothing still does.
   matches: the run back-times to end at the service start.
 - `plan-time` — anchors forward from the earliest non-service `PlanTime` on the
   chosen day. Falls back to back-timing when the day has no such time.
+
+  With `deriveRehearsalTimes` on, rehearsal times are skipped when looking for that
+  anchor: one that has become an entry of its own cannot also be what the run sheet
+  hangs off, or doors would be dragged up on top of the 06:15 sync.
 
 ## Multi-day plans
 
@@ -224,11 +257,11 @@ useful for building next month's service ahead of time.
 
 The default timing applied to every event, and what run sheet headings become.
 
-Then _Before the run sheet_: the production run, as a table of steps and lengths.
-Offsets are never typed in — each step follows the one before and the last hands
-over to the plan's first item, so a length changed anywhere re-times everything
-ahead of it and the chain cannot drift. The table owns the `pre-start` inferred
-entries and leaves any other anchor alone.
+Then _Before the run sheet_: two switches for what gets read off the plan, and the
+lead-in, which is the only part of the morning still stated. Below them a table of
+steps the plan does not hold, normally empty — offsets are never typed in, each
+step follows the one before and the last hands over to the plan's first item. The
+table owns the `pre-start` inferred entries and leaves any other anchor alone.
 
 Then the items Planning Center actually carries, read from the next few run sheets
 of a pinned service type. Each row offers timing, hide timer, aux timer and skip,
@@ -289,10 +322,18 @@ What survives becomes an entry, and the rest of the file shapes it:
   substring and is what the settings panel writes; `titleMatch` is a regex for
   rules written by hand. An effect can set the timer type, the strategy, the
   colour, the switches, and `title` to rename the event.
-- `inferredEntries` — entries the run sheet implies but never states, positioned
-  by an anchor (`pre-start`, `service-start`, `service-end`) plus a signed
-  offset. The settings panel owns the `pre-start` chain as a table of lengths and
-  recomputes the offsets; entries on other anchors are left alone.
+- `deriveRehearsalTimes` — the plan's `rehearsal` times become the production run
+  ahead of the run sheet, at the names and times PCO gives them.
+- `deriveTimedHeaders` — headers stating a clock time in their title become
+  entries at that time, running until whatever starts next. Only headers timed
+  before the service, and only lengthless ones: a header carrying length would
+  shift the service if it were pulled out of the run.
+- `leadIn` — `{ title, duration }` ending where the first derived entry starts, or
+  `null` for none.
+- `inferredEntries` — entries the plan holds nowhere at all, positioned by an
+  anchor (`pre-start`, `service-start`, `service-end`) plus a signed offset. The
+  settings panel owns the `pre-start` chain as a table of lengths and recomputes
+  the offsets; entries on other anchors are left alone.
 - `titleStrip` — regex removed from every title, which is how
   `Doors Open // 9am` becomes `Doors Open`.
 - `respectMasterExclusions` — drop items PCO excludes from the master service, so
@@ -344,4 +385,7 @@ builder or any calling code.
   nor a recall offers the choice yet.
 - Editing hand-written pattern rules in the panel, and reordering rules.
 - Honouring `ItemTime` divergence instead of only warning about it.
+- Showing the derived production run in the settings panel. The panel configures
+  the reading but cannot preview it, so what the morning will look like is only
+  visible after an import.
 - OAuth 2, if this ever needs to serve more than one organisation.

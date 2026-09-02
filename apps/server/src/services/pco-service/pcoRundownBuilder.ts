@@ -36,7 +36,7 @@ import { event as eventDef } from '../../models/eventsDefinition.js';
 
 import { compileMatcher, matchesRule } from './pcoRules.js';
 import { localDateKey, localDayLabel, localTimeOfDayMs } from './pcoTime.js';
-import type { PcoItem, PcoItemTime, PcoPlan, PcoPlanTime } from './pcoTypes.js';
+import type { PcoItem, PcoItemTime, PcoItemType, PcoPlan, PcoPlanTime, PcoServicePosition } from './pcoTypes.js';
 
 /** one calendar day of a plan, in the configured timezone */
 export type PcoPlanDay = {
@@ -46,6 +46,19 @@ export type PcoPlanDay = {
   label: string;
   times: PcoPlanTime[];
   serviceTimes: PcoPlanTime[];
+  /**
+   * The production run: soundchecks, rehearsals, production checks. Named and
+   * timed by the plan, which is what the PRE section is built from.
+   */
+  rehearsalTimes: PcoPlanTime[];
+  /**
+   * Every non-service time, rehearsals included, which is what anchors a run under
+   * `preAnchor: 'plan-time'`.
+   *
+   * What is in here and not in `rehearsalTimes` is staffing call times -- the
+   * kitchen, the carpark, the producer's whole morning -- which overlap each other
+   * and both services, so they never become entries.
+   */
   otherTimes: PcoPlanTime[];
 };
 
@@ -104,6 +117,7 @@ export function groupPlanTimesByDay(planTimes: PcoPlanTime[], timezone: string):
         label: localDayLabel(planTime.attributes.starts_at, timezone),
         times: [],
         serviceTimes: [],
+        rehearsalTimes: [],
         otherTimes: [],
       });
     }
@@ -112,11 +126,91 @@ export function groupPlanTimesByDay(planTimes: PcoPlanTime[], timezone: string):
     if (planTime.attributes.time_type === 'service') {
       day.serviceTimes.push(planTime);
     } else {
+      if (planTime.attributes.time_type === 'rehearsal') {
+        day.rehearsalTimes.push(planTime);
+      }
       day.otherTimes.push(planTime);
     }
   }
 
   return [...byDay.values()].sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+}
+
+/* -------------------------------------------------------------------------- */
+/* the production run                                                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The clock time a title states, as milliseconds since local midnight.
+ *
+ * Two moments in the morning are recorded nowhere but in the text of a heading --
+ * "SERVICE BRIEFING 8:05AM", "BROADCAST BRIEF 8:10am" -- so the title is the only
+ * place left to read them from. Returns null when the title states no time, which
+ * is the normal case for a heading.
+ *
+ * Deliberately strict about the meridiem: a bare "8:05" in a title is far more
+ * likely to be a duration or a date than a time of day, and reading it as one
+ * would place an entry at eight in the morning on the strength of a guess.
+ */
+export function parseTitleTime(title: string): number | null {
+  const match = /(\d{1,2})[:.](\d{2})\s*(am|pm)\b/i.exec(title);
+  if (!match) {
+    return null;
+  }
+  const minutes = Number(match[2]);
+  let hours = Number(match[1]);
+  if (hours > 12 || minutes > 59) {
+    return null;
+  }
+  const isPm = match[3].toLowerCase() === 'pm';
+  // 12am is midnight and 12pm is noon, so the 12 is the exception in both directions
+  if (hours === 12) {
+    hours = 0;
+  }
+  return ((hours + (isPm ? 12 : 0)) * 60 + minutes) * 60 * 1000;
+}
+
+/** a step of the production run, before it is given a duration */
+type DerivedStep = {
+  title: string;
+  note: string;
+  start: number;
+  /** null where only a start is known, as with a timed header */
+  end: number | null;
+};
+
+/**
+ * The rehearsal times of a day, as steps in clock order.
+ *
+ * A rundown is linear and a morning is not: the band and the vocalists rehearse in
+ * different rooms at the same time. The first of any overlapping set keeps the row
+ * and the rest are recorded in its note, so the clock stays true and nothing is
+ * silently lost.
+ *
+ * Gaps are left alone. A plan that says the sync ends at 06:25 and the call time
+ * starts at 06:30 means it, and the entries either side of that gap simply do not
+ * link to each other.
+ */
+export function rehearsalSteps(times: PcoPlanTime[], timezone: string): DerivedStep[] {
+  const sorted = [...times].sort((a, b) => a.attributes.starts_at.localeCompare(b.attributes.starts_at));
+  const steps: DerivedStep[] = [];
+
+  for (const time of sorted) {
+    const start = localTimeOfDayMs(time.attributes.starts_at, timezone);
+    const end = time.attributes.ends_at ? localTimeOfDayMs(time.attributes.ends_at, timezone) : null;
+    const title = time.attributes.name?.trim() || 'Rehearsal';
+
+    // a step still running when this one starts is running alongside it
+    const running = steps.at(-1);
+    if (running && running.end !== null && start < running.end) {
+      running.note = running.note ? `${running.note}\n${title}` : title;
+      continue;
+    }
+
+    steps.push({ title, note: '', start, end });
+  }
+
+  return steps;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -143,14 +237,29 @@ function baseEffect(rules: PcoRules): PcoRuleEffect {
 }
 
 /** default effect, then the first matching rule on top */
-function resolveEffect(item: PcoItem, rules: PcoRules): { effect: PcoRuleEffect; ruleName: string | null } {
-  const candidate = itemCandidate(item);
+function resolveEffectFor(
+  candidate: { title: string; itemType: PcoItemType; servicePosition: PcoServicePosition },
+  rules: PcoRules,
+): { effect: PcoRuleEffect; ruleName: string | null } {
   for (const rule of rules.timerRules) {
     if (matchesRule(rule.match, candidate)) {
       return { effect: { ...baseEffect(rules), ...rule.effect }, ruleName: rule.name };
     }
   }
   return { effect: baseEffect(rules), ruleName: null };
+}
+
+function resolveEffect(item: PcoItem, rules: PcoRules): { effect: PcoRuleEffect; ruleName: string | null } {
+  return resolveEffectFor(itemCandidate(item), rules);
+}
+
+/**
+ * A derived step has no PCO item behind it, but a rule should still be able to
+ * reach it: the settings panel writes rules by title, and the production run is
+ * where hide-timer and aux-timer are most likely to be wanted.
+ */
+function resolveDerivedEffect(title: string, rules: PcoRules): PcoRuleEffect {
+  return resolveEffectFor({ title, itemType: 'item', servicePosition: 'pre' }, rules).effect;
 }
 
 function applyEffect(event: OntimeEvent, effect: PcoRuleEffect): OntimeEvent {
@@ -507,8 +616,43 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
     return { entries, end: cursor };
   };
 
+  /* --- the production run, read off the plan -------------------------------
+   * The morning above the run sheet is in the plan twice removed: as `rehearsal`
+   * times carrying their own names and clock times, and as headers that state a
+   * time in their title and nowhere else.
+   *
+   * The headers have to be taken out of the item pipeline as well as read here.
+   * They sit in `during`, so left where they are they would lay out forward from
+   * the service start and land at 9:00 announcing a briefing that happened at 8:05.
+   */
+
+  const derivedSteps: DerivedStep[] = rules.deriveRehearsalTimes
+    ? rehearsalSteps(day.rehearsalTimes, rules.timezone)
+    : [];
+
+  const timedHeaderIds = new Set<string>();
+  if (rules.deriveTimedHeaders) {
+    for (const item of kept) {
+      // a header carrying length would shift the service if it were pulled out of
+      // the run, so only the lengthless ones -- which is all of them in practice
+      if (item.attributes.item_type !== 'header' || item.attributes.length) {
+        continue;
+      }
+      const stated = parseTitleTime(item.attributes.title ?? '');
+      if (stated === null || stated >= masterStartOfDay) {
+        continue;
+      }
+      timedHeaderIds.add(item.id);
+      // the time was the title's only reason for carrying it; the entry sits there now
+      const title = titleOf(item).replace(/(\d{1,2})[:.](\d{2})\s*(am|pm)\b/i, '').trim();
+      derivedSteps.push({ title: title || titleOf(item), note: '', start: stated, end: null });
+    }
+  }
+
+  derivedSteps.sort((a, b) => a.start - b.start);
+
   const unitsInPosition = (position: PcoItem['attributes']['service_position']): BuildUnit[] =>
-    toUnits(kept.filter((item) => item.attributes.service_position === position));
+    toUnits(kept.filter((item) => item.attributes.service_position === position && !timedHeaderIds.has(item.id)));
 
   const preUnits = unitsInPosition('pre');
   const duringUnits = unitsInPosition('during');
@@ -520,7 +664,14 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
 
   // where the pre-service run begins
   const preTotal = preUnits.reduce((total, unit) => total + unit.duration, 0);
-  const preAnchorTime = day.otherTimes[0];
+  /**
+   * A rehearsal time that has become an entry of its own cannot also be what the
+   * run sheet hangs off: anchoring doors to the 06:15 sync would drag the morning
+   * on top of the production run it sits after.
+   */
+  const preAnchorTime = day.otherTimes.find(
+    (time) => !(rules.deriveRehearsalTimes && time.attributes.time_type === 'rehearsal'),
+  );
   let preStartOfDay: number;
 
   if (rules.preAnchor === 'plan-time' && preAnchorTime) {
@@ -573,6 +724,67 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
 
   const preSection = allPositioned.slice(0, preEndIndex + 1);
   const serviceSection = allPositioned.slice(preEndIndex + 1);
+
+  /* --- the production run becomes entries ----------------------------------
+   * Each step runs until the plan says it ends, and a step the plan only gave a
+   * start to runs until whatever happens next -- the last of them handing over to
+   * the run sheet's own first item. So the briefing is five minutes because the
+   * broadcast brief follows it, and the broadcast brief is ten because the prayer
+   * meeting back-times to 8:20.
+   */
+
+  const derivedEntries: Positioned[] = [];
+  const runHandsOverAt = preSection.length > 0 ? preSection[0].sortKey : preStartOfDay;
+
+  for (let index = 0; index < derivedSteps.length; index++) {
+    const step = derivedSteps[index];
+    const nextStart = derivedSteps[index + 1]?.start ?? runHandsOverAt;
+    const end = step.end ?? nextStart;
+    const duration = Math.max(0, end - step.start);
+
+    if (duration === 0) {
+      warnings.push(`Nothing follows "${step.title}" in the plan, so it was imported as 0:00.`);
+    }
+
+    derivedEntries.push({
+      sortKey: step.start,
+      entry: makeEvent({
+        title: step.title,
+        note: step.note,
+        timeStart: step.start,
+        duration,
+        effect: resolveDerivedEffect(step.title, rules),
+      }),
+    });
+  }
+
+  /**
+   * The lead-in is the one entry of the morning still stated rather than read:
+   * powering the building on is not something Planning Center records. It ends
+   * where the first derived step starts, so it moves when the plan moves.
+   */
+  if (rules.leadIn && derivedSteps.length > 0) {
+    const start = derivedSteps[0].start - rules.leadIn.duration;
+    derivedEntries.unshift({
+      sortKey: start,
+      entry: makeEvent({
+        title: rules.leadIn.title,
+        note: '',
+        timeStart: start,
+        duration: rules.leadIn.duration,
+        effect: { ...resolveDerivedEffect(rules.leadIn.title, rules), ...rules.leadIn.effect },
+      }),
+    });
+  }
+
+  if (rules.deriveRehearsalTimes && day.rehearsalTimes.length === 0) {
+    warnings.push(
+      'This plan has no rehearsal times on the chosen day, so the rundown starts at the run sheet rather than at the production run.',
+    );
+  }
+
+  // already in clock order, and every one of them sits ahead of the run sheet
+  preSection.unshift(...derivedEntries);
 
   /* --- inferred entries ---------------------------------------------------- */
 

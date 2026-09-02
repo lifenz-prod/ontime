@@ -19,7 +19,7 @@
   ],
 
   "mergeIntoPrevious": [{ "titleContains": "online pre service message" }],
-  "ignoreItems": [{ "titleContains": "prayer meeting" }],
+  "ignoreItems": [],
 
   "titleStrip": "\\s*//\\s*\\d{1,2}\\s*(am|pm)\\s*$",
   "respectMasterExclusions": true,
@@ -55,22 +55,18 @@
     }
   ],
 
+  "deriveRehearsalTimes": true,
+  "deriveTimedHeaders": true,
+  "leadIn": { "title": "Power On", "duration": 3600000 },
+
   "inferredEntries": [
     {
-      "name": "Service Briefing",
-      "title": "Service Briefing",
+      "name": "Coffee On",
+      "title": "Coffee On",
       "section": "pre",
       "anchor": "pre-start",
-      "offset": -900000,
+      "offset": -2700000,
       "duration": 300000
-    },
-    {
-      "name": "Link Brief",
-      "title": "Link Brief",
-      "section": "pre",
-      "anchor": "pre-start",
-      "offset": -600000,
-      "duration": 600000
     }
   ]
 }

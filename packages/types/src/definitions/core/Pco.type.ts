@@ -98,6 +98,20 @@ export type PcoCollapseRule = {
  * An entry that the run sheet implies but never states.
  * Positioned by an anchor plus a signed offset, so it tracks the plan when times move.
  */
+/**
+ * The lead-in ahead of the derived production run.
+ *
+ * It has no counterpart in Planning Center -- powering the building on is not
+ * something the plan records -- so it is the one entry of the morning still stated
+ * here rather than read. It ends where the first derived entry starts.
+ */
+export type PcoLeadIn = {
+  title: string;
+  /** milliseconds */
+  duration: number;
+  effect?: PcoRuleEffect;
+};
+
 export type PcoInferredEntry = {
   name: string;
   title: string;
@@ -225,6 +239,41 @@ export type PcoRules = {
   defaultEffect: PcoRuleEffect;
   /** first match wins */
   timerRules: PcoTimerRule[];
+  /**
+   * The production run before the run sheet's own items, taken from the plan's
+   * `rehearsal` times.
+   *
+   * PCO holds the morning twice over: the run sheet items start at doors, and the
+   * call sheet above them -- soundchecks, rehearsals, production checks -- is a set
+   * of `rehearsal` plan times carrying their own names and clock times. Reading
+   * them is what keeps the production run in step with the plan rather than with a
+   * table somebody has to retype.
+   *
+   * `other` times are deliberately left out. They are staffing call times -- the
+   * kitchen, the carpark, the producer's whole morning -- which overlap each other
+   * and the services, and belong to no single row of a rundown.
+   */
+  deriveRehearsalTimes: boolean;
+  /**
+   * Headers whose title states a clock time become entries at that time.
+   *
+   * Two moments in the morning are recorded nowhere but in the text of a heading:
+   * "SERVICE BRIEFING 8:05AM" and "BROADCAST BRIEF 8:10am". They carry no length
+   * and sit in `during`, so without this they are dropped with every other header
+   * and the run has a hole between the last rehearsal time and the run sheet.
+   *
+   * Only headers timed before the service are read; the time is taken from the
+   * title and the entry runs until whatever starts next.
+   */
+  deriveTimedHeaders: boolean;
+  /**
+   * An entry ahead of the first derived one, so the first timer has something to
+   * run against rather than the morning opening on a countdown already underway.
+   *
+   * Anchored to the derived run rather than to a clock time, so it moves with the
+   * plan. Null leaves the morning starting at its first rehearsal time.
+   */
+  leadIn: PcoLeadIn | null;
   inferredEntries: PcoInferredEntry[];
 };
 

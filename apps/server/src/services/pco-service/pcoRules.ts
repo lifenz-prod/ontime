@@ -12,38 +12,11 @@ import {
   EndAction,
   TimeStrategy,
   TimerType,
-  type PcoInferredEntry,
   type PcoItemType,
   type PcoRuleMatch,
   type PcoRules,
   type PcoServicePosition,
 } from 'ontime-types';
-
-/**
- * A contiguous run of entries ending at the start of the pre-service items.
- *
- * The production schedule is a chain: each step follows the one before, and the
- * last one hands over to whatever Planning Center says happens first. Written as a
- * list of lengths, the offsets are arithmetic rather than something to maintain --
- * moving Circle Time by five minutes here moves everything before it too.
- */
-function preServiceRun(steps: { title: string; minutes: number }[]): PcoInferredEntry[] {
-  const minute = 60 * 1000;
-  let offset = -steps.reduce((total, step) => total + step.minutes, 0) * minute;
-
-  return steps.map((step) => {
-    const entry: PcoInferredEntry = {
-      name: step.title,
-      title: step.title,
-      section: 'pre',
-      anchor: 'pre-start',
-      offset,
-      duration: step.minutes * minute,
-    };
-    offset += step.minutes * minute;
-    return entry;
-  });
-}
 
 export const defaultPcoRules: PcoRules = {
   enabled: false,
@@ -53,11 +26,12 @@ export const defaultPcoRules: PcoRules = {
   pinnedServiceTypes: [],
 
   /**
-   * Nothing on the run sheet opens the master service section: everything before
-   * doors is the production schedule below, which Planning Center does not hold.
-   * Set this to a title to have a PCO item close the PRE section instead.
+   * The prayer meeting closes PRE: it is the last thing that happens once, and
+   * doors -- the item after it -- is the first thing each service does for itself.
+   * Putting the boundary here is what keeps the mirror from generating a second
+   * prayer meeting at 10:20 while still letting it generate the 11am's doors.
    */
-  preBoundaryTitleMatch: '',
+  preBoundaryTitleMatch: 'prayer meeting',
   preAnchor: 'back-from-service',
   serviceNames: ['9AM SERVICE', '11AM SERVICE'],
 
@@ -82,13 +56,7 @@ export const defaultPcoRules: PcoRules = {
    */
   mergeIntoPrevious: [{ titleContains: 'online pre service message' }],
 
-  /**
-   * The prayer meeting is on the run sheet as one 25 minute pre-service item, and
-   * in the production schedule below as two -- the meeting and the pack-down after
-   * it. Keeping both would run it twice, so this side of it is dropped and the
-   * pre-service run starts at doors instead.
-   */
-  ignoreItems: [{ titleContains: 'prayer meeting' }],
+  ignoreItems: [],
 
   titleStrip: '\\s*//\\s*\\d{1,2}\\s*(am|pm)\\s*$',
   respectMasterExclusions: true,
@@ -142,35 +110,28 @@ export const defaultPcoRules: PcoRules = {
   ],
 
   /**
-   * The Sunday production schedule, which Planning Center holds nowhere.
+   * The Sunday production schedule, which Planning Center does hold -- as the
+   * plan's `rehearsal` times, each carrying its own name and clock time, plus two
+   * headers that state a time in their title and nowhere else.
    *
-   * The plan starts at doors. Everything before it -- power on, soundcheck, the
-   * briefing, the prayer meeting -- belongs to the production team, and the only
-   * trace of any of it on the run sheet is two header titles reading "SERVICE
-   * BRIEFING 8:05am" and "LINK BRIEF 8:10am".
-   *
-   * Anchoring the run to the pre-service items rather than to a clock time is what
-   * makes it track the plan: the run back-times to the service, so a service that
-   * moves takes the whole morning with it. On a 9:00 service with 15:00 of
-   * pre-service items this puts doors at 8:45 and power on at 5:30, and the two
-   * times the headers claim fall where they say they do.
+   * Reading them is the difference between a morning that tracks the plan and one
+   * transcribed into settings: the transcription this replaced had drifted, calling
+   * the 06:55 slot "Circle Time" after the midweek rehearsal when Sunday's is
+   * "Creative Team Prayer", and still naming a brief Planning Center had since
+   * renamed.
    */
-  inferredEntries: preServiceRun([
-    { title: 'Power On', minutes: 45 },
-    { title: 'Service Sync', minutes: 15 },
-    { title: 'Call Time', minutes: 5 },
-    { title: 'Band Soundcheck + Rehearsal', minutes: 20 },
-    { title: 'Circle Time', minutes: 10 },
-    { title: 'Vocal Soundcheck', minutes: 5 },
-    { title: 'Mix Changes', minutes: 5 },
-    { title: 'Link Worship Record', minutes: 5 },
-    { title: 'Worship Rehearsal', minutes: 25 },
-    { title: 'Production Checks', minutes: 20 },
-    { title: 'Service Briefing', minutes: 5 },
-    { title: 'Link Brief', minutes: 10 },
-    { title: 'Prayer Meeting', minutes: 10 },
-    { title: 'End of Prayer Meeting', minutes: 15 },
-  ]),
+  deriveRehearsalTimes: true,
+  deriveTimedHeaders: true,
+
+  /**
+   * The hour before the first rehearsal time. Powering the building on is the one
+   * part of the morning the plan genuinely does not record, and the first timer
+   * needs something to run against.
+   */
+  leadIn: { title: 'Power On', duration: 60 * 60 * 1000 },
+
+  // everything the morning holds is now read from the plan
+  inferredEntries: [],
 };
 
 /** Compiles a regex source, returning null rather than throwing on a bad pattern */
@@ -212,7 +173,7 @@ export function matchesRule(
 }
 
 /** keys a user file may explicitly blank out, rather than falling back to the default */
-const nullableRuleKeys = new Set<keyof PcoRules>(['serviceTypeId', 'serviceTypeName']);
+const nullableRuleKeys = new Set<keyof PcoRules>(['serviceTypeId', 'serviceTypeName', 'leadIn']);
 
 /**
  * Shallow merge of a user file over the defaults, ignoring keys we do not know.

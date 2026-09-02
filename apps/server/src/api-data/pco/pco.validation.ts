@@ -40,6 +40,28 @@ export const validatePcoRules = [
   body('inferredEntries').isArray(),
   body('inferredEntries.*.title').isString().notEmpty(),
   body('inferredEntries.*.duration').isInt({ min: 0 }),
+  body('deriveRehearsalTimes').isBoolean(),
+  body('deriveTimedHeaders').isBoolean(),
+  /**
+   * Null is meaningful here -- it is how the panel says the morning opens on its
+   * first rehearsal time -- so this is one check rather than a nullable object
+   * followed by field chains that would not run on the null.
+   */
+  body('leadIn').custom((value) => {
+    if (value === null || value === undefined) {
+      return true;
+    }
+    if (typeof value !== 'object' || Array.isArray(value)) {
+      throw new Error('leadIn must be an object or null');
+    }
+    if (typeof value.title !== 'string' || !value.title.trim()) {
+      throw new Error('leadIn.title must be a non-empty string');
+    }
+    if (!Number.isInteger(value.duration) || value.duration < 0) {
+      throw new Error('leadIn.duration must be a positive number of milliseconds');
+    }
+    return true;
+  }),
 
   report,
 ];

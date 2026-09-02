@@ -19,7 +19,7 @@ import { describe, expect, it } from 'vitest';
 
 import { regenerateInstances } from '../../rundown-service/serviceInstanceUtils.js';
 import { defaultPcoRules } from '../pcoRules.js';
-import { buildRundownFromPlan, groupPlanTimesByDay } from '../pcoRundownBuilder.js';
+import { buildRundownFromPlan, groupPlanTimesByDay, parseTitleTime } from '../pcoRundownBuilder.js';
 import { localTimeOfDayMs } from '../pcoTime.js';
 
 import { items, itemTimes, plan, planTimes } from './fixtures/centralAm.js';
@@ -33,9 +33,10 @@ const shippedRules: PcoRules = { ...defaultPcoRules, timezone: 'Pacific/Auckland
  * folded, nothing merged, nothing dropped, headings as blocks, and only the
  * briefing inferred.
  *
- * The tests below are about the mechanics, and they should keep testing the
- * mechanics when the shipped rules change. What the shipped rules produce is
- * asserted in one place, "the corrected rundown".
+ * The production run is derived off too, so these stay tests of how items are laid
+ * out rather than of what the plan's rehearsal times add above them. The
+ * derivation has its own describe block, and what the shipped rules produce
+ * together is asserted in one place, "the corrected rundown".
  */
 const rules: PcoRules = {
   ...shippedRules,
@@ -44,7 +45,13 @@ const rules: PcoRules = {
   preBoundaryTitleMatch: 'prayer meeting',
   collapseSections: [],
   mergeIntoPrevious: [],
-  ignoreItems: [{ titleMatch: '^\\s*service briefing', itemType: 'header' }],
+  deriveRehearsalTimes: false,
+  deriveTimedHeaders: false,
+  leadIn: null,
+  ignoreItems: [
+    { titleMatch: '^\\s*service briefing', itemType: 'header' },
+    { titleMatch: '^\\s*broadcast brief', itemType: 'header' },
+  ],
   inferredEntries: [
     {
       name: 'Service Briefing',
@@ -142,6 +149,159 @@ describe('pre-service items back-time to the service start', () => {
   it('starts the pre run 40:00 before the service, where the sheet puts it', () => {
     // 25:00 prayer + 12:20 doors + 1:00 online + 1:40 video = 40:00, so 8:20
     expect(eventNamed(build().rundown, 'Prayer Meeting').timeStart).toBe(at(9) - at(0, 40));
+  });
+});
+
+describe('reading a clock time out of a title', () => {
+  it('reads the time two headers state and nothing else records', () => {
+    expect(parseTitleTime('SERVICE BRIEFING 8:05AM')).toBe(at(8, 5));
+    expect(parseTitleTime('BROADCAST BRIEF 8:10am')).toBe(at(8, 10));
+  });
+
+  it('says nothing about a heading that states no time', () => {
+    expect(parseTitleTime('PRAISE & WORSHIP')).toBeNull();
+    expect(parseTitleTime('DRAFT RUNSHEET')).toBeNull();
+  });
+
+  it('ignores a bare time, which is far more likely to be a length', () => {
+    // "Father's Day VID (1:58)" is a duration, and reading it as 1:58am would be worse
+    expect(parseTitleTime("Father's Day VID (1:58) // BROADCAST")).toBeNull();
+  });
+
+  it('puts noon and midnight on the right side of the clock', () => {
+    expect(parseTitleTime('Doors 12:00am')).toBe(at(0));
+    expect(parseTitleTime('Lunch 12:30pm')).toBe(at(12, 30));
+    expect(parseTitleTime('Rehearsal 1:00pm')).toBe(at(13));
+  });
+
+  it('refuses a time that is not one', () => {
+    expect(parseTitleTime('Room 25:99pm')).toBeNull();
+  });
+});
+
+describe('the production run, read off the plan', () => {
+  const derived = () => buildRundownFromPlan({ plan, planTimes, items, itemTimes, rules: shippedRules });
+
+  it('takes its rows from the rehearsal times, with the names the plan gives them', () => {
+    const result = derived();
+    const preTitles = titles(result.rundown).slice(0, boundaryIndexOf(result));
+
+    expect(preTitles).toEqual([
+      'Power On',
+      'Service Sync',
+      'Call Time - Creative Team',
+      'Band Soundcheck + Rehearsal',
+      'Creative Team Prayer',
+      'Vocal Soundcheck',
+      'Mix Changes',
+      'Link Worship Record',
+      'Worship Rehearsal',
+      'Production Checks',
+      'SERVICE BRIEFING',
+      'BROADCAST BRIEF',
+      'Prayer Meeting',
+    ]);
+  });
+
+  it('places each step where the plan places it', () => {
+    const { rundown } = derived();
+
+    expect(eventNamed(rundown, 'Service Sync').timeStart).toBe(at(6, 15));
+    expect(eventNamed(rundown, 'Service Sync').timeEnd).toBe(at(6, 25));
+    expect(eventNamed(rundown, 'Production Checks').timeEnd).toBe(at(8, 5));
+  });
+
+  it('leaves the gap the plan leaves, rather than stretching an entry across it', () => {
+    const { rundown } = derived();
+
+    expect(eventNamed(rundown, 'Service Sync').timeEnd).toBe(at(6, 25));
+    expect(eventNamed(rundown, 'Call Time - Creative Team').timeStart).toBe(at(6, 30));
+    expect(eventNamed(rundown, 'Call Time - Creative Team').linkStart).toBeNull();
+  });
+
+  it('keeps one row for two rehearsals in different rooms, and records the other in its note', () => {
+    const band = eventNamed(derived().rundown, 'Band Soundcheck + Rehearsal');
+
+    expect(band.timeStart).toBe(at(6, 35));
+    expect(band.timeEnd).toBe(at(6, 55));
+    expect(band.note).toBe('Vocal Rehearsal - Backstage');
+  });
+
+  it('never lets a staffing call time become a row', () => {
+    // the producer's morning runs 07:30 to 12:45, straight through both services
+    expect(titles(derived().rundown)).not.toContain('Producer Call Time');
+  });
+
+  it('runs the briefs at the times their titles state, handing over to the run sheet', () => {
+    const { rundown } = derived();
+
+    expect(eventNamed(rundown, 'SERVICE BRIEFING').timeStart).toBe(at(8, 5));
+    expect(eventNamed(rundown, 'SERVICE BRIEFING').timeEnd).toBe(at(8, 10));
+    expect(eventNamed(rundown, 'BROADCAST BRIEF').timeStart).toBe(at(8, 10));
+    // the prayer meeting back-times to 8:20, and the brief ends exactly there
+    expect(eventNamed(rundown, 'BROADCAST BRIEF').timeEnd).toBe(at(8, 20));
+    expect(eventNamed(rundown, 'Prayer Meeting').timeStart).toBe(at(8, 20));
+  });
+
+  it('drops the time from the title, since the entry now sits at it', () => {
+    expect(titles(derived().rundown)).not.toContain('SERVICE BRIEFING 8:05AM');
+  });
+
+  it('opens with an hour of lead-in, ending where the first rehearsal time starts', () => {
+    const powerOn = eventNamed(derived().rundown, 'Power On');
+
+    expect(powerOn.timeStart).toBe(at(5, 15));
+    expect(powerOn.timeEnd).toBe(at(6, 15));
+  });
+
+  it('moves the lead-in when the plan moves, rather than holding a clock time', () => {
+    // the whole production morning pushed back half an hour
+    const shift = (iso: string) => new Date(new Date(iso).valueOf() + 30 * MILLIS_PER_MINUTE).toISOString();
+    const later = planTimes.map((time) =>
+      time.attributes.time_type === 'rehearsal'
+        ? { ...time, attributes: { ...time.attributes, starts_at: shift(time.attributes.starts_at) } }
+        : time,
+    );
+    const { rundown } = buildRundownFromPlan({ plan, planTimes: later, items, itemTimes, rules: shippedRules });
+
+    expect(eventNamed(rundown, 'Service Sync').timeStart).toBe(at(6, 45));
+    expect(eventNamed(rundown, 'Power On').timeStart).toBe(at(5, 45));
+  });
+
+  it('is not mirrored, because the morning happens once', () => {
+    const result = derived();
+    const mirrored = regenerateInstances(result.rundown, result.serviceProfiles);
+
+    expect(mirrored.filter((entry) => titleOf(entry) === 'Worship Rehearsal')).toHaveLength(1);
+    expect(mirrored.filter((entry) => titleOf(entry) === 'Prayer Meeting')).toHaveLength(1);
+    // doors, which each service does for itself, is the one either side of the boundary
+    expect(mirrored.filter((entry) => titleOf(entry) === 'Doors Open')).toHaveLength(2);
+  });
+
+  it('can be turned off, leaving the morning to start at the run sheet', () => {
+    const { rundown } = buildRundownFromPlan({
+      plan,
+      planTimes,
+      items,
+      itemTimes,
+      rules: { ...shippedRules, deriveRehearsalTimes: false, deriveTimedHeaders: false, leadIn: null },
+    });
+
+    expect(titles(rundown)).not.toContain('Worship Rehearsal');
+    expect(titles(rundown)[0]).toBe('Prayer Meeting');
+  });
+
+  it('says so when the plan holds no rehearsal times to read', () => {
+    const servicesOnly = planTimes.filter((time) => time.attributes.time_type === 'service');
+    const { warnings } = buildRundownFromPlan({
+      plan,
+      planTimes: servicesOnly,
+      items,
+      itemTimes,
+      rules: shippedRules,
+    });
+
+    expect(warnings.join(' ')).toMatch(/no rehearsal times/i);
   });
 });
 
@@ -362,10 +522,24 @@ describe('divergence the offset mirror cannot express', () => {
 });
 
 describe('preAnchor', () => {
+  /** the same Sunday with the production morning stripped out of the plan */
+  const servicesOnly = planTimes.filter((time) => time.attributes.time_type === 'service');
+
   it('back-times from the service when the day has no other plan time', () => {
-    // this Sunday carries only the two service times, so plan-time has nothing to anchor to
-    const { rundown } = build({ rules: { ...rules, preAnchor: 'plan-time' } });
+    const { rundown } = build({ planTimes: servicesOnly, rules: { ...rules, preAnchor: 'plan-time' } });
     expect(eventNamed(rundown, 'Pre Service Video').timeEnd).toBe(at(9));
+  });
+
+  it('anchors to a plan time when the day has one to anchor to', () => {
+    // the producer's call time, the only non-service time left once rehearsals are derived
+    const { rundown } = build({ rules: { ...rules, deriveRehearsalTimes: true, preAnchor: 'plan-time' } });
+    expect(eventNamed(rundown, 'Prayer Meeting').timeStart).toBe(at(7, 30));
+  });
+
+  it('will not anchor the run sheet to a rehearsal time that is now an entry of its own', () => {
+    // 06:15 is the service sync, which is a row in the production run above
+    const { rundown } = build({ rules: { ...rules, deriveRehearsalTimes: true, preAnchor: 'plan-time' } });
+    expect(eventNamed(rundown, 'Prayer Meeting').timeStart).not.toBe(at(6, 15));
   });
 });
 
@@ -779,22 +953,25 @@ describe('the corrected rundown', () => {
   });
 
   const corrected: [title: string, start: number, duration: number][] = [
-    // the production schedule, which the run sheet does not hold
-    ['Power On', at(5, 30), at(0, 45)],
-    ['Service Sync', at(6, 15), at(0, 15)],
-    ['Call Time', at(6, 30), at(0, 5)],
+    // the hour before the first rehearsal time, the one entry not read off the plan
+    ['Power On', at(5, 15), at(1, 0)],
+    // the production run, read off the plan's rehearsal times
+    ['Service Sync', at(6, 15), at(0, 10)],
+    // note the gap: the plan says 06:25 to 06:30 is nobody's
+    ['Call Time - Creative Team', at(6, 30), at(0, 5)],
+    // the vocalists rehearse alongside this one; they are in its note
     ['Band Soundcheck + Rehearsal', at(6, 35), at(0, 20)],
-    ['Circle Time', at(6, 55), at(0, 10)],
+    ['Creative Team Prayer', at(6, 55), at(0, 10)],
     ['Vocal Soundcheck', at(7, 5), at(0, 5)],
     ['Mix Changes', at(7, 10), at(0, 5)],
     ['Link Worship Record', at(7, 15), at(0, 5)],
     ['Worship Rehearsal', at(7, 20), at(0, 25)],
     ['Production Checks', at(7, 45), at(0, 20)],
-    // the two times the opening headers claim, and nothing else records
-    ['Service Briefing', at(8, 5), at(0, 5)],
-    ['Link Brief', at(8, 10), at(0, 10)],
-    ['Prayer Meeting', at(8, 20), at(0, 10)],
-    ['End of Prayer Meeting', at(8, 30), at(0, 15)],
+    // the two times the opening headers claim, in their titles and nowhere else
+    ['SERVICE BRIEFING', at(8, 5), at(0, 5)],
+    ['LINK BRIEF', at(8, 10), at(0, 10)],
+    // the run sheet's own first item, which the briefs hand over to
+    ['Prayer Meeting', at(8, 20), at(0, 25)],
     // -- 9AM SERVICE ---------------------------------------------------------
     // 13:20 is doors plus the online message merged into it
     ['Doors Open', at(8, 45), at(0, 13, 20)],
@@ -824,11 +1001,13 @@ describe('the corrected rundown', () => {
     expect(eventNamed(result.rundown, 'Praise & Worship').countToEnd).toBe(true);
   });
 
-  it('links every entry except the first of the morning', () => {
+  it('links every entry except the first of the morning and the one after the gap', () => {
     const events = result.rundown.filter(isOntimeEvent);
     expect(events[0].title).toBe('Power On');
-    expect(events[0].linkStart).toBeNull();
-    expect(events.slice(1).every((event) => event.linkStart !== null)).toBe(true);
+
+    // the plan leaves 06:25 to 06:30 to nobody, so the call time starts on its own
+    const unlinked = events.filter((event) => event.linkStart === null).map((event) => event.title);
+    expect(unlinked).toEqual(['Power On', 'Call Time - Creative Team']);
   });
 
   it('marks every event public', () => {
@@ -841,7 +1020,7 @@ describe('the corrected rundown', () => {
     expect(blocks[0].title).toBe('9AM SERVICE');
 
     const index = boundaryIndexOf(result);
-    expect(titleOf(result.rundown[index - 1])).toBe('End of Prayer Meeting');
+    expect(titleOf(result.rundown[index - 1])).toBe('Prayer Meeting');
     expect(titleOf(result.rundown[index + 1])).toBe('Doors Open');
   });
 

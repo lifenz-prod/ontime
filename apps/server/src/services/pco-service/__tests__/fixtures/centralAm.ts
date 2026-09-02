@@ -11,7 +11,7 @@
  * organisation's local wall clock there. Hence 09:00Z for a service whose
  * `starts_at` is 21:00Z. See `planDateKey`.
  *
- * Two things this fixture pins down, both read off the plan:
+ * Three things this fixture pins down, all read off the plan:
  *
  * 1. `service_position: 'pre'` items back-time as one run ending at 9:00 --
  *    prayer 25:00 + doors 12:20 + online 1:00 + video 1:40 = 40:00, and
@@ -21,10 +21,14 @@
  *    The 11am variant is 1:00 longer because the 9am carries an extra "Online
  *    Pre Service Message" that the 11am does not. Both land on :58:20.
  *
- * The "SERVICE BRIEFING 8:05AM" header carries no length and sits in `during`,
- * at sequence 1. The 8:05 briefing is therefore nowhere in the data -- it exists
- * only as text in that title, 15 minutes ahead of the prayer meeting. Representing
- * it as a real entry is what `rules.inferredEntries` is for.
+ * 3. The morning above the run sheet is in the plan twice removed: as `rehearsal`
+ *    times carrying their own names and clock times, and as two headers stating a
+ *    time in their title and nowhere else. The two meet exactly -- the last
+ *    rehearsal time ends at 8:05, which is what the first header claims -- and the
+ *    briefs hand over to the prayer meeting at 8:20.
+ *
+ * Item ids are opaque and were assigned before the second header was transcribed,
+ * so they no longer run in step with `sequence`. Order comes from `sequence`.
  */
 
 import type { PcoItem, PcoItemTime, PcoPlan, PcoPlanTime } from '../../pcoTypes.js';
@@ -56,9 +60,44 @@ const planTime = (
   attributes: { name, starts_at: startsAt, ends_at: endsAt, time_type: timeType },
 });
 
+/**
+ * The production morning, which the plan holds as `rehearsal` times.
+ *
+ * Transcribed from the live plan with its two awkward shapes intact, because both
+ * are what the builder has to get right:
+ *
+ * 1. A **gap**. The sync ends at 06:25 and the call time starts at 06:30. The plan
+ *    means it, so the rundown holds a gap there and the entries either side do not
+ *    link.
+ * 2. An **overlap**. The band and the vocalists rehearse in different rooms from
+ *    06:35 to 06:55. A rundown is linear, so one of them keeps the row.
+ *
+ * Production Checks ends at 08:05, which is exactly what the SERVICE BRIEFING
+ * header below claims -- the two halves of the morning meet without either
+ * knowing about the other.
+ */
 export const planTimes: PcoPlanTime[] = [
   // a midweek rehearsal on a different date, which must not be mistaken for the service day
   planTime('t-wed', 'Midweek Rehearsal', '2026-08-19T07:00:00Z', '2026-08-19T09:00:00Z', 'rehearsal'),
+
+  planTime('t-r1', 'Service Sync', '2026-08-22T18:15:00Z', '2026-08-22T18:25:00Z', 'rehearsal'),
+  planTime('t-r2', 'Call Time - Creative Team', '2026-08-22T18:30:00Z', '2026-08-22T18:35:00Z', 'rehearsal'),
+  planTime('t-r3', 'Band Soundcheck + Rehearsal', '2026-08-22T18:35:00Z', '2026-08-22T18:55:00Z', 'rehearsal'),
+  planTime('t-r4', 'Vocal Rehearsal - Backstage', '2026-08-22T18:35:00Z', '2026-08-22T18:55:00Z', 'rehearsal'),
+  planTime('t-r5', 'Creative Team Prayer', '2026-08-22T18:55:00Z', '2026-08-22T19:05:00Z', 'rehearsal'),
+  planTime('t-r6', 'Vocal Soundcheck', '2026-08-22T19:05:00Z', '2026-08-22T19:10:00Z', 'rehearsal'),
+  planTime('t-r7', 'Mix Changes', '2026-08-22T19:10:00Z', '2026-08-22T19:15:00Z', 'rehearsal'),
+  planTime('t-r8', 'Link Worship Record', '2026-08-22T19:15:00Z', '2026-08-22T19:20:00Z', 'rehearsal'),
+  planTime('t-r9', 'Worship Rehearsal', '2026-08-22T19:20:00Z', '2026-08-22T19:45:00Z', 'rehearsal'),
+  planTime('t-r10', 'Production Checks', '2026-08-22T19:45:00Z', '2026-08-22T20:05:00Z', 'rehearsal'),
+
+  /**
+   * A staffing call time, which is what `other` is for. It runs from before the
+   * production checks to after the second service, so it belongs to no row of a
+   * rundown -- the plan carries a dozen more like it.
+   */
+  planTime('t-o1', 'Producer Call Time', '2026-08-22T19:30:00Z', '2026-08-23T00:45:00Z', 'other'),
+
   planTime('t-9am', '9:00 AM', '2026-08-22T21:00:00Z', '2026-08-22T22:12:00Z', 'service'),
   planTime('t-11am', '11:00 AM', '2026-08-22T23:00:00Z', '2026-08-23T00:12:00Z', 'service'),
 ];
@@ -92,33 +131,40 @@ const item = (
 });
 
 export const items: PcoItem[] = [
-  // the briefing header opens the sheet but belongs to `during` and has no length
+  /**
+   * Two headers open the sheet, both `during` and both lengthless. They are the
+   * only record anywhere that the briefing and the broadcast brief happen, and
+   * they say when in their titles rather than in any field -- which is why the
+   * builder reads the title. Left in `during` they would lay out forward from the
+   * service and land at 9:00 announcing a briefing four hours past.
+   */
   item('i-01', 1, 'SERVICE BRIEFING 8:05AM', '0:00', 'header'),
+  item('i-1b', 2, 'BROADCAST BRIEF 8:10am', '0:00', 'header'),
 
   // -- pre-service, back-timed to 9:00 --------------------------------------
-  item('i-02', 2, 'Prayer Meeting', '25:00', 'item', 'pre', 'Ps A. Speaker'),
-  item('i-03', 3, 'Doors Open // 11am', '13:20', 'item', 'pre'),
-  item('i-04', 4, 'Doors Open // 9am', '12:20', 'item', 'pre'),
-  item('i-05', 5, 'Online Pre Service Message', '1:00', 'item', 'pre'),
-  item('i-06', 6, 'Pre Service Video', '1:40', 'song', 'pre'),
+  item('i-02', 3, 'Prayer Meeting', '25:00', 'item', 'pre', 'Ps A. Speaker'),
+  item('i-03', 4, 'Doors Open // 11am', '13:20', 'item', 'pre'),
+  item('i-04', 5, 'Doors Open // 9am', '12:20', 'item', 'pre'),
+  item('i-05', 6, 'Online Pre Service Message', '1:00', 'item', 'pre'),
+  item('i-06', 7, 'Pre Service Video', '1:40', 'song', 'pre'),
 
   // -- the service itself, forward from 9:00 --------------------------------
-  item('i-07', 7, 'PRAISE & WORSHIP', '0:00', 'header'),
-  item('i-08', 8, 'I Thank God', '4:00', 'song', 'during', 'WL - E. Leader'),
-  item('i-09', 9, 'O Praise The Name (Anástasis)', '5:30', 'song', 'during', 'WL - D. Leader'),
-  item('i-10', 10, 'Jesus Have It All', '7:00', 'song', 'during', 'WL - E. Leader'),
-  item('i-11', 11, 'I Exalt Thee', '3:30', 'song', 'during', 'WL - D. Leader'),
-  item('i-12', 12, 'MC Moment', '4:00', 'item', 'during', 'Ps B. Speaker'),
-  item('i-13', 13, 'WELCOME & ANNOUNCEMENTS', '0:00', 'header'),
-  item('i-14', 14, 'Welcome', '1:00', 'item', 'during', 'Ps B. Speaker'),
-  item('i-15', 15, 'Meet & Greet', '1:00'),
-  item('i-16', 16, 'MESSAGE', '0:00', 'header'),
-  item('i-17', 17, 'Message (Incl. Ministry & Altar Call)', '45:00', 'item', 'during', 'Ps C. Speaker'),
-  item('i-18', 18, 'Fall Like Rain', '0:00', 'song', 'during', 'WL - D. Leader'),
-  item('i-19', 19, 'Here I Am To Worship / Worthy Of It All TAG', '0:00', 'song', 'during', 'WL - D. Leader'),
-  item('i-20', 20, 'EOS Announcements', '1:00', 'item', 'during', 'Bibles'),
-  item('i-21', 21, 'End', '0:00'),
-  item('i-22', 22, 'END', '0:00', 'header'),
+  item('i-07', 8, 'PRAISE & WORSHIP', '0:00', 'header'),
+  item('i-08', 9, 'I Thank God', '4:00', 'song', 'during', 'WL - E. Leader'),
+  item('i-09', 10, 'O Praise The Name (Anástasis)', '5:30', 'song', 'during', 'WL - D. Leader'),
+  item('i-10', 11, 'Jesus Have It All', '7:00', 'song', 'during', 'WL - E. Leader'),
+  item('i-11', 12, 'I Exalt Thee', '3:30', 'song', 'during', 'WL - D. Leader'),
+  item('i-12', 13, 'MC Moment', '4:00', 'item', 'during', 'Ps B. Speaker'),
+  item('i-13', 14, 'WELCOME & ANNOUNCEMENTS', '0:00', 'header'),
+  item('i-14', 15, 'Welcome', '1:00', 'item', 'during', 'Ps B. Speaker'),
+  item('i-15', 16, 'Meet & Greet', '1:00'),
+  item('i-16', 17, 'MESSAGE', '0:00', 'header'),
+  item('i-17', 18, 'Message (Incl. Ministry & Altar Call)', '45:00', 'item', 'during', 'Ps C. Speaker'),
+  item('i-18', 19, 'Fall Like Rain', '0:00', 'song', 'during', 'WL - D. Leader'),
+  item('i-19', 20, 'Here I Am To Worship / Worthy Of It All TAG', '0:00', 'song', 'during', 'WL - D. Leader'),
+  item('i-20', 21, 'EOS Announcements', '1:00', 'item', 'during', 'Bibles'),
+  item('i-21', 22, 'End', '0:00'),
+  item('i-22', 23, 'END', '0:00', 'header'),
 ];
 
 const excludedFrom = (id: string, itemId: string, planTimeId: string, length: number): PcoItemTime => ({

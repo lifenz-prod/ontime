@@ -375,8 +375,10 @@ describe('what the import will do with each item', () => {
   it('reads the shipped rules back as plain words', () => {
     expect(dispositionFor('PRAISE & WORSHIP', 'header')).toBe('collapsed');
     expect(dispositionFor('Online Pre Service Message')).toBe('merged');
-    expect(dispositionFor('Prayer Meeting')).toBe('ignored');
     expect(dispositionFor('Welcome')).toBe('event');
+    // the shipped rules drop nothing now: the prayer meeting used to be dropped as a
+    // duplicate of a hand-written production run, and the run is read off the plan
+    expect(dispositionFor('Prayer Meeting')).toBe('event');
   });
 
   it('follows what headings are set to become', () => {
