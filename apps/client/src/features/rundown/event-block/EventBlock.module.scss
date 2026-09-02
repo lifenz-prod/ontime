@@ -225,6 +225,11 @@ $skip-opacity: 0.2;
   .statusIcon.disabled {
     color: $gray-1000;
   }
+
+  /* end action: play next after delay */
+  .statusIcon.delayedAction {
+    color: $orange-700;
+  }
 }
 
 @keyframes wiggle {

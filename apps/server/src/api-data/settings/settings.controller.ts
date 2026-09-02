@@ -1,5 +1,5 @@
 import { ErrorResponse, Settings } from 'ontime-types';
-import { getErrorMessage, obfuscate } from 'ontime-utils';
+import { getErrorMessage, obfuscate, validateEndActionDelay } from 'ontime-utils';
 
 import type { Request, Response } from 'express';
 
@@ -50,6 +50,7 @@ export async function postSettings(req: Request, res: Response<Settings | ErrorR
     }
 
     const language = req.body?.language || 'en';
+    const endActionDelay = validateEndActionDelay(req.body?.endActionDelay, settings.endActionDelay);
 
     const newData = {
       ...settings,
@@ -58,6 +59,7 @@ export async function postSettings(req: Request, res: Response<Settings | ErrorR
       timeFormat,
       language,
       serverPort,
+      endActionDelay,
     };
     await getDataProvider().setSettings(newData);
     res.status(200).send(newData);

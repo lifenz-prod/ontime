@@ -450,6 +450,7 @@ export const demoDb: DatabaseModel = {
     operatorKey: null,
     timeFormat: '24',
     language: 'en',
+    endActionDelay: 30,
   },
   viewSettings: {
     dangerColor: '#ED3333',

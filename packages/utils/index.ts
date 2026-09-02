@@ -80,7 +80,12 @@ export { obfuscate, unobfuscate } from './src/generic/generic.js';
 export { isNumeric } from './src/types/types.js';
 
 // model validation
-export { validateEndAction, validateTimerType } from './src/validate-events/validateEvent.js';
+export {
+  maxEndActionDelay,
+  validateEndAction,
+  validateEndActionDelay,
+  validateTimerType,
+} from './src/validate-events/validateEvent.js';
 
 // feature business logic
 

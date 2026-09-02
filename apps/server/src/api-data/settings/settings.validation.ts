@@ -22,6 +22,7 @@ export const validateSettings = [
   body('timeFormat').isString().isIn(['12', '24']),
   body('language').isString(),
   body('serverPort').isPort().optional(),
+  body('endActionDelay').isInt({ min: 0, max: 3600 }).optional(),
 
   (req: Request, res: Response, next: NextFunction) => {
     const errors = validationResult(req);

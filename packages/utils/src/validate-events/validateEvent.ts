@@ -34,6 +34,28 @@ export function validateEndAction(maybeAction: unknown, fallback = EndAction.Non
   return Object.values(EndAction).includes(maybeAction as EndAction) ? (maybeAction as EndAction) : fallback;
 }
 
+/** the largest overrun we allow before the delayed end action advances (seconds) */
+export const maxEndActionDelay = 3600;
+
+/**
+ * Checks if given value is a usable end action delay in seconds, returns the fallback otherwise
+ * @param {number} maybeDelay
+ * @param {number} [fallback]
+ */
+export function validateEndActionDelay(maybeDelay: unknown, fallback = 30): number {
+  // we avoid Number() coercion of null, booleans and empty strings, which would silently become 0
+  const isNumeric = typeof maybeDelay === 'number' || (typeof maybeDelay === 'string' && maybeDelay.trim().length > 0);
+  if (!isNumeric) {
+    return fallback;
+  }
+
+  const asNumber = Number(maybeDelay);
+  if (!Number.isFinite(asNumber)) {
+    return fallback;
+  }
+  return Math.min(Math.max(Math.round(asNumber), 0), maxEndActionDelay);
+}
+
 /**
  * Checks if given value is a valid type of TimerType, returns the fallback otherwise
  * @param {TimerType} maybeTimerType
