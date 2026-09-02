@@ -52,6 +52,27 @@ The cue screen can be displayed inside ProPresenter as a web layer, so operators
 
 The cue screen updates live as the rundown plays, with no extra configuration needed in ProPresenter.
 
+## Starting Ontime automatically when the machine turns on (Windows)
+
+On the machine that runs Ontime, you usually want it to come up on its own after a power cut or a scheduled reboot — with nobody there to click anything. Ontime already **launches itself as soon as a user is signed in** (this is on by default). The missing piece is getting Windows to sign that user in automatically at boot, so no keyboard or mouse is needed.
+
+This is a one-time setup per machine. It does **not** change how you install or update Ontime — keep downloading and running the installer exactly as before.
+
+**1. Confirm Ontime's auto-launch is on.** Open Ontime, go to Settings, and check that "start Ontime automatically on login" (auto-launch) is enabled. It's on by default, so normally there's nothing to do here.
+
+**2. Turn on Windows automatic sign-in.** Use a dedicated, low-privilege account for the Ontime machine (not a personal admin login):
+
+   - Press `Windows + R`, type `netplwiz`, press Enter.
+   - Select the account Ontime should run under.
+   - Untick **"Users must enter a user name and password to use this computer"** and click **Apply**.
+   - Enter that account's password when prompted and confirm.
+
+   > If the tick-box isn't showing, it's usually because Windows Hello / PIN sign-in is enabled. Turn off *Settings → Accounts → Sign-in options → "Require Windows Hello sign-in for Microsoft accounts"* and try again. On locked-down/domain machines you may need IT to do this, or use Microsoft's [Autologon](https://learn.microsoft.com/sysinternals/downloads/autologon) tool instead.
+
+**3. Reboot to test.** Restart the machine and leave it alone. Windows should sign in on its own, Ontime should start, and the views should be reachable from other devices at `http://<server-ip>:4001` as usual.
+
+> **Security note:** the machine now sits signed in after boot, so treat it like any always-on appliance — keep it physically secured and use a limited account, not an admin one.
+
 ## Found a bug?
 
 If something isn't working right, please **[open a bug report](https://github.com/lifenz-prod/ontime/issues/new)**. Include what you were doing, what you expected, and what happened — a screenshot helps a lot. Bug reports are the fastest way to get things fixed.

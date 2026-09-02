@@ -136,6 +136,12 @@ export const useEventAction = () => {
         if (newEvent.timeStrategy === undefined) {
           newEvent.timeStrategy = defaultTimeStrategy;
         }
+
+        // this fork runs to the clock, so a new event counts down to its end time.
+        // left alone when the caller already decided, so a clone keeps the value it copied
+        if (newEvent.countToEnd === undefined) {
+          newEvent.countToEnd = true;
+        }
       }
 
       // handle adding options that concern all event type

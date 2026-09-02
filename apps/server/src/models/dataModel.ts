@@ -20,6 +20,7 @@ export const dbModel: DatabaseModel = {
     operatorKey: null,
     timeFormat: '24',
     language: 'en',
+    endActionDelay: 30,
   },
   viewSettings: {
     overrideStyles: false,

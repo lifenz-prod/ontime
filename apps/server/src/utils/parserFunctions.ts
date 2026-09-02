@@ -15,7 +15,7 @@ import {
   isOntimeDelay,
   isOntimeEvent,
 } from 'ontime-types';
-import { customFieldLabelToKey, generateId, isAlphanumericWithSpace } from 'ontime-utils';
+import { customFieldLabelToKey, generateId, isAlphanumericWithSpace, validateEndActionDelay } from 'ontime-utils';
 
 import { dbModel } from '../models/dataModel.js';
 import { block as blockDef, delay as delayDef } from '../models/eventsDefinition.js';
@@ -136,6 +136,7 @@ export function parseSettings(data: Partial<DatabaseModel>): Settings {
     operatorKey: data.settings.operatorKey ?? null,
     timeFormat: data.settings.timeFormat ?? '24',
     language: data.settings.language ?? 'en',
+    endActionDelay: validateEndActionDelay(data.settings.endActionDelay, dbModel.settings.endActionDelay),
   };
 }
 

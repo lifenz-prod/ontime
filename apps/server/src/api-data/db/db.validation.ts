@@ -34,6 +34,7 @@ export const validateQuickProject = [
   // Settings fields
   body('settings.timeFormat').optional().isIn(['12', '24']),
   body('settings.language').optional().isString().trim(),
+  body('settings.endActionDelay').optional().isInt({ min: 0, max: 3600 }),
 
   // ViewSettings fields
   body('viewSettings.freezeEnd').optional().isBoolean(),

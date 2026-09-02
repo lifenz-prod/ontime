@@ -105,6 +105,7 @@ export default function EditorSettingsForm() {
                 <option value={EndAction.Stop}>Stop</option>
                 <option value={EndAction.LoadNext}>Load next</option>
                 <option value={EndAction.PlayNext}>Play next</option>
+                <option value={EndAction.PlayNextDelayed}>Play next after delay</option>
               </Select>
             </Panel.ListItem>
           </Panel.ListGroup>

@@ -5,7 +5,7 @@
  */
 
 import { AuthenticationStatus, CustomFields, LogOrigin, MaybeString, OntimeRundown, ServiceProfiles } from 'ontime-types';
-import { ImportMap, getErrorMessage } from 'ontime-utils';
+import { ImportMap, defaultImportMap, getErrorMessage, isImportMap } from 'ontime-utils';
 
 import { sheets, type sheets_v4 } from '@googleapis/sheets';
 import { Credentials, OAuth2Client } from 'google-auth-library';
@@ -37,12 +37,15 @@ type PersistedSheetsState = {
   clientSecret: ClientSecret | null;
   sheetId: MaybeString;
   credentials: PersistedCredentials | null;
+  /** last import map used from the UI, reused when importing without a client (eg. from OSC) */
+  importMap: ImportMap | null;
 };
 
 const defaultState: PersistedSheetsState = {
   clientSecret: null,
   sheetId: null,
   credentials: null,
+  importMap: null,
 };
 
 const adapter = new JSONFile<PersistedSheetsState>(publicFiles.sheetsState);
@@ -54,6 +57,7 @@ let currentAuthUrl: MaybeString = null;
 let currentAuthCode: MaybeString = null;
 
 let currentSheetId: MaybeString = null;
+let currentImportMap: ImportMap | null = null;
 
 let pollInterval: NodeJS.Timeout | null = null;
 let cleanupTimeout: NodeJS.Timeout | null = null;
@@ -76,6 +80,7 @@ function resetMemoryState() {
   currentAuthUrl = null;
   currentAuthCode = null;
   currentSheetId = null;
+  currentImportMap = null;
 
   clearActiveTimers();
 }
@@ -112,6 +117,7 @@ async function persistCurrentState() {
     clientSecret: currentClientSecret,
     sheetId: currentSheetId,
     credentials: currentAuthClient ? getPersistedCredentials(currentAuthClient) : null,
+    importMap: currentImportMap,
   });
 }
 
@@ -153,6 +159,7 @@ export async function init() {
     const persistedState = await readPersistedState();
     currentClientSecret = persistedState.clientSecret;
     currentSheetId = persistedState.sheetId;
+    currentImportMap = isImportMap(persistedState.importMap) ? persistedState.importMap : null;
 
     if (!persistedState.clientSecret || !persistedState.credentials) {
       return;
@@ -372,6 +379,48 @@ export async function getWorksheetOptions(sheetId: string): ReturnType<typeof ve
   return verifySheet(sheetId);
 }
 
+/**
+ * Lists the worksheets of the currently linked sheet
+ * Unlike getWorksheetOptions, this does not change the linked sheet
+ */
+export async function listWorksheets(): Promise<string[]> {
+  if (!currentAuthClient) {
+    throw new Error('Not authenticated with Google Sheets');
+  }
+  if (!currentSheetId) {
+    throw new Error('No Google Sheet is linked');
+  }
+
+  const { worksheetOptions } = await verifySheet();
+  return worksheetOptions;
+}
+
+/**
+ * The ID of the currently linked sheet, if any
+ */
+export function getLinkedSheetId(): MaybeString {
+  return currentSheetId;
+}
+
+/**
+ * The import map last used from the UI, falling back to the defaults.
+ * This is what lets an import be triggered without a client providing options.
+ */
+export function getImportMap(): ImportMap {
+  return currentImportMap ?? defaultImportMap;
+}
+
+/**
+ * Stores the import map so later headless imports use the same column mapping
+ */
+async function rememberImportMap(options: ImportMap) {
+  if (!isImportMap(options)) {
+    return;
+  }
+  currentImportMap = options;
+  await persistCurrentStateSafe();
+}
+
 async function verifyWorksheet(sheetId: string, worksheet: string): Promise<{ worksheetId: number; range: string }> {
   currentSheetId = sheetId;
   await persistCurrentStateSafe();
@@ -401,6 +450,7 @@ async function verifyWorksheet(sheetId: string, worksheet: string): Promise<{ wo
 
 export async function upload(sheetId: string, options: ImportMap) {
   const { worksheetId, range } = await verifyWorksheet(sheetId, options.worksheet);
+  await rememberImportMap(options);
 
   const readResponse = await sheets({ version: 'v4', auth: currentAuthClient }).spreadsheets.values.get({
     spreadsheetId: sheetId,
@@ -479,6 +529,7 @@ export async function download(
   serviceProfiles: ServiceProfiles;
 }> {
   const { range } = await verifyWorksheet(sheetId, options.worksheet);
+  await rememberImportMap(options);
 
   const googleResponse = await sheets({ version: 'v4', auth: currentAuthClient }).spreadsheets.values.get({
     spreadsheetId: sheetId,

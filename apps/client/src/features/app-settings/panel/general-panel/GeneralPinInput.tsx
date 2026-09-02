@@ -4,7 +4,7 @@ import { IoEyeOutline } from 'react-icons/io5';
 import { IconButton, Input, InputGroup, InputRightElement } from '@chakra-ui/react';
 import { Settings } from 'ontime-types';
 
-import { isAlphanumeric } from '../../../../common/utils/regex';
+import { isOnlyNumbers } from '../../../../common/utils/regex';
 
 interface GeneralPinInputProps {
   register: UseFormRegister<Settings>;
@@ -20,11 +20,12 @@ export default function GeneralPinInput(props: PropsWithChildren<GeneralPinInput
       <Input
         variant='ontime-filled'
         type={isVisible ? 'text' : 'password'}
+        inputMode='numeric'
         maxLength={4}
         {...register(formName, {
           pattern: {
-            value: isAlphanumeric,
-            message: 'Only alphanumeric characters are allowed',
+            value: isOnlyNumbers,
+            message: 'Only numbers are allowed',
           },
         })}
         placeholder='-'

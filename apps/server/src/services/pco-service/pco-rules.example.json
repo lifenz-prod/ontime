@@ -1,0 +1,34 @@
+{
+  "timezone": "Pacific/Auckland",
+  "serviceTypeId": null,
+
+  "preBoundaryTitleMatch": "prayer meeting",
+  "preAnchor": "back-from-service",
+  "serviceNames": ["9am", "11am"],
+  "headersAsBlocks": true,
+
+  "ignoreItems": [],
+  "titleStrip": "\\s*//\\s*\\d{1,2}\\s*(am|pm)\\s*$",
+  "respectMasterExclusions": true,
+
+  "defaultEffect": {
+    "timerType": "count-down",
+    "countToEnd": true,
+    "timeStrategy": "lock-end",
+    "endAction": "none"
+  },
+
+  "timerRules": [
+    {
+      "name": "message is a fixed-duration countdown",
+      "match": { "titleMatch": "^\\s*(message|sermon)\\b" },
+      "effect": {
+        "timerType": "count-down",
+        "countToEnd": false,
+        "timeStrategy": "lock-duration"
+      }
+    }
+  ],
+
+  "inferredEntries": []
+}

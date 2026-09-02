@@ -1,12 +1,61 @@
 name: Ontime CLI build
 
+# Triggered by the tag push, not by `release: published`.
+#
+# The GitHub Release is created by build.yml using GITHUB_TOKEN, and GitHub
+# deliberately does not let a GITHUB_TOKEN-created event start another
+# workflow. Listening for `release: published` therefore never fired. Tagging
+# is the same signal and does fire, so we key off the tag and derive the
+# channel from its name: a tag containing `-` (v4.0.1-beta.5) is a prerelease.
+#
+# NOTE FOR THIS FORK: apps/cli is still named `@getontime/cli`, which is owned
+# by the upstream maintainers. Publishing will be rejected with a 403 until the
+# package is renamed to a scope this org owns. Setting NPM_TOKEN alone is not
+# enough. See the `guard_package_name` job below.
 on:
-  release:
-    types: [published]
+  push:
+    tags: [ "*" ]
   workflow_dispatch:
 
 jobs:
+  # `secrets` is not available in a job-level `if`, so presence is checked in a
+  # step and passed down as an output. Without this the job would fail on every
+  # tag for anyone who has not set up npm publishing.
+  check_secrets:
+    runs-on: ubuntu-latest
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      - id: check
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -n "$NPM_TOKEN" ]; then
+            echo 'configured=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'configured=false' >> "$GITHUB_OUTPUT"
+            echo '::notice::NPM_TOKEN is not set, skipping the npm publish'
+          fi
+
+  # Publishing to a package this org does not own would fail late, after a full
+  # build. Fail fast and say why instead.
+  guard_package_name:
+    needs: check_secrets
+    if: needs.check_secrets.outputs.configured == 'true' && startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse to publish an upstream package name
+        run: |
+          NAME=$(node -p "require('./apps/cli/package.json').name")
+          if [ "$NAME" = "@getontime/cli" ]; then
+            echo "::error::apps/cli is still '$NAME', owned by the upstream maintainers. Rename it to a scope this org owns before publishing."
+            exit 1
+          fi
+          echo "publishing as $NAME"
+
   build_cli:
+    needs: guard_package_name
     permissions:
       id-token: write
     runs-on: ubuntu-latest
@@ -38,17 +87,17 @@ jobs:
 
       - name: Copy server
         run: mkdir -p apps/cli/server && cp apps/server/dist/index.cjs apps/cli/server/index.cjs
-      
+
       - name: Copy client
         run: cp -R apps/client/build apps/cli/client
 
       - name: Copy external
         run: cp -R apps/server/src/external apps/cli/external
-      
+
       # Stable releases move the `latest` dist-tag; betas go to `beta` so that
       # `npm i @getontime/cli` keeps resolving to the last stable.
       - name: Publish to NPM (stable)
-        if: github.event.release.prerelease == false
+        if: ${{ !contains(github.ref_name, '-') }}
         run: pnpm publish --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -56,7 +105,7 @@ jobs:
         working-directory: ./apps/cli
 
       - name: Publish to NPM (beta)
-        if: github.event.release.prerelease == true
+        if: ${{ contains(github.ref_name, '-') }}
         run: pnpm publish --access public --no-git-checks --tag beta
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

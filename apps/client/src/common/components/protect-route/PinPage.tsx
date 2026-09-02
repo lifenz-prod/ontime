@@ -42,7 +42,7 @@ export default function PinPage(props: PinPageProps) {
       {`Ontime ${permission}`}
       <div className={failed ? style.pin__failed : style.pin}>
         <PinInput
-          type='alphanumeric'
+          type='number'
           size='lg'
           mask
           autoFocus

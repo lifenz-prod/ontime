@@ -5,7 +5,7 @@ import { loadDemo, loadProject } from '../../../common/api/db';
 import { postShowWelcomeDialog } from '../../../common/api/settings';
 import { invalidateAllCaches } from '../../../common/api/utils';
 import ExternalLink from '../../../common/components/link/external-link/ExternalLink';
-import { appVersion, discordUrl, documentationUrl, websiteUrl } from '../../../externals';
+import { appVersion, documentationUrl, websiteUrl } from '../../../externals';
 import * as Editor from '../editor-utils/EditorUtils';
 
 import ImportProjectButton from './composite/ImportProjectButton';
@@ -66,7 +66,6 @@ export default function Welcome(props: WelcomeProps) {
               <div>Ontime v{appVersion}</div>
               <ExternalLink href={websiteUrl}>Website</ExternalLink>
               <ExternalLink href={documentationUrl}>Read the docs</ExternalLink>
-              <ExternalLink href={discordUrl}>Discord server</ExternalLink>
             </div>
             <div className={style.column}>
               <div className={style.header}>Welcome to Ontime</div>

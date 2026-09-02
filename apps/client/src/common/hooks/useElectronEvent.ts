@@ -7,7 +7,7 @@ const isElectron = window.process?.type === 'renderer';
 const ipcRenderer = isElectron ? window.require('electron').ipcRenderer : null;
 
 export function useElectronEvent() {
-  const sendToElectron = useCallback((channel: string, args?: string | Record<string, unknown>) => {
+  const sendToElectron = useCallback((channel: string, args?: string | boolean | Record<string, unknown>) => {
     if (isElectron && ipcRenderer) {
       ipcRenderer.send(channel, args);
     }

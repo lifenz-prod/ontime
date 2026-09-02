@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button, Input, Select } from '@chakra-ui/react';
 import { Settings } from 'ontime-types';
+import { maxEndActionDelay } from 'ontime-utils';
 
 import { postSettings } from '../../../../common/api/settings';
 import { maybeAxiosError } from '../../../../common/api/utils';
@@ -148,6 +149,30 @@ export default function GeneralPanelForm() {
                 <option value='12'>12 hours 11:00:10 PM</option>
                 <option value='24'>24 hours 23:00:10</option>
               </Select>
+            </Panel.ListItem>
+            <Panel.ListItem>
+              <Panel.Field
+                title='Delayed advance'
+                description='Seconds an event overruns before the "Play next after delay" end action advances'
+                error={errors.endActionDelay?.message}
+              />
+              <Input
+                id='endActionDelay'
+                size='sm'
+                type='number'
+                variant='ontime-filled'
+                width='75px'
+                isDisabled={disableInputs}
+                {...register('endActionDelay', {
+                  valueAsNumber: true,
+                  required: { value: true, message: 'Required field' },
+                  min: { value: 0, message: `Delay must be within range 0 - ${maxEndActionDelay} seconds` },
+                  max: {
+                    value: maxEndActionDelay,
+                    message: `Delay must be within range 0 - ${maxEndActionDelay} seconds`,
+                  },
+                })}
+              />
             </Panel.ListItem>
             <Panel.ListItem>
               <Panel.Field

@@ -1,4 +1,12 @@
-import { LogOrigin, Playback, qlabStatePlaceholder, runtimeStorePlaceholder, SimpleDirection, SimplePlayback } from 'ontime-types';
+import {
+  LogOrigin,
+  Playback,
+  qlabStatePlaceholder,
+  rundownSourcesPlaceholder,
+  runtimeStorePlaceholder,
+  SimpleDirection,
+  SimplePlayback,
+} from 'ontime-types';
 
 import 'dotenv/config';
 import express from 'express';
@@ -41,6 +49,7 @@ import { getShowWelcomeDialog } from './services/app-state-service/AppStateServi
 import { oscServer } from './adapters/OscAdapter.js';
 import { qlabService } from './services/qlab-service/QlabService.js';
 import { init as initSheetService } from './services/sheet-service/SheetService.js';
+import { init as initRundownSources } from './services/rundown-source-service/RundownSourceService.js';
 
 // Utilities
 import { clearUploadfolder } from './utils/upload.js';
@@ -198,6 +207,7 @@ export const startServer = async (
       direction: SimpleDirection.CountDown,
     },
     qlab: qlabStatePlaceholder,
+    rundownSources: rundownSourcesPlaceholder,
     ping: -1,
   });
 
@@ -214,6 +224,9 @@ export const startServer = async (
 
   // TODO: pass event store to rundownservice
   runtimeService.init(maybeRestorePoint);
+
+  // list the rundowns available for recall, this is not blocking
+  initRundownSources();
 
   const nif = getNetworkInterfaces();
   consoleSuccess(`Local: http://localhost:${resultPort}${prefix}/editor`);
