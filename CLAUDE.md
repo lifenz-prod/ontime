@@ -100,7 +100,15 @@ Note: only `build.yml` (desktop binaries + GitHub Release) is wired up and verif
 
 ## Working conventions
 
-- **Make changes in the main repo** (`/Volumes/ALANS T7/Coding/ontime`), not in worktrees — the running app is served from here, so worktree edits don't take effect until merged.
+- **Worktrees for parallel branches; the main repo stays the serving checkout.** `/Volumes/ALANS T7/Coding/ontime` is where the running app is served from, so leave it on whatever branch is live. To work on another branch at the same time, add a worktree:
+  ```bash
+  git worktree add "/Volumes/ALANS T7/Coding/ontime-wt/<branch>" <branch>
+  ```
+  Note that two sessions sharing one checkout share its branch — a checkout in one silently moves the ground under the other. Four things to get right:
+  - **Keep worktrees outside the repo.** Worktrees under `.claude/worktrees/` were once committed as gitlinks, which made a bare `git status` walk two full checkouts and their `node_modules` and take minutes (see 13ee4579). A sibling `ontime-wt/` avoids this.
+  - **Stay on the T7 volume.** pnpm's store is at `/Volumes/ALANS T7/.pnpm-store/v3`; a worktree on another volume cannot hardlink from it and falls back to copying. On-volume, `pnpm i` in a fresh worktree takes seconds.
+  - **Give each worktree its own data dir.** `getAppDataPath()` (`apps/server/src/setup/index.ts`) resolves to `~/Library/Application Support/Ontime` regardless of which checkout the server runs from, so two dev servers otherwise share one `projects/` database, `pco-rules.json` and Sheets credentials — and the second server persists its fallback port over the first's `serverPort`. Run each with its own: `ONTIME_DATA=<worktree>/.ontime-data pnpm dev`.
+  - **Copy `.env` across.** It is gitignored, so a fresh worktree has none and the PCO connector silently lists nothing.
 - Shared types belong in `packages/types`; shared pure logic in `packages/utils` — don't duplicate these in apps.
 - Linting/formatting: ESLint + Prettier (`.eslintrc`, `.prettierrc`). Keep CI green: lint, typecheck, and tests across workspaces.
 - License: AGPL-3.0-only.
