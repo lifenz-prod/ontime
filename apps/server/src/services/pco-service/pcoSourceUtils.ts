@@ -12,14 +12,23 @@ import type {
   PcoPinnedServiceType,
   PcoPlanSheetItem,
   PcoPlanSummary,
+  PcoRuleEffect,
   PcoRules,
   PcoServicePosition,
   PcoTimerRule,
 } from 'ontime-types';
 
 import { PcoError, planDateKey } from './PcoClient.js';
+import { localTimeOfDayMs } from './pcoTime.js';
 import { compileMatcher, matchesRule } from './pcoRules.js';
-import { parseTitleTime, resolveEffectFor, scopeRulesToServiceType } from './pcoRundownBuilder.js';
+import {
+  parseTitleTime,
+  rehearsalSteps,
+  resolveEffectFor,
+  scopeRulesToServiceType,
+  titleWithoutTime,
+  type PcoPlanDay,
+} from './pcoRundownBuilder.js';
 import type { PcoItem, PcoPlan, PcoServiceType } from './pcoTypes.js';
 
 /** the parts of the configuration that identify a service type */
@@ -355,60 +364,135 @@ export function findPinnedBySourceName(pinned: PcoPinnedServiceType[], name: str
 }
 
 /**
- * One plan's run sheet, resolved through the rules exactly as the import will.
+ * The morning of one plan, resolved through the rules exactly as the import will.
  *
  * Where `knownItemsFromPlans` tallies titles across the next few plans so the
  * settings panel can offer what a service type usually holds, this is the plan in
- * front of the person about to import it: every item, in order, with its own
- * length and what the rules will do with it.
+ * front of the person about to import it.
  *
- * Items excluded from the master service are left in. They are the other service's
- * copy -- "Doors Open // 11am" alongside "Doors Open // 9am" -- and the row says so
- * rather than the sheet quietly being one item shorter than Planning Center's.
+ * All of it, not only the run sheet. The production run above the sheet is read
+ * from the plan's `rehearsal` times and the lead-in ahead of that is stated in the
+ * rules, and both become entries -- so both are rows here. A page that listed only
+ * the items would be a partial account of what the import does.
+ *
+ * Only the build day's rehearsal times. A plan routinely carries a midweek
+ * rehearsal alongside the Sunday one, and an Ontime rundown is a single day: the
+ * Wednesday times belong to a morning this import is not building.
  */
+/** an `importAs` choice as a disposition, which is the vocabulary the page reads */
+function dispositionFromImportAs(importAs: PcoRuleEffect['importAs']): PcoItemDisposition {
+  if (importAs === 'omit') return 'ignored';
+  if (importAs === 'block') return 'block';
+  return 'event';
+}
+
 export function planSheetItems(
   items: PcoItem[],
   rules: PcoRules,
   serviceTypeId: string,
-  /** the master service start, so a heading timed after it is not claimed as derived */
-  serviceStartOfDay?: number,
+  /** the day the rundown will be built for; without it only the run sheet is listed */
+  day?: PcoPlanDay,
 ): PcoPlanSheetItem[] {
   const scoped = scopeRulesToServiceType(rules, serviceTypeId);
   const ownRuleNames = new Set((rules.serviceTypeRules?.[serviceTypeId] ?? []).map((rule) => rule.name));
   const stripMatcher = compileMatcher(scoped.titleStrip);
+  const serviceStartOfDay = day?.serviceTimes[0]
+    ? localTimeOfDayMs(day.serviceTimes[0].attributes.starts_at, scoped.timezone)
+    : undefined;
 
-  return [...items]
-    .sort((a, b) => (a.attributes.sequence ?? 0) - (b.attributes.sequence ?? 0))
-    .map((item) => {
-      const sourceTitle = item.attributes.title ?? '';
-      // rules match the title Planning Center holds; the strip is for display
-      const candidate = {
-        title: sourceTitle,
-        itemType: item.attributes.item_type,
-        servicePosition: item.attributes.service_position,
-      };
-      const { effect, ruleName } = resolveEffectFor(candidate, scoped);
-      const stripped = stripMatcher ? sourceTitle.replace(stripMatcher, '').trim() : sourceTitle.trim();
+  /** the shared half of a row: how the rules resolve a title */
+  const resolve = (title: string, itemType: PcoItemType, servicePosition: PcoServicePosition) => {
+    const candidate = { title, itemType, servicePosition };
+    const { effect, ruleName } = resolveEffectFor(candidate, scoped);
+    return {
+      disposition: dispositionOf(scoped, candidate),
+      matchedBy: ruleName,
+      matchedByServiceType: ruleName !== null && ownRuleNames.has(ruleName),
+      effect,
+    };
+  };
 
-      // a lengthless heading stating a time before the service becomes an entry at it
-      const stated = scoped.deriveTimedHeaders && item.attributes.item_type === 'header' && !item.attributes.length
+  const rows: PcoPlanSheetItem[] = [];
+
+  /* --- the production run, read off the plan's rehearsal times -------------- */
+
+  const steps = day && scoped.deriveRehearsalTimes ? rehearsalSteps(day.rehearsalTimes, scoped.timezone) : [];
+
+  if (scoped.leadIn && steps.length > 0) {
+    const title = scoped.leadIn.title;
+    rows.push({
+      id: 'lead-in',
+      source: 'lead-in',
+      title,
+      sourceTitle: title,
+      itemType: 'item',
+      servicePosition: 'pre',
+      duration: scoped.leadIn.duration,
+      startsAt: steps[0].start - scoped.leadIn.duration,
+      alongside: null,
+      ...resolve(title, 'item', 'pre'),
+    });
+  }
+
+  for (let index = 0; index < steps.length; index++) {
+    const step = steps[index];
+    // the same rule the builder uses: a step runs until the plan says it ends
+    const duration = Math.max(0, (step.end ?? steps[index + 1]?.start ?? step.start) - step.start);
+    rows.push({
+      id: step.id,
+      source: 'rehearsal',
+      title: step.title,
+      sourceTitle: step.title,
+      itemType: 'item',
+      servicePosition: 'pre',
+      duration,
+      startsAt: step.start,
+      alongside: step.note || null,
+      ...resolve(step.title, 'item', 'pre'),
+    });
+  }
+
+  /* --- the run sheet -------------------------------------------------------- */
+
+  const ordered = [...items].sort((a, b) => (a.attributes.sequence ?? 0) - (b.attributes.sequence ?? 0));
+
+  for (const item of ordered) {
+    const sourceTitle = item.attributes.title ?? '';
+    const itemType = item.attributes.item_type;
+    const servicePosition = item.attributes.service_position;
+    const stripped = stripMatcher ? sourceTitle.replace(stripMatcher, '').trim() : sourceTitle.trim();
+
+    /**
+     * A lengthless heading stating a time before the service is not dropped: it
+     * becomes an entry at the time it names, titled without the time. The row is
+     * named the same way, so a rule written here reaches that entry.
+     */
+    const stated =
+      scoped.deriveTimedHeaders && itemType === 'header' && !item.attributes.length
         ? parseTitleTime(sourceTitle)
         : null;
-      const derivedAt =
-        stated !== null && (serviceStartOfDay === undefined || stated < serviceStartOfDay) ? stated : null;
+    const startsAt = stated !== null && (serviceStartOfDay === undefined || stated < serviceStartOfDay) ? stated : null;
+    const title = startsAt !== null ? titleWithoutTime(stripped) : stripped;
 
-      return {
-        id: item.id,
-        title: effect.title?.trim() || stripped,
-        derivedAt,
-        sourceTitle,
-        itemType: item.attributes.item_type,
-        servicePosition: item.attributes.service_position,
-        duration: Math.max(0, (item.attributes.length ?? 0) * 1000),
-        disposition: dispositionOf(scoped, candidate),
-        matchedBy: ruleName,
-        matchedByServiceType: ruleName !== null && ownRuleNames.has(ruleName),
-        effect,
-      };
+    const resolved = resolve(startsAt !== null ? title : sourceTitle, itemType, servicePosition);
+
+    rows.push({
+      id: item.id,
+      source: 'item',
+      // a rename applies to the entry, so it is what the row should be called
+      title: resolved.effect.title?.trim() || title,
+      sourceTitle,
+      itemType,
+      servicePosition,
+      duration: Math.max(0, (item.attributes.length ?? 0) * 1000),
+      startsAt,
+      alongside: null,
+      ...resolved,
+      // a timed heading is imported whatever its kind would otherwise make it
+      disposition:
+        startsAt !== null ? dispositionFromImportAs(resolved.effect.importAs) : resolved.disposition,
     });
+  }
+
+  return rows;
 }

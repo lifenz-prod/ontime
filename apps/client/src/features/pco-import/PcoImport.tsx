@@ -140,7 +140,7 @@ export default function PcoImport() {
   };
 
   const importable = sheet?.items.filter(
-    (item) => item.derivedAt !== null || item.disposition === 'event' || item.disposition === 'block',
+    (item) => item.disposition === 'event' || item.disposition === 'block',
   ).length;
   const days = sheet?.availableDays.filter((day) => day.hasServices) ?? [];
 
@@ -238,7 +238,7 @@ export default function PcoImport() {
           </div>
           <div className={style.sectionHint}>
             {sheet
-              ? `Every item on the ${sheet.dates || selected.date} ${sheet.serviceTypeName} plan. A change here is remembered for ${sheet.serviceTypeName} and applied to its next plan too.`
+              ? `The whole morning of the ${sheet.dates || selected.date} ${sheet.serviceTypeName} plan: the production run read from its rehearsal times, then the run sheet. A change here is remembered for ${sheet.serviceTypeName} and applied to its next plan too.`
               : 'Reading the run sheet from Planning Center...'}
           </div>
 
@@ -258,7 +258,7 @@ export default function PcoImport() {
           <div className={style.footer}>
             <div className={style.summary}>
               {sheet
-                ? `${importable} of ${sheet.items.length} items will be imported, plus the production run read from the plan's rehearsal times.`
+                ? `${importable} of ${sheet.items.length} rows will be imported.`
                 : ''}
             </div>
             <Button

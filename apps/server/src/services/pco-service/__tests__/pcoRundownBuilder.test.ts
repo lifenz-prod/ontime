@@ -291,6 +291,64 @@ describe('the production run, read off the plan', () => {
     expect(titles(rundown)[0]).toBe('Prayer Meeting');
   });
 
+  it('takes a rule written against a step, since a step is an entry like any other', () => {
+    const { rundown } = buildRundownFromPlan({
+      plan,
+      planTimes,
+      items,
+      itemTimes,
+      rules: {
+        ...shippedRules,
+        serviceTypeRules: {
+          '156118': [
+            { name: 'Worship Rehearsal', match: { titleContains: 'Worship Rehearsal' }, effect: { hideTimer: true } },
+          ],
+        },
+      },
+      serviceTypeId: '156118',
+    });
+
+    expect(eventNamed(rundown, 'Worship Rehearsal').hideTimer).toBe(true);
+    expect(eventNamed(rundown, 'Production Checks').hideTimer).toBe(false);
+  });
+
+  it('leaves a step out when a rule says to, without stretching the one above it', () => {
+    const { rundown } = buildRundownFromPlan({
+      plan,
+      planTimes,
+      items,
+      itemTimes,
+      rules: {
+        ...shippedRules,
+        timerRules: [
+          { name: 'no mix changes', match: { titleContains: 'Mix Changes' }, effect: { importAs: 'omit' } },
+        ],
+      },
+    });
+
+    expect(titles(rundown)).not.toContain('Mix Changes');
+    // the row is gone and the gap is left: the plan still says the soundcheck ends at 07:10
+    expect(eventNamed(rundown, 'Vocal Soundcheck').timeEnd).toBe(at(7, 10));
+    expect(eventNamed(rundown, 'Link Worship Record').timeStart).toBe(at(7, 15));
+  });
+
+  it('names a timed heading without the time, which is what a rule has to match', () => {
+    const { rundown } = buildRundownFromPlan({
+      plan,
+      planTimes,
+      items,
+      itemTimes,
+      rules: {
+        ...shippedRules,
+        timerRules: [
+          { name: 'briefing', match: { titleContains: 'SERVICE BRIEFING' }, effect: { showAsAuxTimer: true } },
+        ],
+      },
+    });
+
+    expect(eventNamed(rundown, 'SERVICE BRIEFING').showAsAuxTimer).toBe(true);
+  });
+
   it('says so when the plan holds no rehearsal times to read', () => {
     const servicesOnly = planTimes.filter((time) => time.attributes.time_type === 'service');
     const { warnings } = buildRundownFromPlan({

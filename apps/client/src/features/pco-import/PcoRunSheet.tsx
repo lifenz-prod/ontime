@@ -60,6 +60,7 @@ export default function PcoRunSheet({ items, isSaving, isCustomised, ownEffect, 
         <thead>
           <tr>
             <th>Item</th>
+            <th className={style.fit}>Starts</th>
             <th className={style.fit}>Length</th>
             <th className={style.fit}>Import as</th>
             <th className={style.fit}>Timing</th>
@@ -98,25 +99,16 @@ interface RunSheetRowProps {
 }
 
 function RunSheetRow({ item, isSaving, isCustomised, ownEffect, onChange, onReset }: RunSheetRowProps) {
-  /**
-   * A heading whose title states a time is imported despite its disposition, as an
-   * entry at the time it names. Saying "Leave out" on the one part of the morning
-   * nothing else records would be the page's worst lie, so the row says what really
-   * happens -- and its controls are disabled, because a rule written from this title
-   * would not reach the entry, which is titled without the time.
-   */
-  const derived = item.derivedAt !== null;
-  const reason = derived ? undefined : inertReason[item.disposition];
-  // the heading itself is dropped, but an entry is made from it, so the row says so
-  const importAs = derived ? 'event' : importAsOf(item.disposition);
+  const reason = inertReason[item.disposition];
+  const importAs = importAsOf(item.disposition);
 
   /**
    * A folded or merged row is decided by a rule that is not per-item, so its timer
    * controls would do nothing. Everything else stays editable, including a row set
    * to be left out -- turning it back on is how you undo that.
    */
-  const inert = derived || reason !== undefined || isSaving;
-  const noTimer = derived || importAs !== 'event';
+  const inert = reason !== undefined || isSaving;
+  const noTimer = importAs !== 'event';
 
   /**
    * Two effects, and the difference is the point. The controls read `shown`, the
@@ -131,12 +123,16 @@ function RunSheetRow({ item, isSaving, isCustomised, ownEffect, onChange, onRese
     <tr data-inert={inert || noTimer}>
       <td>
         <span className={style.itemTitle}>{item.title || 'Untitled'}</span>
-        {item.itemType === 'header' && <span className={style.badge}>heading</span>}
-        {item.servicePosition === 'pre' && <span className={style.badge}>pre-service</span>}
-        {derived && <span className={style.muted}> · imported at {clockLabel(item.derivedAt as number)}</span>}
+        {item.source === 'rehearsal' && <span className={style.badge}>rehearsal time</span>}
+        {item.source === 'lead-in' && <span className={style.badge}>lead-in</span>}
+        {item.source === 'item' && item.itemType === 'song' && <span className={style.badge}>song</span>}
+        {item.source === 'item' && item.itemType === 'header' && <span className={style.badge}>heading</span>}
+        {item.source === 'item' && item.servicePosition === 'pre' && <span className={style.badge}>pre-service</span>}
+        {item.alongside && <span className={style.muted}> · alongside {item.alongside}</span>}
         {reason && <span className={style.muted}> · {reason}</span>}
         {isCustomised && <span className={`${style.badge} ${style.customised}`}>set for this service type</span>}
       </td>
+      <td className={style.numeric}>{item.startsAt === null ? '' : clockLabel(item.startsAt)}</td>
       <td className={style.numeric}>{lengthLabel(item.duration)}</td>
 
       <td className={style.fit}>

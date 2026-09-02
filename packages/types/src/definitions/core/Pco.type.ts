@@ -421,17 +421,31 @@ export type PcoKnownItems = {
   items: PcoKnownItem[];
 };
 
+/** where a row of the sheet comes from */
+export type PcoPlanSheetSource =
+  /** an item of the run sheet */
+  | 'item'
+  /** a `rehearsal` plan time, which is how PCO holds the production run */
+  | 'rehearsal'
+  /** the lead-in, the one entry the plan does not hold at all */
+  | 'lead-in';
+
 /**
- * One row of a plan's run sheet, as the import page shows it.
+ * One row of the morning, as the import page shows it.
  *
  * Where `PcoKnownItem` is a title tallied across the next few plans, this is one
- * actual item of one actual plan: it keeps the plan's order and its own length, so
- * the page shows the morning that is about to be imported rather than a summary of
- * the ones like it.
+ * row of one actual plan: the page shows the morning that is about to be imported
+ * rather than a summary of the ones like it.
+ *
+ * The run sheet is only half of it. The rows above it -- the production run read
+ * from the plan's rehearsal times, and the lead-in ahead of that -- are listed here
+ * too, because they are entries in the rundown and leaving them out would make the
+ * page a partial account of what the import does.
  */
 export type PcoPlanSheetItem = {
-  /** the PCO item id, which is what a row is keyed by */
+  /** the PCO item or plan time id; the lead-in has a fixed synthetic one */
   id: string;
+  source: PcoPlanSheetSource;
   /** as it will be titled after `titleStrip` and any rename */
   title: string;
   /** the title Planning Center holds, which is what a rule has to match */
@@ -440,6 +454,15 @@ export type PcoPlanSheetItem = {
   servicePosition: PcoServicePosition;
   /** milliseconds, as the plan states it */
   duration: number;
+  /**
+   * Milliseconds since midnight, for the rows the plan fixes on the clock: a
+   * rehearsal time, the lead-in before it, and a heading whose title states a time.
+   *
+   * Null for an ordinary run sheet item, whose place depends on the whole build --
+   * the pre-service run back-times to the service, so nothing before it is known
+   * until every length is in.
+   */
+  startsAt: number | null;
   /** what the import will do with it as the rules stand */
   disposition: PcoItemDisposition;
   /** the rule deciding it, null when nothing matches */
@@ -447,14 +470,11 @@ export type PcoPlanSheetItem = {
   /** true when that rule is scoped to this service type rather than the whole organisation */
   matchedByServiceType: boolean;
   /**
-   * Milliseconds since midnight, when the item is a heading whose title states a
-   * time and `deriveTimedHeaders` will read it.
-   *
-   * Such a row is imported despite its disposition saying otherwise: the heading is
-   * dropped and an entry is made at the time it names. The page has to say so, or a
-   * row would read "Leave out" for the one part of the morning nothing else records.
+   * What runs at the same time, for the rehearsal rows the plan overlaps: the band
+   * and the vocalists rehearse in different rooms, and a rundown is linear, so one
+   * keeps the row and this is what it carries in its note.
    */
-  derivedAt: number | null;
+  alongside: string | null;
   /** everything the row's controls edit, already resolved through the rules */
   effect: PcoRuleEffect;
 };

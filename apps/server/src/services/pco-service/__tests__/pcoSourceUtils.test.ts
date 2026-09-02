@@ -2,6 +2,7 @@ import type { PcoPinnedServiceType, PcoRules } from 'ontime-types';
 import { describe, expect, it } from 'vitest';
 
 import { defaultPcoRules } from '../pcoRules.js';
+import { groupPlanTimesByDay } from '../pcoRundownBuilder.js';
 import type { PcoItem, PcoPlan, PcoServiceType } from '../pcoTypes.js';
 import {
   findPinnedBySourceName,
@@ -16,7 +17,11 @@ import {
   resolveServiceType,
 } from '../pcoSourceUtils.js';
 
-import { items as centralAmItems, plan as centralAmPlan } from './fixtures/centralAm.js';
+import {
+  items as centralAmItems,
+  plan as centralAmPlan,
+  planTimes as centralAmPlanTimes,
+} from './fixtures/centralAm.js';
 
 const serviceType = (id: string, name: string): PcoServiceType => ({
   type: 'ServiceType',
@@ -399,76 +404,165 @@ describe('what the import will do with each item', () => {
 
 describe('one plan as the import page lists it', () => {
   const rules: PcoRules = { ...defaultPcoRules, timezone: 'Pacific/Auckland' };
+  const days = groupPlanTimesByDay(centralAmPlanTimes, rules.timezone);
+  const sunday = days.find((day) => day.serviceTimes.length > 0);
+
   const sheet = (overrides: Partial<PcoRules> = {}, serviceTypeId = '156118') =>
-    planSheetItems(centralAmItems, { ...rules, ...overrides }, serviceTypeId);
+    planSheetItems(centralAmItems, { ...rules, ...overrides }, serviceTypeId, sunday);
 
-  it('keeps the run sheet in the order Planning Center holds it', () => {
-    expect(sheet().map((item) => item.title).slice(0, 5)).toEqual([
-      'SERVICE BRIEFING 8:05AM',
-      'BROADCAST BRIEF 8:10am',
-      'Prayer Meeting',
-      'Doors Open',
-      'Doors Open',
-    ]);
+  const titles = () => sheet().map((row) => row.title);
+  const row = (title: string) => sheet().find((entry) => entry.title === title);
+
+  describe('the production run above the run sheet', () => {
+    it('lists the plan rehearsal times as rows of their own', () => {
+      expect(titles().slice(0, 11)).toEqual([
+        'Power On',
+        'Service Sync',
+        'Call Time - Creative Team',
+        'Band Soundcheck + Rehearsal',
+        'Creative Team Prayer',
+        'Vocal Soundcheck',
+        'Mix Changes',
+        'Link Worship Record',
+        'Worship Rehearsal',
+        'Production Checks',
+        'SERVICE BRIEFING',
+      ]);
+    });
+
+    it('places each one on the clock, which the run sheet items cannot be', () => {
+      expect(row('Service Sync')?.startsAt).toBe(6 * 3600_000 + 15 * 60_000);
+      expect(row('Service Sync')?.duration).toBe(10 * 60_000);
+      // an item's place depends on the whole build, so the page does not claim one
+      expect(row('Prayer Meeting')?.startsAt).toBeNull();
+    });
+
+    it('opens with the lead-in, ending where the first rehearsal time starts', () => {
+      expect(row('Power On')?.source).toBe('lead-in');
+      expect(row('Power On')?.startsAt).toBe(5 * 3600_000 + 15 * 60_000);
+    });
+
+    it('says what runs alongside a row, where the plan overlaps two rehearsals', () => {
+      expect(row('Band Soundcheck + Rehearsal')?.alongside).toBe('Vocal Rehearsal - Backstage');
+      expect(row('Vocal Soundcheck')?.alongside).toBeNull();
+    });
+
+    it('leaves out the midweek rehearsal, which belongs to a morning this is not building', () => {
+      // the plan carries a Wednesday rehearsal alongside the Sunday production run
+      expect(days.map((day) => day.dateKey)).toEqual(['2026-08-19', '2026-08-23']);
+      expect(titles()).not.toContain('Midweek Rehearsal');
+    });
+
+    it('leaves out staffing call times, which belong to no row', () => {
+      expect(titles()).not.toContain('Producer Call Time');
+    });
+
+    it('lists no production run when the rehearsal times are not being read', () => {
+      const withoutRun = planSheetItems(centralAmItems, { ...rules, deriveRehearsalTimes: false }, '156118', sunday);
+      expect(withoutRun.map((entry) => entry.title)).not.toContain('Service Sync');
+      expect(withoutRun[0].source).toBe('item');
+    });
   });
 
-  it('keeps the title a rule has to match alongside the one a person reads', () => {
-    // the strip takes the service suffix off for display, and a rule still sees it
-    const doors = sheet().filter((item) => item.title === 'Doors Open');
-    expect(doors.map((item) => item.sourceTitle)).toEqual(['Doors Open // 11am', 'Doors Open // 9am']);
+  describe('a heading whose title states a time', () => {
+    it('is named as the entry will be named, so a rule written here reaches it', () => {
+      expect(row('SERVICE BRIEFING')?.sourceTitle).toBe('SERVICE BRIEFING 8:05AM');
+      expect(row('BROADCAST BRIEF')?.sourceTitle).toBe('BROADCAST BRIEF 8:10am');
+    });
+
+    it('is imported rather than dropped with the other headings', () => {
+      expect(row('SERVICE BRIEFING')?.disposition).toBe('event');
+      expect(row('SERVICE BRIEFING')?.startsAt).toBe(8 * 3600_000 + 5 * 60_000);
+      // the headings that state no time still follow headersBecome
+      expect(row('PRAISE & WORSHIP')?.disposition).toBe('collapsed');
+      expect(row('WELCOME & ANNOUNCEMENTS')?.disposition).toBe('ignored');
+    });
+
+    it('takes a per-row choice like any other row', () => {
+      const omitted = sheet({
+        serviceTypeRules: {
+          '156118': [
+            { name: 'SERVICE BRIEFING', match: { titleContains: 'SERVICE BRIEFING' }, effect: { importAs: 'omit' } },
+          ],
+        },
+      });
+      expect(omitted.find((entry) => entry.title === 'SERVICE BRIEFING')?.disposition).toBe('ignored');
+    });
   });
 
-  it('says what the import will do with each row', () => {
-    const byTitle = new Map(sheet().map((item) => [item.sourceTitle, item.disposition]));
+  describe('the run sheet', () => {
+    it('keeps the order Planning Center holds it in', () => {
+      expect(titles().slice(11, 16)).toEqual([
+        'BROADCAST BRIEF',
+        'Prayer Meeting',
+        'Doors Open',
+        'Doors Open',
+        'Online Pre Service Message',
+      ]);
+    });
 
-    expect(byTitle.get('Prayer Meeting')).toBe('event');
-    expect(byTitle.get('Online Pre Service Message')).toBe('merged');
-    expect(byTitle.get('PRAISE & WORSHIP')).toBe('collapsed');
-    // a heading the shipped rules drop, which is why its row takes no timer settings
-    expect(byTitle.get('WELCOME & ANNOUNCEMENTS')).toBe('ignored');
+    it('keeps the title a rule has to match alongside the one a person reads', () => {
+      const doors = sheet().filter((entry) => entry.title === 'Doors Open');
+      expect(doors.map((entry) => entry.sourceTitle)).toEqual(['Doors Open // 11am', 'Doors Open // 9am']);
+    });
+
+    it('says what the import will do with each row', () => {
+      expect(row('Prayer Meeting')?.disposition).toBe('event');
+      expect(row('Online Pre Service Message')?.disposition).toBe('merged');
+    });
+
+    it('carries the length the plan states, in milliseconds', () => {
+      expect(row('Prayer Meeting')?.duration).toBe(25 * 60 * 1000);
+    });
   });
 
-  it('carries the length the plan states, in milliseconds', () => {
-    const prayer = sheet().find((item) => item.title === 'Prayer Meeting');
-    expect(prayer?.duration).toBe(25 * 60 * 1000);
-  });
-
-  it('applies a rule scoped to the service type it was written for', () => {
+  describe('rules scoped to a service type', () => {
     const scoped = {
       serviceTypeRules: {
         '156118': [{ name: 'Welcome', match: { titleContains: 'welcome' }, effect: { hideTimer: true } }],
       },
     };
 
-    const own = sheet(scoped).find((item) => item.sourceTitle === 'Welcome');
-    expect(own?.effect.hideTimer).toBe(true);
-    expect(own?.matchedByServiceType).toBe(true);
+    it('applies to the service type it was written for', () => {
+      const own = sheet(scoped).find((entry) => entry.sourceTitle === 'Welcome');
+      expect(own?.effect.hideTimer).toBe(true);
+      expect(own?.matchedByServiceType).toBe(true);
+    });
 
-    // the same plan read as a different service type is untouched by it
-    const other = sheet(scoped, '158458').find((item) => item.sourceTitle === 'Welcome');
-    expect(other?.effect.hideTimer).toBeUndefined();
-    expect(other?.matchedByServiceType).toBe(false);
+    it('leaves the same plan read as another service type untouched', () => {
+      const other = sheet(scoped, '158458').find((entry) => entry.sourceTitle === 'Welcome');
+      expect(other?.effect.hideTimer).toBeUndefined();
+      expect(other?.matchedByServiceType).toBe(false);
+    });
+
+    it('reports an organisation-wide rule as such, so a row does not claim to be local', () => {
+      const message = sheet().find((entry) => entry.sourceTitle?.startsWith('Message'));
+      expect(message?.matchedBy).toBe('message is a fixed-duration countdown');
+      expect(message?.matchedByServiceType).toBe(false);
+    });
+
+    it('reaches a production run row, which is an entry like any other', () => {
+      const quiet = sheet({
+        serviceTypeRules: {
+          '156118': [
+            { name: 'Worship Rehearsal', match: { titleContains: 'Worship Rehearsal' }, effect: { hideTimer: true } },
+          ],
+        },
+      });
+      expect(quiet.find((entry) => entry.title === 'Worship Rehearsal')?.effect.hideTimer).toBe(true);
+    });
   });
 
-  it('reports an organisation-wide rule as such, so a row does not claim to be local', () => {
-    const message = sheet().find((item) => item.sourceTitle?.startsWith('Message'));
-    expect(message?.matchedBy).toBe('message is a fixed-duration countdown');
-    expect(message?.matchedByServiceType).toBe(false);
-  });
+  describe('importAs read back as a disposition', () => {
+    const withRule = (effect: Record<string, unknown>) =>
+      sheet({
+        serviceTypeRules: { '156118': [{ name: 'Welcome', match: { titleContains: 'welcome' }, effect }] },
+      }).find((entry) => entry.sourceTitle === 'Welcome')?.disposition;
 
-  it('reads importAs back as the disposition, so the row shows the choice that was made', () => {
-    const asBlock = {
-      serviceTypeRules: {
-        '156118': [{ name: 'Welcome', match: { titleContains: 'welcome' }, effect: { importAs: 'block' as const } }],
-      },
-    };
-    expect(sheet(asBlock).find((item) => item.sourceTitle === 'Welcome')?.disposition).toBe('block');
-
-    const omitted = {
-      serviceTypeRules: {
-        '156118': [{ name: 'Welcome', match: { titleContains: 'welcome' }, effect: { importAs: 'omit' as const } }],
-      },
-    };
-    expect(sheet(omitted).find((item) => item.sourceTitle === 'Welcome')?.disposition).toBe('ignored');
+    it('shows the choice that was made', () => {
+      expect(withRule({ importAs: 'block' })).toBe('block');
+      expect(withRule({ importAs: 'omit' })).toBe('ignored');
+      expect(withRule({ importAs: 'event' })).toBe('event');
+    });
   });
 });

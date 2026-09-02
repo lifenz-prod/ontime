@@ -243,10 +243,18 @@ sheet minutes before a service and wanting the width of a screen; settings keeps
 what is genuinely configuration.
 
 Two steps. First the upcoming plans of every pinned service type, grouped by campus
-heading. Then the chosen plan's **whole run sheet**, in Planning Center's order,
-with its own lengths — not a tally of the titles the next few plans share, which is
-what the settings panel offers. Each row says what the import will do with it and
-lets that be changed:
+heading. Then the chosen plan's **whole morning**, in order: the lead-in, the
+production run read from the plan's rehearsal times, then the run sheet with its own
+lengths — not a tally of the titles the next few plans share, which is what the
+settings panel offers. Every row is an entry the import will make, so every row is
+listed and every row is editable.
+
+Only the build day's rehearsal times. A plan routinely carries a midweek rehearsal
+alongside the Sunday one, and a rundown is a single day: the Wednesday times belong
+to a morning this import is not building. A row the plan fixes on the clock shows
+its start; a run sheet item does not, because its place depends on the whole build.
+
+Each row says what the import will do with it and lets that be changed:
 
 | Control      | What it does                                                     |
 | ------------ | ---------------------------------------------------------------- |
@@ -255,12 +263,15 @@ lets that be changed:
 | At the end   | the event's end action                                           |
 | Hide timer / Aux timer / Skip | the switches an event carries               |
 
-A row that cannot take these says why and is disabled rather than offering a
-control that would do nothing: folded into its section, or merged into the entry
-above. A heading whose title states a time is the opposite case — its disposition
-says it is dropped, and it is not: it says _imported at 08:05_, because an entry is
-made at the time it names. Its controls are disabled too, since a rule written from
-this row's title would not reach an entry titled without the time.
+A row that cannot take these says why and is disabled rather than offering a control
+that would do nothing: folded into its section, or merged into the entry above.
+
+A heading whose title states a time is fully editable, and is named the way the
+entry will be named — _SERVICE BRIEFING_, not _SERVICE BRIEFING 8:05AM_ — because a
+rule written from a row has to match the entry the build makes. `importAs` reaches
+the production run as well, so a step nobody runs can be left out from its row; the
+gap it leaves stays a gap, since the plan still says when the step either side of it
+happens.
 
 **Choices are remembered per service type.** A run sheet item means different things
 on different ones — "Message" is forty minutes on Central AM and twenty-five on
@@ -427,10 +438,7 @@ builder or any calling code.
   nor a recall offers the choice yet.
 - Editing hand-written pattern rules in the panel, and reordering rules.
 - Honouring `ItemTime` divergence instead of only warning about it.
-- Showing the derived production run on the import page. The run sheet lists what
-  Planning Center holds as items; the entries read from its rehearsal times are
-  summarised but not listed, so the shape of the morning is only visible after an
-  import.
-- Editing a derived timed heading from its row. The entry is titled without the
-  time, so a rule written from the row's title would not reach it.
+- A length for a timed heading. The plan states when the briefing starts and not
+  how long it runs -- that is decided by whatever follows it -- so the row shows a
+  start and no length.
 - OAuth 2, if this ever needs to serve more than one organisation.

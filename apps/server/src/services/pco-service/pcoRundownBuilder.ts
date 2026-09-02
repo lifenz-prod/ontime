@@ -187,8 +187,22 @@ export function parseTitleTime(title: string): number | null {
   return ((hours + (isPm ? 12 : 0)) * 60 + minutes) * 60 * 1000;
 }
 
+/**
+ * The title with the clock time taken out of it, which is what a derived entry is
+ * called: "SERVICE BRIEFING 8:05AM" becomes "SERVICE BRIEFING", because the entry
+ * now sits at 8:05 and the title repeating it is noise.
+ *
+ * Exported so the import page names the row the same way. A rule written from a row
+ * has to match the entry the build makes, and the entry is named by this.
+ */
+export function titleWithoutTime(title: string): string {
+  return title.replace(/(\d{1,2})[:.](\d{2})\s*(am|pm)\b/i, '').trim() || title.trim();
+}
+
 /** a step of the production run, before it is given a duration */
-type DerivedStep = {
+export type DerivedStep = {
+  /** the plan time it came from, so the import page can key a row by it */
+  id: string;
   title: string;
   note: string;
   start: number;
@@ -224,7 +238,7 @@ export function rehearsalSteps(times: PcoPlanTime[], timezone: string): DerivedS
       continue;
     }
 
-    steps.push({ title, note: '', start, end });
+    steps.push({ id: time.id, title, note: '', start, end });
   }
 
   return steps;
@@ -677,8 +691,7 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
       }
       timedHeaderIds.add(item.id);
       // the time was the title's only reason for carrying it; the entry sits there now
-      const title = titleOf(item).replace(/(\d{1,2})[:.](\d{2})\s*(am|pm)\b/i, '').trim();
-      derivedSteps.push({ title: title || titleOf(item), note: '', start: stated, end: null });
+      derivedSteps.push({ id: item.id, title: titleWithoutTime(titleOf(item)), note: '', start: stated, end: null });
     }
   }
 
@@ -771,9 +784,26 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
 
   for (let index = 0; index < derivedSteps.length; index++) {
     const step = derivedSteps[index];
+    /**
+     * The end is taken before anything is dropped, so leaving a step out removes a
+     * row and leaves a gap rather than stretching the one above it over the hole.
+     */
     const nextStart = derivedSteps[index + 1]?.start ?? runHandsOverAt;
     const end = step.end ?? nextStart;
     const duration = Math.max(0, end - step.start);
+
+    // a production step takes the same per-row choices as a run sheet item
+    const effect = resolveDerivedEffect(step.title, rules);
+    if (effect.importAs === 'omit') {
+      continue;
+    }
+    if (effect.importAs === 'block') {
+      derivedEntries.push({
+        sortKey: step.start,
+        entry: { type: SupportedEvent.Block, id: generateId(), title: step.title },
+      });
+      continue;
+    }
 
     if (duration === 0) {
       warnings.push(`Nothing follows "${step.title}" in the plan, so it was imported as 0:00.`);
@@ -781,13 +811,7 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
 
     derivedEntries.push({
       sortKey: step.start,
-      entry: makeEvent({
-        title: step.title,
-        note: step.note,
-        timeStart: step.start,
-        duration,
-        effect: resolveDerivedEffect(step.title, rules),
-      }),
+      entry: makeEvent({ title: step.title, note: step.note, timeStart: step.start, duration, effect }),
     });
   }
 
@@ -798,16 +822,20 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
    */
   if (rules.leadIn && derivedSteps.length > 0) {
     const start = derivedSteps[0].start - rules.leadIn.duration;
-    derivedEntries.unshift({
-      sortKey: start,
-      entry: makeEvent({
-        title: rules.leadIn.title,
-        note: '',
-        timeStart: start,
-        duration: rules.leadIn.duration,
-        effect: { ...resolveDerivedEffect(rules.leadIn.title, rules), ...rules.leadIn.effect },
-      }),
-    });
+    const effect = { ...resolveDerivedEffect(rules.leadIn.title, rules), ...rules.leadIn.effect };
+
+    if (effect.importAs !== 'omit') {
+      derivedEntries.unshift({
+        sortKey: start,
+        entry: makeEvent({
+          title: rules.leadIn.title,
+          note: '',
+          timeStart: start,
+          duration: rules.leadIn.duration,
+          effect,
+        }),
+      });
+    }
   }
 
   if (rules.deriveRehearsalTimes && day.rehearsalTimes.length === 0) {

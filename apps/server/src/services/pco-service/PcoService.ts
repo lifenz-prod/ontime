@@ -66,7 +66,7 @@ import {
   planSummary,
   resolveServiceType,
 } from './pcoSourceUtils.js';
-import { localDateKey, localTimeOfDayMs } from './pcoTime.js';
+import { localDateKey } from './pcoTime.js';
 import { savePcoRules } from './pcoRulesFile.js';
 
 /** how many upcoming plans the import tab lists per service type */
@@ -491,13 +491,13 @@ export async function getPcoPlanSheet(serviceTypeId: string, planId: string): Pr
     client.getPlanContent(serviceTypeId, plan.id),
   ]);
 
-  // the day the rundown would be built for, so a heading timed after the service
-  // is not reported as one the import will read
+  /**
+   * The day the rundown would be built for. It decides which rehearsal times are
+   * listed -- a plan routinely carries a midweek one, and that morning is not the
+   * one being imported.
+   */
   const days = groupPlanTimesByDay(planTimes, config.rules.timezone);
   const buildDay = days.find((day) => day.serviceTimes.length > 0);
-  const masterStartOfDay = buildDay
-    ? localTimeOfDayMs(buildDay.serviceTimes[0].attributes.starts_at, config.rules.timezone)
-    : undefined;
 
   return {
     serviceTypeId,
@@ -511,7 +511,7 @@ export async function getPcoPlanSheet(serviceTypeId: string, planId: string): Pr
       label: day.label,
       hasServices: day.serviceTimes.length > 0,
     })),
-    items: planSheetItems(content.items, config.rules, serviceTypeId, masterStartOfDay),
+    items: planSheetItems(content.items, config.rules, serviceTypeId, buildDay),
   };
 }
 
