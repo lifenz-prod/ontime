@@ -4,6 +4,7 @@ import type {
   PcoImportRequest,
   PcoImportResult,
   PcoKnownItems,
+  PcoPlanSheet,
   PcoPlanSummary,
   PcoRules,
   PcoServiceTypeSummary,
@@ -36,6 +37,12 @@ export async function getPcoKnownItems(serviceTypeId?: string): Promise<PcoKnown
   const res = await axios.get(`${pcoPath}/known-items`, {
     params: serviceTypeId ? { serviceTypeId } : undefined,
   });
+  return res.data;
+}
+
+/** one plan's run sheet, resolved through the rules exactly as the import will */
+export async function getPcoPlanSheet(serviceTypeId: string, planId: string): Promise<PcoPlanSheet> {
+  const res = await axios.get(`${pcoPath}/plan-sheet`, { params: { serviceTypeId, planId } });
   return res.data;
 }
 

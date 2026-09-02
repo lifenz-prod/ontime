@@ -80,7 +80,24 @@ export type PcoBuildInput = {
   rules: PcoRules;
   /** YYYY-MM-DD in the configured timezone; defaults to the first day holding a service time */
   targetDate?: string;
+  /** which service type the plan belongs to, so its own rules are applied */
+  serviceTypeId?: string;
 };
+
+/**
+ * The rules as they apply to one service type: its own rules first, since first
+ * match wins and the narrower scope should beat the organisation-wide one.
+ *
+ * Exported because the import page has to resolve an item the same way the build
+ * will, or the row would show one thing and the import do another.
+ */
+export function scopeRulesToServiceType(rules: PcoRules, serviceTypeId?: string): PcoRules {
+  const scoped = serviceTypeId ? rules.serviceTypeRules?.[serviceTypeId] : undefined;
+  if (!scoped || scoped.length === 0) {
+    return rules;
+  }
+  return { ...rules, timerRules: [...scoped, ...rules.timerRules] };
+}
 
 /* -------------------------------------------------------------------------- */
 /* timezone helpers                                                            */
@@ -236,8 +253,13 @@ function baseEffect(rules: PcoRules): PcoRuleEffect {
   return rest;
 }
 
-/** default effect, then the first matching rule on top */
-function resolveEffectFor(
+/**
+ * Default effect, then the first matching rule on top.
+ *
+ * Exported because the import page has to resolve a row exactly as the build will,
+ * or a control would show one thing and the import do another.
+ */
+export function resolveEffectFor(
   candidate: { title: string; itemType: PcoItemType; servicePosition: PcoServicePosition },
   rules: PcoRules,
 ): { effect: PcoRuleEffect; ruleName: string | null } {
@@ -406,7 +428,8 @@ export function findDivergence(
 /* -------------------------------------------------------------------------- */
 
 export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
-  const { plan, planTimes, items, itemTimes = [], rules, targetDate } = input;
+  const { plan, planTimes, items, itemTimes = [], targetDate } = input;
+  const rules = scopeRulesToServiceType(input.rules, input.serviceTypeId);
   const warnings: string[] = [];
 
   const availableDays = groupPlanTimesByDay(planTimes, rules.timezone);
@@ -555,8 +578,18 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
         continue;
       }
 
+      /**
+       * `importAs` is a per-item override of what the item's kind would make it,
+       * which is what lets the import page decide this a row at a time instead of
+       * sending someone to edit the ignore list.
+       */
+      const effect = resolveEffect(item, rules).effect;
       const isHeader = item.attributes.item_type === 'header';
-      if (isHeader && rules.headersBecome === 'nothing') {
+
+      if (effect.importAs === 'omit') {
+        continue;
+      }
+      if (!effect.importAs && isHeader && rules.headersBecome === 'nothing') {
         continue;
       }
 
@@ -564,8 +597,8 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
         title: titleOf(item),
         note: item.attributes.description ?? '',
         duration: durationOf(item),
-        effect: resolveEffect(item, rules).effect,
-        isBlock: isHeader && rules.headersBecome === 'block',
+        effect,
+        isBlock: effect.importAs ? effect.importAs === 'block' : isHeader && rules.headersBecome === 'block',
         itemIds: [item.id],
       });
     }

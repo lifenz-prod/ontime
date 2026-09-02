@@ -1,8 +1,11 @@
 import {
   type PcoInferredEntry,
+  type PcoItemDisposition,
+  type PcoItemImportAs,
   type PcoRuleEffect,
   type PcoRules,
   type PcoTimerRule,
+  EndAction,
   TimerType,
   TimeStrategy,
 } from 'ontime-types';
@@ -125,6 +128,119 @@ export function withEffectForTitle(rules: PcoRules, title: string, effect: PcoRu
   }
 
   return { ...rules, timerRules };
+}
+
+/* -------------------------------------------------------------------------- */
+/* rules scoped to one service type, which the import page writes               */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A run sheet item means different things on different service types -- "Message"
+ * is forty minutes on Central AM and twenty-five on Central PM -- so a choice made
+ * while importing one plan is remembered against its service type and left out of
+ * the others. These are applied ahead of the organisation-wide rules.
+ */
+export function serviceTypeRulesOf(rules: PcoRules, serviceTypeId: string): PcoTimerRule[] {
+  return rules.serviceTypeRules?.[serviceTypeId] ?? [];
+}
+
+function ruleIndexIn(list: PcoTimerRule[], title: string): number {
+  const wanted = title.trim().toLowerCase();
+  return list.findIndex((rule) => isPanelRule(rule) && rule.match.titleContains?.trim().toLowerCase() === wanted);
+}
+
+/** whether this service type holds a choice of its own for a title */
+export function hasServiceTypeEffect(rules: PcoRules, serviceTypeId: string, title: string): boolean {
+  return ruleIndexIn(serviceTypeRulesOf(rules, serviceTypeId), title) !== -1;
+}
+
+/**
+ * What this service type explicitly holds for a title, empty when nothing is set.
+ *
+ * The distinction from the resolved effect matters when writing. A row's controls
+ * show the resolved effect, because that is what the import will actually do -- but
+ * a change has to be applied to this, or toggling one switch would freeze today's
+ * `defaultEffect` into the rule and the row would stop following the defaults it
+ * never had an opinion about.
+ */
+export function serviceTypeEffectFor(rules: PcoRules, serviceTypeId: string, title: string): PcoRuleEffect {
+  const list = serviceTypeRulesOf(rules, serviceTypeId);
+  const index = ruleIndexIn(list, title);
+  return index === -1 ? {} : list[index].effect;
+}
+
+/**
+ * Writes one title's effect against one service type.
+ *
+ * An emptied effect removes the rule rather than leaving one that matches and does
+ * nothing, which is also how a row is reset to following the defaults.
+ */
+export function withServiceTypeEffect(
+  rules: PcoRules,
+  serviceTypeId: string,
+  title: string,
+  effect: PcoRuleEffect,
+): PcoRules {
+  const list = [...serviceTypeRulesOf(rules, serviceTypeId)];
+  const index = ruleIndexIn(list, title);
+
+  if (isEffectEmpty(effect)) {
+    if (index !== -1) {
+      list.splice(index, 1);
+    }
+  } else {
+    const rule: PcoTimerRule = { name: title, match: { titleContains: title }, effect };
+    if (index === -1) {
+      // first match wins, so a choice has to sit ahead of anything already here
+      list.unshift(rule);
+    } else {
+      list[index] = rule;
+    }
+  }
+
+  const serviceTypeRules = { ...(rules.serviceTypeRules ?? {}) };
+  if (list.length === 0) {
+    delete serviceTypeRules[serviceTypeId];
+  } else {
+    serviceTypeRules[serviceTypeId] = list;
+  }
+  return { ...rules, serviceTypeRules };
+}
+
+/** what an item becomes, as the import page offers it */
+export const importAsLabels: Record<PcoItemImportAs, string> = {
+  event: 'Timed event',
+  block: 'Block',
+  omit: 'Leave out',
+};
+
+/**
+ * The import choice for a row.
+ *
+ * Read off the disposition rather than the effect, so a row shows what the import
+ * will actually do with it -- including when a fold or a merge decided that and no
+ * per-item rule is involved.
+ */
+export function importAsOf(disposition: PcoItemDisposition): PcoItemImportAs {
+  if (disposition === 'block') return 'block';
+  if (disposition === 'ignored') return 'omit';
+  return 'event';
+}
+
+export function applyImportAs(effect: PcoRuleEffect, choice: PcoItemImportAs): PcoRuleEffect {
+  return { ...effect, importAs: choice };
+}
+
+export const endActionLabels: Record<EndAction, string> = {
+  [EndAction.None]: 'Stop at end',
+  [EndAction.Stop]: 'Stop playback',
+  [EndAction.LoadNext]: 'Load next',
+  [EndAction.PlayNext]: 'Play next',
+  [EndAction.PlayNextDelayed]: 'Play next after delay',
+};
+
+export function applyEndAction(effect: PcoRuleEffect, action: EndAction): PcoRuleEffect {
+  return { ...effect, endAction: action };
 }
 
 /** rules written by hand, which the panel lists but does not edit */

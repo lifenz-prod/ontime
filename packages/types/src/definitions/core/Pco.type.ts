@@ -44,7 +44,25 @@ export type PcoRuleEffect = {
   skip?: boolean;
   hideTimer?: boolean;
   showAsAuxTimer?: boolean;
+  /**
+   * Whether the item becomes a timed event at all.
+   *
+   * Overrides `headersBecome` for the one item it matches, and `'omit'` does what
+   * an `ignoreItems` entry would -- which is what makes the import page able to
+   * decide this per row rather than by editing the rule lists. Absent, the item
+   * follows the shipped behaviour for its kind.
+   */
+  importAs?: PcoItemImportAs;
 };
+
+/** what an item becomes, when a rule decides it rather than the item's kind */
+export type PcoItemImportAs =
+  /** a timed event of its own */
+  | 'event'
+  /** a divider carrying no timer, though its length still shifts what follows */
+  | 'block'
+  /** never reaches the rundown, and its length goes with it */
+  | 'omit';
 
 /**
  * All present fields must match, and an empty match matches nothing.
@@ -240,6 +258,18 @@ export type PcoRules = {
   /** first match wins */
   timerRules: PcoTimerRule[];
   /**
+   * Rules that apply to one service type only, keyed by its Planning Center id.
+   *
+   * The import page writes here. A run sheet item means different things on
+   * different service types -- "Message" is forty minutes on Central AM and
+   * twenty-five on Central PM -- so a choice made while importing one is
+   * remembered for the next plan of that service type and left out of the others.
+   *
+   * Applied ahead of `timerRules`, since first match wins and the narrower scope
+   * should win over the organisation-wide one.
+   */
+  serviceTypeRules: Record<string, PcoTimerRule[]>;
+  /**
    * The production run before the run sheet's own items, taken from the plan's
    * `rehearsal` times.
    *
@@ -389,6 +419,57 @@ export type PcoKnownItems = {
   /** how many plans were read to build the list */
   plansSampled: number;
   items: PcoKnownItem[];
+};
+
+/**
+ * One row of a plan's run sheet, as the import page shows it.
+ *
+ * Where `PcoKnownItem` is a title tallied across the next few plans, this is one
+ * actual item of one actual plan: it keeps the plan's order and its own length, so
+ * the page shows the morning that is about to be imported rather than a summary of
+ * the ones like it.
+ */
+export type PcoPlanSheetItem = {
+  /** the PCO item id, which is what a row is keyed by */
+  id: string;
+  /** as it will be titled after `titleStrip` and any rename */
+  title: string;
+  /** the title Planning Center holds, which is what a rule has to match */
+  sourceTitle: string;
+  itemType: PcoItemType;
+  servicePosition: PcoServicePosition;
+  /** milliseconds, as the plan states it */
+  duration: number;
+  /** what the import will do with it as the rules stand */
+  disposition: PcoItemDisposition;
+  /** the rule deciding it, null when nothing matches */
+  matchedBy: string | null;
+  /** true when that rule is scoped to this service type rather than the whole organisation */
+  matchedByServiceType: boolean;
+  /**
+   * Milliseconds since midnight, when the item is a heading whose title states a
+   * time and `deriveTimedHeaders` will read it.
+   *
+   * Such a row is imported despite its disposition saying otherwise: the heading is
+   * dropped and an entry is made at the time it names. The page has to say so, or a
+   * row would read "Leave out" for the one part of the morning nothing else records.
+   */
+  derivedAt: number | null;
+  /** everything the row's controls edit, already resolved through the rules */
+  effect: PcoRuleEffect;
+};
+
+export type PcoPlanSheet = {
+  serviceTypeId: string;
+  serviceTypeName: string;
+  planId: string;
+  /** the plan's own title, which is often blank */
+  planTitle: string;
+  /** human readable, eg "6 September 2026" */
+  dates: string;
+  /** every day the plan touches, so the page can offer the choice */
+  availableDays: { dateKey: string; label: string; hasServices: boolean }[];
+  items: PcoPlanSheetItem[];
 };
 
 export type PcoImportRequest = {

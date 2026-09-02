@@ -8,8 +8,8 @@ including the PRE section and both Sunday services.
 Usable. The API client, the rundown builder and the rules config are unit tested
 against a fixture shaped like a real Central AM plan. The connector is registered
 as a **rundown source provider**, so a plan can be recalled over OSC, websocket or
-HTTP, and there is a settings panel for importing by hand, entering credentials and
-configuring what each run sheet item does.
+HTTP, an import page at `/pco-import` for picking a plan and saying what each of its
+items becomes, and a settings panel for credentials, pins and defaults.
 
 ## What PCO gives us, and what it does not
 
@@ -235,6 +235,49 @@ else the organisation's only one. Anything ambiguous is an error listing the ids
 choose from — this organisation has 329 service types, so guessing would be worse
 than failing.
 
+## The import page
+
+`/pco-import`, its own route rather than a settings section. Choosing a plan and
+saying what each of its items becomes is an operator's task, done against a run
+sheet minutes before a service and wanting the width of a screen; settings keeps
+what is genuinely configuration.
+
+Two steps. First the upcoming plans of every pinned service type, grouped by campus
+heading. Then the chosen plan's **whole run sheet**, in Planning Center's order,
+with its own lengths — not a tally of the titles the next few plans share, which is
+what the settings panel offers. Each row says what the import will do with it and
+lets that be changed:
+
+| Control      | What it does                                                     |
+| ------------ | ---------------------------------------------------------------- |
+| Import as    | a timed event, a block, or left out                              |
+| Timing       | countdown to a time of day, or a fixed duration                  |
+| At the end   | the event's end action                                           |
+| Hide timer / Aux timer / Skip | the switches an event carries               |
+
+A row that cannot take these says why and is disabled rather than offering a
+control that would do nothing: folded into its section, or merged into the entry
+above. A heading whose title states a time is the opposite case — its disposition
+says it is dropped, and it is not: it says _imported at 08:05_, because an entry is
+made at the time it names. Its controls are disabled too, since a rule written from
+this row's title would not reach an entry titled without the time.
+
+**Choices are remembered per service type.** A run sheet item means different things
+on different ones — "Message" is forty minutes on Central AM and twenty-five on
+Central PM — so a change is written to `serviceTypeRules[<id>]` and applied to that
+service type's next plan, leaving the others alone. The row carries a badge when the
+service type holds a choice of its own, and the reset button removes it.
+
+A rule written this way holds **only what was chosen**. The controls show the
+resolved effect, which is what the import will really do, but a change is applied to
+what the service type explicitly holds — otherwise toggling one switch would freeze
+today's `defaultEffect` into the rule, and the row would stop following defaults it
+never had an opinion about.
+
+Importing replaces the rundown and the service profiles, and is refused while a show
+is running. Unlike a recall, an import here names a specific dated plan, which is
+what makes it useful for building next month's service ahead of time.
+
 ## The settings panel
 
 Two entries under _Planning Center_ in app settings, both editing the same
@@ -242,16 +285,11 @@ Two entries under _Planning Center_ in app settings, both editing the same
 have to write the whole file back, silently reverting the other.
 
 **Import from Planning Center** — connection state, the credentials, the switch
-above, the pinned service types, and the upcoming plans across them with an Import
-button per plan. Pinning exists because of the 329: the picker is a search, and what
-gets used is kept. A pin carries an optional campus heading, which groups the plan
-list and disambiguates a shared service type name. The pins are also exactly what a
-recall can address, so pinning is how a campus decides what its Companion buttons
-can reach. Importing replaces the rundown and the service profiles, and is refused
-while a show is running.
-
-Unlike a recall, an import here names a specific dated plan, which is what makes it
-useful for building next month's service ahead of time.
+above, the pinned service types, and the way out to the import page. Pinning exists
+because of the 329: the picker is a search, and what gets used is kept. A pin
+carries an optional campus heading, which groups the plan list and disambiguates a
+shared service type name. The pins are also exactly what a recall can address, so
+pinning is how a campus decides what its Companion buttons can reach.
 
 **Import defaults** — three things, in the order the morning runs.
 
@@ -321,7 +359,11 @@ What survives becomes an entry, and the rest of the file shapes it:
 - `timerRules` — first match wins. `titleContains` is a literal, case-insensitive
   substring and is what the settings panel writes; `titleMatch` is a regex for
   rules written by hand. An effect can set the timer type, the strategy, the
-  colour, the switches, and `title` to rename the event.
+  colour, the switches, `title` to rename the event, and `importAs` to decide
+  whether it becomes an event, a block, or nothing at all.
+- `serviceTypeRules` — the same rules, keyed by Planning Center service type id and
+  applied ahead of `timerRules`. Written by the import page and not meant to be
+  edited by hand.
 - `deriveRehearsalTimes` — the plan's `rehearsal` times become the production run
   ahead of the run sheet, at the names and times PCO gives them.
 - `deriveTimedHeaders` — headers stating a clock time in their title become
@@ -385,7 +427,10 @@ builder or any calling code.
   nor a recall offers the choice yet.
 - Editing hand-written pattern rules in the panel, and reordering rules.
 - Honouring `ItemTime` divergence instead of only warning about it.
-- Showing the derived production run in the settings panel. The panel configures
-  the reading but cannot preview it, so what the morning will look like is only
-  visible after an import.
+- Showing the derived production run on the import page. The run sheet lists what
+  Planning Center holds as items; the entries read from its rehearsal times are
+  summarised but not listed, so the shape of the morning is only visible after an
+  import.
+- Editing a derived timed heading from its row. The entry is titled without the
+  time, so a rule written from the row's title would not reach it.
 - OAuth 2, if this ever needs to serve more than one organisation.

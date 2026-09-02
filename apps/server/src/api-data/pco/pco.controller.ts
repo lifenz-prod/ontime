@@ -2,6 +2,7 @@ import type {
   ErrorResponse,
   PcoImportResult,
   PcoKnownItems,
+  PcoPlanSheet,
   PcoPlanSummary,
   PcoRules,
   PcoServiceTypeSummary,
@@ -15,6 +16,7 @@ import { PcoError } from '../../services/pco-service/PcoClient.js';
 import {
   getPcoConfig,
   getPcoKnownItems,
+  getPcoPlanSheet,
   getPcoStatus,
   importPcoPlan,
   listPcoPlans,
@@ -72,6 +74,20 @@ export async function getKnownItems(req: Request, res: Response<PcoKnownItems | 
     const serviceTypeId = typeof req.query.serviceTypeId === 'string' ? req.query.serviceTypeId : undefined;
     const plansToSample = Number(req.query.plans) || undefined;
     res.status(200).send(await getPcoKnownItems(serviceTypeId, plansToSample));
+  } catch (error) {
+    sendFailure(res, error);
+  }
+}
+
+/** the run sheet of one plan, as the import page lists it */
+export async function getPlanSheet(req: Request, res: Response<PcoPlanSheet | ErrorResponse>) {
+  try {
+    const serviceTypeId = typeof req.query.serviceTypeId === 'string' ? req.query.serviceTypeId : '';
+    const planId = typeof req.query.planId === 'string' ? req.query.planId : '';
+    if (!serviceTypeId || !planId) {
+      return res.status(400).send({ message: 'serviceTypeId and planId are both required' });
+    }
+    res.status(200).send(await getPcoPlanSheet(serviceTypeId, planId));
   } catch (error) {
     sendFailure(res, error);
   }

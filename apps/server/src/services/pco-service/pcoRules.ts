@@ -110,6 +110,12 @@ export const defaultPcoRules: PcoRules = {
   ],
 
   /**
+   * Written by the import page, one entry per service type. Empty until somebody
+   * changes a row while importing, and never touched by hand.
+   */
+  serviceTypeRules: {},
+
+  /**
    * The Sunday production schedule, which Planning Center does hold -- as the
    * plan's `rehearsal` times, each carrying its own name and clock time, plus two
    * headers that state a time in their title and nowhere else.

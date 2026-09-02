@@ -10,6 +10,7 @@ import type {
   PcoItemType,
   PcoKnownItem,
   PcoPinnedServiceType,
+  PcoPlanSheetItem,
   PcoPlanSummary,
   PcoRules,
   PcoServicePosition,
@@ -17,7 +18,8 @@ import type {
 } from 'ontime-types';
 
 import { PcoError, planDateKey } from './PcoClient.js';
-import { matchesRule } from './pcoRules.js';
+import { compileMatcher, matchesRule } from './pcoRules.js';
+import { parseTitleTime, resolveEffectFor, scopeRulesToServiceType } from './pcoRundownBuilder.js';
 import type { PcoItem, PcoPlan, PcoServiceType } from './pcoTypes.js';
 
 /** the parts of the configuration that identify a service type */
@@ -187,6 +189,13 @@ export function dispositionOf(
   if (rules.ignoreItems.some((match) => matchesRule(match, candidate))) {
     return 'ignored';
   }
+
+  // a per-item choice from the import page beats what the item's kind would make it
+  const { importAs } = resolveEffectFor(candidate, rules).effect;
+  if (importAs) {
+    return importAs === 'omit' ? 'ignored' : importAs;
+  }
+
   if (candidate.itemType === 'header') {
     return rules.headersBecome === 'block' ? 'block' : rules.headersBecome === 'nothing' ? 'ignored' : 'event';
   }
@@ -343,4 +352,63 @@ export function findPinnedBySourceName(pinned: PcoPinnedServiceType[], name: str
   const names = pinnedSourceNames(pinned);
   const index = names.findIndex((candidate) => candidate.toLowerCase() === target);
   return index === -1 ? undefined : pinned[index];
+}
+
+/**
+ * One plan's run sheet, resolved through the rules exactly as the import will.
+ *
+ * Where `knownItemsFromPlans` tallies titles across the next few plans so the
+ * settings panel can offer what a service type usually holds, this is the plan in
+ * front of the person about to import it: every item, in order, with its own
+ * length and what the rules will do with it.
+ *
+ * Items excluded from the master service are left in. They are the other service's
+ * copy -- "Doors Open // 11am" alongside "Doors Open // 9am" -- and the row says so
+ * rather than the sheet quietly being one item shorter than Planning Center's.
+ */
+export function planSheetItems(
+  items: PcoItem[],
+  rules: PcoRules,
+  serviceTypeId: string,
+  /** the master service start, so a heading timed after it is not claimed as derived */
+  serviceStartOfDay?: number,
+): PcoPlanSheetItem[] {
+  const scoped = scopeRulesToServiceType(rules, serviceTypeId);
+  const ownRuleNames = new Set((rules.serviceTypeRules?.[serviceTypeId] ?? []).map((rule) => rule.name));
+  const stripMatcher = compileMatcher(scoped.titleStrip);
+
+  return [...items]
+    .sort((a, b) => (a.attributes.sequence ?? 0) - (b.attributes.sequence ?? 0))
+    .map((item) => {
+      const sourceTitle = item.attributes.title ?? '';
+      // rules match the title Planning Center holds; the strip is for display
+      const candidate = {
+        title: sourceTitle,
+        itemType: item.attributes.item_type,
+        servicePosition: item.attributes.service_position,
+      };
+      const { effect, ruleName } = resolveEffectFor(candidate, scoped);
+      const stripped = stripMatcher ? sourceTitle.replace(stripMatcher, '').trim() : sourceTitle.trim();
+
+      // a lengthless heading stating a time before the service becomes an entry at it
+      const stated = scoped.deriveTimedHeaders && item.attributes.item_type === 'header' && !item.attributes.length
+        ? parseTitleTime(sourceTitle)
+        : null;
+      const derivedAt =
+        stated !== null && (serviceStartOfDay === undefined || stated < serviceStartOfDay) ? stated : null;
+
+      return {
+        id: item.id,
+        title: effect.title?.trim() || stripped,
+        derivedAt,
+        sourceTitle,
+        itemType: item.attributes.item_type,
+        servicePosition: item.attributes.service_position,
+        duration: Math.max(0, (item.attributes.length ?? 0) * 1000),
+        disposition: dispositionOf(scoped, candidate),
+        matchedBy: ruleName,
+        matchedByServiceType: ruleName !== null && ownRuleNames.has(ruleName),
+        effect,
+      };
+    });
 }

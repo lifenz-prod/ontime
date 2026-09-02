@@ -8,6 +8,7 @@ import {
   findPlanBySourceName,
   knownItemsFromPlans,
   maskCredentialId,
+  planSheetItems,
   pinnedSourceNames,
   planSourceName,
   planSourceNames,
@@ -15,7 +16,7 @@ import {
   resolveServiceType,
 } from '../pcoSourceUtils.js';
 
-import { plan as centralAmPlan } from './fixtures/centralAm.js';
+import { items as centralAmItems, plan as centralAmPlan } from './fixtures/centralAm.js';
 
 const serviceType = (id: string, name: string): PcoServiceType => ({
   type: 'ServiceType',
@@ -393,5 +394,81 @@ describe('what the import will do with each item', () => {
     expect(
       dispositionFor('PRAISE & WORSHIP', 'header', { ...defaultPcoRules, ignoreItems: [{ itemType: 'header' }] }),
     ).toBe('collapsed');
+  });
+});
+
+describe('one plan as the import page lists it', () => {
+  const rules: PcoRules = { ...defaultPcoRules, timezone: 'Pacific/Auckland' };
+  const sheet = (overrides: Partial<PcoRules> = {}, serviceTypeId = '156118') =>
+    planSheetItems(centralAmItems, { ...rules, ...overrides }, serviceTypeId);
+
+  it('keeps the run sheet in the order Planning Center holds it', () => {
+    expect(sheet().map((item) => item.title).slice(0, 5)).toEqual([
+      'SERVICE BRIEFING 8:05AM',
+      'BROADCAST BRIEF 8:10am',
+      'Prayer Meeting',
+      'Doors Open',
+      'Doors Open',
+    ]);
+  });
+
+  it('keeps the title a rule has to match alongside the one a person reads', () => {
+    // the strip takes the service suffix off for display, and a rule still sees it
+    const doors = sheet().filter((item) => item.title === 'Doors Open');
+    expect(doors.map((item) => item.sourceTitle)).toEqual(['Doors Open // 11am', 'Doors Open // 9am']);
+  });
+
+  it('says what the import will do with each row', () => {
+    const byTitle = new Map(sheet().map((item) => [item.sourceTitle, item.disposition]));
+
+    expect(byTitle.get('Prayer Meeting')).toBe('event');
+    expect(byTitle.get('Online Pre Service Message')).toBe('merged');
+    expect(byTitle.get('PRAISE & WORSHIP')).toBe('collapsed');
+    // a heading the shipped rules drop, which is why its row takes no timer settings
+    expect(byTitle.get('WELCOME & ANNOUNCEMENTS')).toBe('ignored');
+  });
+
+  it('carries the length the plan states, in milliseconds', () => {
+    const prayer = sheet().find((item) => item.title === 'Prayer Meeting');
+    expect(prayer?.duration).toBe(25 * 60 * 1000);
+  });
+
+  it('applies a rule scoped to the service type it was written for', () => {
+    const scoped = {
+      serviceTypeRules: {
+        '156118': [{ name: 'Welcome', match: { titleContains: 'welcome' }, effect: { hideTimer: true } }],
+      },
+    };
+
+    const own = sheet(scoped).find((item) => item.sourceTitle === 'Welcome');
+    expect(own?.effect.hideTimer).toBe(true);
+    expect(own?.matchedByServiceType).toBe(true);
+
+    // the same plan read as a different service type is untouched by it
+    const other = sheet(scoped, '158458').find((item) => item.sourceTitle === 'Welcome');
+    expect(other?.effect.hideTimer).toBeUndefined();
+    expect(other?.matchedByServiceType).toBe(false);
+  });
+
+  it('reports an organisation-wide rule as such, so a row does not claim to be local', () => {
+    const message = sheet().find((item) => item.sourceTitle?.startsWith('Message'));
+    expect(message?.matchedBy).toBe('message is a fixed-duration countdown');
+    expect(message?.matchedByServiceType).toBe(false);
+  });
+
+  it('reads importAs back as the disposition, so the row shows the choice that was made', () => {
+    const asBlock = {
+      serviceTypeRules: {
+        '156118': [{ name: 'Welcome', match: { titleContains: 'welcome' }, effect: { importAs: 'block' as const } }],
+      },
+    };
+    expect(sheet(asBlock).find((item) => item.sourceTitle === 'Welcome')?.disposition).toBe('block');
+
+    const omitted = {
+      serviceTypeRules: {
+        '156118': [{ name: 'Welcome', match: { titleContains: 'welcome' }, effect: { importAs: 'omit' as const } }],
+      },
+    };
+    expect(sheet(omitted).find((item) => item.sourceTitle === 'Welcome')?.disposition).toBe('ignored');
   });
 });

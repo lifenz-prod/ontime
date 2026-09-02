@@ -74,6 +74,15 @@ Generated 9am/11am replica service sections so playback runs continuously across
 - iPad/mobile PRE/9am/11am tabs are view filters only; the PRE tab is synthesized client-side.
 - Settings UI: `features/app-settings/panel/service-profiles-panel`.
 
+### Planning Center connector
+Plans are pulled from PCO as an alternative rundown source to Google Sheets. Two
+surfaces: the import page at `/pco-import` (`features/pco-import`) picks a plan and
+sets what each run sheet item becomes, remembering the choices per PCO service type;
+the settings panel (`features/app-settings/panel/pco-panel`) holds the connection,
+credentials, pinned service types and defaults. Server side is
+`services/pco-service` — see its README, which carries the API's quirks and the
+timing model.
+
 ## Releases (beta + stable)
 
 Releases are driven entirely by the **git tag**. Pushing a tag triggers `build.yml`, which builds the desktop binaries and creates a GitHub Release; that Release's `published` event then triggers `build_cli.yml` (npm) and `build_docker.yml` (Docker Hub).

@@ -27,6 +27,7 @@ import {
   type PcoImportRequest,
   type PcoImportResult,
   type PcoKnownItems,
+  type PcoPlanSheet,
   type PcoPlanSummary,
   type PcoRules,
   type PcoServiceTypeSummary,
@@ -54,17 +55,18 @@ import {
 } from './pcoCredentialsFile.js';
 import type { PcoItem, PcoServiceType } from './pcoTypes.js';
 import { ensurePcoRulesFile, readPcoRules } from './pcoRulesFile.js';
-import { buildRundownFromPlan, type PcoBuildResult } from './pcoRundownBuilder.js';
+import { buildRundownFromPlan, groupPlanTimesByDay, type PcoBuildResult } from './pcoRundownBuilder.js';
 import {
   findPinnedBySourceName,
   knownItemsFromPlans,
+  planSheetItems,
   maskCredentialId,
   pinnedSourceNames,
   planSourceName,
   planSummary,
   resolveServiceType,
 } from './pcoSourceUtils.js';
-import { localDateKey } from './pcoTime.js';
+import { localDateKey, localTimeOfDayMs } from './pcoTime.js';
 import { savePcoRules } from './pcoRulesFile.js';
 
 /** how many upcoming plans the import tab lists per service type */
@@ -286,6 +288,7 @@ export async function fetchPcoSource(name: string): Promise<Pick<PcoBuildResult,
     items: content.items,
     itemTimes: content.itemTimes,
     rules: config.rules,
+    serviceTypeId: pinned.id,
   });
 
   logger.info(
@@ -467,6 +470,52 @@ export async function getPcoKnownItems(serviceTypeId?: string, plansToSample = 4
 }
 
 /**
+ * One plan's run sheet, resolved through the rules as the import will resolve it.
+ *
+ * This is what the import page lists. It reads a single named plan rather than
+ * sampling the next few, because the person looking at it is about to import that
+ * plan and wants to see the morning, not a summary of the mornings like it.
+ */
+export async function getPcoPlanSheet(serviceTypeId: string, planId: string): Promise<PcoPlanSheet> {
+  const config = getPcoConfig();
+  const client = getClient(config);
+
+  const serviceType = (await listServiceTypesFor(client)).find((candidate) => candidate.id === serviceTypeId);
+  if (!serviceType) {
+    throw new PcoError(`No Planning Center service type with id ${serviceTypeId}`);
+  }
+
+  const plan = await client.getPlan(serviceTypeId, planId);
+  const [planTimes, content] = await Promise.all([
+    client.getPlanTimes(serviceTypeId, plan.id),
+    client.getPlanContent(serviceTypeId, plan.id),
+  ]);
+
+  // the day the rundown would be built for, so a heading timed after the service
+  // is not reported as one the import will read
+  const days = groupPlanTimesByDay(planTimes, config.rules.timezone);
+  const buildDay = days.find((day) => day.serviceTimes.length > 0);
+  const masterStartOfDay = buildDay
+    ? localTimeOfDayMs(buildDay.serviceTimes[0].attributes.starts_at, config.rules.timezone)
+    : undefined;
+
+  return {
+    serviceTypeId,
+    serviceTypeName: serviceType.attributes.name.trim(),
+    planId: plan.id,
+    planTitle: plan.attributes.title ?? '',
+    dates: plan.attributes.dates ?? '',
+    // a plan often carries a midweek rehearsal, and only a day with services can be built
+    availableDays: days.map((day) => ({
+      dateKey: day.dateKey,
+      label: day.label,
+      hasServices: day.serviceTimes.length > 0,
+    })),
+    items: planSheetItems(content.items, config.rules, serviceTypeId, masterStartOfDay),
+  };
+}
+
+/**
  * Builds one plan and replaces the project's rundown with it.
  *
  * The same destructive operation as a recall or a sheet import, so it carries the
@@ -494,6 +543,7 @@ export async function importPcoPlan(request: PcoImportRequest): Promise<PcoImpor
     itemTimes: content.itemTimes,
     rules: config.rules,
     targetDate: request.targetDate,
+    serviceTypeId: request.serviceTypeId,
   });
 
   // replaces the rundown, stops playback and regenerates the mirrored service

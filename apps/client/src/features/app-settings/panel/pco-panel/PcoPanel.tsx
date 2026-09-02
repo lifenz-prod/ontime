@@ -8,7 +8,7 @@ import * as Panel from '../../panel-utils/PanelUtils';
 
 import PcoConnection from './PcoConnection';
 import PcoDefaults from './PcoDefaults';
-import PcoUpcoming from './PcoUpcoming';
+import PcoImportLink from './PcoImportLink';
 
 /**
  * Planning Center settings.
@@ -44,7 +44,7 @@ export default function PcoPanel({ location }: PanelBaseProps) {
         <>
           <div ref={importRef}>
             <PcoConnection rules={rules} patchRules={patchRules} isSaving={isPending} />
-            <PcoUpcoming rules={rules} />
+            <PcoImportLink />
           </div>
           <div ref={defaultsRef}>
             <PcoDefaults rules={rules} patchRules={patchRules} isSaving={isPending} />

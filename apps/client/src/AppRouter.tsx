@@ -22,6 +22,7 @@ const Editor = React.lazy(() => import('./features/editors/ProtectedEditor'));
 const MobileEditor = React.lazy(() => import('./features/editors/ProtectedMobileEditor'));
 const IpadEditor = React.lazy(() => import('./features/editors/ProtectedIpadEditor'));
 const Cuesheet = React.lazy(() => import('./views/cuesheet/ProtectedCuesheet'));
+const PcoImportPage = React.lazy(() => import('./features/pco-import/ProtectedPcoImport'));
 const Operator = React.lazy(() => import('./features/operator/OperatorExport'));
 
 const TimerView = React.lazy(() => import('./views/timer/Timer'));
@@ -200,6 +201,7 @@ export default function AppRouter() {
         <Route path='/mobile-editor' element={<MobileEditor />} />
         <Route path='/ipad-editor' element={<IpadEditor />} />
         <Route path='/cuesheet' element={<PCuesheet />} />
+        <Route path='/pco-import' element={<PcoImportPage />} />
         <Route
           path='/op'
           element={

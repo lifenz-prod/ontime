@@ -37,6 +37,20 @@ export const validatePcoRules = [
   body('ignoreItems').isArray(),
   body('timerRules').isArray(),
   body('timerRules.*.name').isString().notEmpty(),
+  // a map of service type id -> rules, written by the import page
+  body('serviceTypeRules')
+    .optional()
+    .custom((value) => {
+      if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        throw new Error('serviceTypeRules must be an object keyed by service type id');
+      }
+      for (const rules of Object.values(value)) {
+        if (!Array.isArray(rules)) {
+          throw new Error('each serviceTypeRules entry must be an array of rules');
+        }
+      }
+      return true;
+    }),
   body('inferredEntries').isArray(),
   body('inferredEntries.*.title').isString().notEmpty(),
   body('inferredEntries.*.duration').isInt({ min: 0 }),

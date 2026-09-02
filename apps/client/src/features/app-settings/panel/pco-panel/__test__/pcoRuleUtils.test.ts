@@ -7,13 +7,17 @@ import {
   describeEffect,
   effectForTitle,
   handWrittenRules,
+  hasServiceTypeEffect,
+  importAsOf,
   isEffectEmpty,
   isPanelRule,
   moveRunStep,
   runSteps,
+  serviceTypeEffectFor,
   timingOf,
   withEffectForTitle,
   withRunSteps,
+  withServiceTypeEffect,
 } from '../pcoRuleUtils';
 
 const shippedRule: PcoTimerRule = {
@@ -223,5 +227,80 @@ describe('the pre-service run', () => {
     const steps = [step('A', 5), step('B', 5)];
     expect(moveRunStep(steps, 0, -1)).toBe(steps);
     expect(moveRunStep(steps, 1, 2)).toBe(steps);
+  });
+});
+
+describe('rules the import page writes against one service type', () => {
+  const empty = { timerRules: [], serviceTypeRules: {} } as unknown as PcoRules;
+
+  it('writes a choice under the service type it was made on', () => {
+    const next = withServiceTypeEffect(empty, '156118', 'Fun', { hideTimer: true });
+
+    expect(next.serviceTypeRules['156118']).toEqual([
+      { name: 'Fun', match: { titleContains: 'Fun' }, effect: { hideTimer: true } },
+    ]);
+    // the organisation-wide rules are not where a per-plan-type choice belongs
+    expect(next.timerRules).toEqual([]);
+  });
+
+  it('leaves the other service types alone', () => {
+    const one = withServiceTypeEffect(empty, '156118', 'Fun', { hideTimer: true });
+    const two = withServiceTypeEffect(one, '158458', 'Fun', { skip: true });
+
+    expect(two.serviceTypeRules['156118'][0].effect).toEqual({ hideTimer: true });
+    expect(two.serviceTypeRules['158458'][0].effect).toEqual({ skip: true });
+  });
+
+  it('replaces a choice rather than stacking a second rule on the same title', () => {
+    const one = withServiceTypeEffect(empty, '156118', 'Fun', { hideTimer: true });
+    const two = withServiceTypeEffect(one, '156118', 'Fun', { skip: true });
+
+    expect(two.serviceTypeRules['156118']).toHaveLength(1);
+    expect(two.serviceTypeRules['156118'][0].effect).toEqual({ skip: true });
+  });
+
+  it('puts a new choice first, since first match wins', () => {
+    const one = withServiceTypeEffect(empty, '156118', 'Fun', { hideTimer: true });
+    const two = withServiceTypeEffect(one, '156118', 'Welcome', { skip: true });
+
+    expect(two.serviceTypeRules['156118'].map((rule) => rule.name)).toEqual(['Welcome', 'Fun']);
+  });
+
+  it('removes the rule when a row is reset, rather than leaving one that does nothing', () => {
+    const one = withServiceTypeEffect(empty, '156118', 'Fun', { hideTimer: true });
+    const reset = withServiceTypeEffect(one, '156118', 'Fun', {});
+
+    expect(reset.serviceTypeRules['156118']).toBeUndefined();
+    expect(hasServiceTypeEffect(reset, '156118', 'Fun')).toBe(false);
+  });
+
+  it('reads back only what the service type explicitly holds', () => {
+    const rules = withServiceTypeEffect(empty, '156118', 'Fun', { hideTimer: true });
+
+    expect(serviceTypeEffectFor(rules, '156118', 'Fun')).toEqual({ hideTimer: true });
+    // nothing is set for these, so a change starts from empty and does not freeze the defaults
+    expect(serviceTypeEffectFor(rules, '156118', 'Welcome')).toEqual({});
+    expect(serviceTypeEffectFor(rules, '158458', 'Fun')).toEqual({});
+  });
+
+  it('survives rules written before service type rules existed', () => {
+    const old = { timerRules: [] } as unknown as PcoRules;
+    expect(hasServiceTypeEffect(old, '156118', 'Fun')).toBe(false);
+    expect(serviceTypeEffectFor(old, '156118', 'Fun')).toEqual({});
+    expect(withServiceTypeEffect(old, '156118', 'Fun', { skip: true }).serviceTypeRules['156118']).toHaveLength(1);
+  });
+});
+
+describe('importAsOf', () => {
+  it('reads a disposition back as the choice the row shows', () => {
+    expect(importAsOf('event')).toBe('event');
+    expect(importAsOf('block')).toBe('block');
+    expect(importAsOf('ignored')).toBe('omit');
+  });
+
+  it('shows a folded or merged item as an event, since it does reach the rundown', () => {
+    // its row is disabled with a reason, so the select is only ever read here
+    expect(importAsOf('collapsed')).toBe('event');
+    expect(importAsOf('merged')).toBe('event');
   });
 });

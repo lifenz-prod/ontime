@@ -1,12 +1,20 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
-import type { PcoKnownItems, PcoPlanSummary, PcoRules, PcoServiceTypeSummary, PcoStatus } from 'ontime-types';
+import type {
+  PcoKnownItems,
+  PcoPlanSheet,
+  PcoPlanSummary,
+  PcoRules,
+  PcoServiceTypeSummary,
+  PcoStatus,
+} from 'ontime-types';
 
-import { PCO_KNOWN_ITEMS, PCO_PLANS, PCO_RULES, PCO_SERVICE_TYPES, PCO_STATUS } from '../api/constants';
+import { PCO_KNOWN_ITEMS, PCO_PLAN_SHEET, PCO_PLANS, PCO_RULES, PCO_SERVICE_TYPES, PCO_STATUS } from '../api/constants';
 import {
   deletePcoCredentials,
   editPcoRules,
   getPcoKnownItems,
   getPcoPlans,
+  getPcoPlanSheet,
   getPcoRules,
   getPcoServiceTypes,
   getPcoStatus,
@@ -77,6 +85,22 @@ export function usePcoKnownItems(serviceTypeId: string | undefined, enabled: boo
     queryKey: [...PCO_KNOWN_ITEMS, serviceTypeId],
     queryFn: () => getPcoKnownItems(serviceTypeId),
     enabled,
+    ...remoteQueryOptions,
+  });
+
+  return { data, isFetching, isError, error, refetch };
+}
+
+/**
+ * The run sheet of one plan. Kept fresh on the import page rather than cached
+ * hard: the rules it is resolved through change from the same page, and a stale
+ * row would say the import will do something it will not.
+ */
+export function usePcoPlanSheet(serviceTypeId: string | undefined, planId: string | undefined) {
+  const { data, isFetching, isError, error, refetch } = useQuery<PcoPlanSheet>({
+    queryKey: [...PCO_PLAN_SHEET, serviceTypeId, planId],
+    queryFn: () => getPcoPlanSheet(serviceTypeId as string, planId as string),
+    enabled: Boolean(serviceTypeId && planId),
     ...remoteQueryOptions,
   });
 

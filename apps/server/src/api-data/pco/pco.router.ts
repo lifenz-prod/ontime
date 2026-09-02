@@ -4,6 +4,7 @@ import {
   deleteCredentials,
   getKnownItems,
   getPlans,
+  getPlanSheet,
   getRules,
   getServiceTypes,
   getStatus,
@@ -19,6 +20,7 @@ router.get('/', getStatus);
 router.get('/service-types', getServiceTypes);
 router.get('/plans', getPlans);
 router.get('/known-items', getKnownItems);
+router.get('/plan-sheet', getPlanSheet);
 router.get('/rules', getRules);
 router.post('/rules', validatePcoRules, postRules);
 router.post('/import', validatePcoImport, postImport);
