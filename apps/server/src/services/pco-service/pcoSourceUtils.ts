@@ -23,11 +23,13 @@ import { localTimeOfDayMs } from './pcoTime.js';
 import { compileMatcher, matchesRule } from './pcoRules.js';
 import {
   parseTitleTime,
+  planSectionFolds,
   rehearsalSteps,
   resolveEffectFor,
   scopeRulesToServiceType,
   titleWithoutTime,
   type PcoPlanDay,
+  type SectionFold,
 } from './pcoRundownBuilder.js';
 import type { PcoItem, PcoPlan, PcoServiceType } from './pcoTypes.js';
 
@@ -456,6 +458,22 @@ export function planSheetItems(
 
   const ordered = [...items].sort((a, b) => (a.attributes.sequence ?? 0) - (b.attributes.sequence ?? 0));
 
+  /**
+   * The folds, planned exactly as the build plans them and per position group, since
+   * that is how the builder lays a section out. Without this the page could only say
+   * that a heading was folded, never which of the items under it went with it -- and
+   * with `membersMatch` that is the whole question.
+   */
+  const folds = { opens: new Map<string, SectionFold>(), swallowed: new Set<string>() };
+  for (const position of ['pre', 'during', 'post'] as const) {
+    const planned = planSectionFolds(
+      ordered.filter((item) => item.attributes.service_position === position),
+      scoped,
+    );
+    planned.opens.forEach((fold, id) => folds.opens.set(id, fold));
+    planned.swallowed.forEach((id) => folds.swallowed.add(id));
+  }
+
   for (const item of ordered) {
     const sourceTitle = item.attributes.title ?? '';
     const itemType = item.attributes.item_type;
@@ -476,6 +494,18 @@ export function planSheetItems(
 
     const resolved = resolve(startsAt !== null ? title : sourceTitle, itemType, servicePosition);
 
+    /**
+     * What the build will do with this row, in the order the build decides it: a
+     * fold claims an item first, then a timed heading is imported whatever its kind
+     * would otherwise make it, then the ordinary rules.
+     */
+    const dispositionOfRow = (): PcoItemDisposition => {
+      if (folds.opens.has(item.id)) return 'collapsed';
+      if (folds.swallowed.has(item.id)) return 'collapsed';
+      if (startsAt !== null) return dispositionFromImportAs(resolved.effect.importAs);
+      return resolved.disposition;
+    };
+
     rows.push({
       id: item.id,
       source: 'item',
@@ -488,9 +518,7 @@ export function planSheetItems(
       startsAt,
       alongside: null,
       ...resolved,
-      // a timed heading is imported whatever its kind would otherwise make it
-      disposition:
-        startsAt !== null ? dispositionFromImportAs(resolved.effect.importAs) : resolved.disposition,
+      disposition: dispositionOfRow(),
     });
   }
 

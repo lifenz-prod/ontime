@@ -38,13 +38,20 @@ export const defaultPcoRules: PcoRules = {
   // a header is a heading on the run sheet, not something anybody cues
   headersBecome: 'nothing',
 
-  // the worship set is five songs to the band and one segment to the caller
+  /**
+   * The worship set is several songs to the band and one segment to the caller.
+   *
+   * Only the songs though: Planning Center types them `song` and types the MC
+   * moment sitting in the middle of the set `item`, and that moment is cued. So the
+   * runs of songs either side of it fold and it keeps its own row.
+   */
   collapseSections: [
     {
       name: 'Praise & Worship',
       match: { itemType: 'header', titleContains: 'praise & worship' },
       // the sheet shouts its headings; the rundown does not have to
       title: 'Praise & Worship',
+      membersMatch: { itemType: 'song' },
     },
   ],
 

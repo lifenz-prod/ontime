@@ -14,7 +14,8 @@
       "name": "Praise & Worship",
       "match": { "itemType": "header", "titleContains": "praise & worship" },
       "title": "Praise & Worship",
-      "listContents": true
+      "listContents": true,
+      "membersMatch": { "itemType": "song" }
     }
   ],
 

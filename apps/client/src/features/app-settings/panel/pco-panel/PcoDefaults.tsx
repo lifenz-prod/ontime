@@ -9,12 +9,15 @@ import * as Panel from '../../panel-utils/PanelUtils';
 
 import PcoPreServiceRun from './PcoPreServiceRun';
 import {
+  type FoldChoice,
   type TimingChoice,
   applyTiming,
   applyToggle,
   describeEffect,
   describeMatch,
   effectForTitle,
+  foldChoiceOf,
+  foldLabels,
   handWrittenRules,
   removeRuleAt,
   timingLabels,
@@ -22,6 +25,7 @@ import {
   toggleKeys,
   toggleLabels,
   withEffectForTitle,
+  withFoldChoice,
 } from './pcoRuleUtils';
 
 import style from './PcoPanel.module.scss';
@@ -126,6 +130,28 @@ export default function PcoDefaults({ rules, patchRules, isSaving }: PcoDefaults
               isDisabled={isSaving}
               onChange={(event) => save({ fixedDurationCarriesForward: event.target.checked })}
             />
+          </Panel.ListItem>
+          <Panel.ListItem>
+            <Panel.Field
+              title='A folded section takes'
+              description='Planning Center types worship songs as songs and the MC moment between them as an item. Folding only the songs leaves that moment its own cue, and a section split by one becomes two segments in run sheet order rather than one'
+            />
+            <Select
+              size='sm'
+              width='12rem'
+              variant='ontime'
+              value={foldChoiceOf(rules)}
+              isDisabled={isSaving || rules.collapseSections.length === 0}
+              onChange={(event) =>
+                save({ collapseSections: withFoldChoice(rules, event.target.value as FoldChoice).collapseSections })
+              }
+            >
+              {Object.entries(foldLabels).map(([choice, label]) => (
+                <option key={choice} value={choice}>
+                  {label}
+                </option>
+              ))}
+            </Select>
           </Panel.ListItem>
           <Panel.ListItem>
             <Panel.Field

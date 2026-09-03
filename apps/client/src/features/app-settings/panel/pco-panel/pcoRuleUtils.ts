@@ -243,6 +243,43 @@ export function applyEndAction(effect: PcoRuleEffect, action: EndAction): PcoRul
   return { ...effect, endAction: action };
 }
 
+/* -------------------------------------------------------------------------- */
+/* how much of a folded section folds                                          */
+/* -------------------------------------------------------------------------- */
+
+/** what a fold takes, as the panel offers it */
+export type FoldChoice = 'songs' | 'section';
+
+export const foldLabels: Record<FoldChoice, string> = {
+  songs: 'Only the songs',
+  section: 'The whole section',
+};
+
+/**
+ * Whether the folds take only the songs.
+ *
+ * Read across every collapse rule, because the panel offers one switch: this
+ * organisation ships with a single fold, and a rule written by hand to fold
+ * something that is not a worship set would not want a different answer here.
+ */
+export function foldChoiceOf(rules: PcoRules): FoldChoice {
+  const folds = rules.collapseSections;
+  return folds.length > 0 && folds.every((rule) => rule.membersMatch?.itemType === 'song') ? 'songs' : 'section';
+}
+
+export function withFoldChoice(rules: PcoRules, choice: FoldChoice): PcoRules {
+  return {
+    ...rules,
+    collapseSections: rules.collapseSections.map((rule) => {
+      if (choice === 'songs') {
+        return { ...rule, membersMatch: { itemType: 'song' as const } };
+      }
+      const { membersMatch: _foldsEverythingNow, ...rest } = rule;
+      return rest;
+    }),
+  };
+}
+
 /** rules written by hand, which the panel lists but does not edit */
 export function handWrittenRules(rules: PcoRules): PcoTimerRule[] {
   return rules.timerRules.filter((rule) => !isPanelRule(rule));

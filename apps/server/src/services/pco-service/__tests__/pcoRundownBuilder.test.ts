@@ -21,6 +21,7 @@ import { regenerateInstances } from '../../rundown-service/serviceInstanceUtils.
 import { defaultPcoRules } from '../pcoRules.js';
 import { buildRundownFromPlan, groupPlanTimesByDay, parseTitleTime } from '../pcoRundownBuilder.js';
 import { localTimeOfDayMs } from '../pcoTime.js';
+import type { PcoItem } from '../pcoTypes.js';
 
 import { items, itemTimes, plan, planTimes } from './fixtures/centralAm.js';
 import { items as fullItems, itemTimes as fullItemTimes } from './fixtures/centralAmFullSheet.js';
@@ -81,6 +82,30 @@ const eventNamed = (rundown: ReturnType<typeof build>['rundown'], title: string)
     throw new Error(`no event titled "${title}" in [${titles(rundown).join(', ')}]`);
   }
   return found;
+};
+
+/** a PCO item, for the run sheet shapes the fixtures do not carry */
+const item = (
+  id: string,
+  sequence: number,
+  title: string,
+  length: string,
+  itemType: 'song' | 'header' | 'media' | 'item' = 'item',
+): PcoItem => {
+  const [minutes, seconds] = length.split(':').map(Number);
+  return {
+    type: 'Item',
+    id,
+    attributes: {
+      title,
+      description: '',
+      html_details: null,
+      length: minutes * 60 + (seconds ?? 0),
+      sequence,
+      item_type: itemType,
+      service_position: 'during',
+    },
+  };
 };
 
 const boundaryIndexOf = (result: ReturnType<typeof build>): number =>
@@ -765,6 +790,97 @@ describe('folding a section into one event', () => {
     expect(eventNamed(folded({ listContents: false }).rundown, 'PRAISE & WORSHIP').note).toBe('');
   });
 
+  it('folds only the members a rule names, leaving the rest their own rows', () => {
+    // Planning Center types the songs `song` and the MC moment `item`, and somebody
+    // cues that moment: folding it away takes the section's one cue with it
+    const { rundown } = folded({ title: 'Praise & Worship', membersMatch: { itemType: 'song' } });
+
+    // 4:00 + 5:30 + 7:00 + 3:30 = 20:00, and the 4:00 MC moment follows it
+    expect(eventNamed(rundown, 'Praise & Worship').duration).toBe(20 * MILLIS_PER_MINUTE);
+    expect(eventNamed(rundown, 'MC Moment').timeStart).toBe(at(9, 20));
+    expect(eventNamed(rundown, 'MC Moment').duration).toBe(4 * MILLIS_PER_MINUTE);
+    // and nothing after it has moved
+    expect(eventNamed(rundown, 'Welcome').timeStart).toBe(at(9, 24));
+  });
+
+  it('lists only what it folded, not what it left alone', () => {
+    const { rundown } = folded({ title: 'Praise & Worship', membersMatch: { itemType: 'song' } });
+
+    expect(eventNamed(rundown, 'Praise & Worship').note).toBe(
+      ['I Thank God', 'O Praise The Name (Anástasis)', 'Jesus Have It All', 'I Exalt Thee'].join('\n'),
+    );
+  });
+
+  describe('a section a non-member splits in two', () => {
+    /** the shape of a communion week: songs, an MC thought, then more songs */
+    const split = [
+      item('s-1', 1, 'PRAISE & WORSHIP', '0:00', 'header'),
+      item('s-2', 2, 'Praise', '4:00', 'song'),
+      item('s-3', 3, 'Cornerstone', '6:00', 'song'),
+      item('s-4', 4, 'MC Communion Thought', '4:00', 'item'),
+      item('s-5', 5, 'O Praise The Name', '5:00', 'song'),
+      item('s-6', 6, 'Christ And Christ Crucified TAG', '3:00', 'song'),
+      item('s-7', 7, 'MESSAGE', '0:00', 'header'),
+      item('s-8', 8, 'Message', '40:00'),
+    ];
+
+    const splitRundown = () =>
+      buildRundownFromPlan({
+        plan,
+        planTimes,
+        items: split,
+        itemTimes: [],
+        rules: {
+          ...rules,
+          headersBecome: 'nothing',
+          collapseSections: [
+            {
+              name: 'worship',
+              match: { itemType: 'header', titleContains: 'praise & worship' },
+              title: 'Praise & Worship',
+              membersMatch: { itemType: 'song' },
+            },
+          ],
+        },
+      }).rundown;
+
+    it('keeps the run sheet order rather than gathering the songs together', () => {
+      // after the PRE entry and the boundary block, which this shape does not test
+      expect(titles(splitRundown()).slice(-4)).toEqual([
+        'Praise & Worship',
+        'MC Communion Thought',
+        'Praise & Worship (cont.)',
+        'Message',
+      ]);
+    });
+
+    it('gives each run the length of the songs actually in it', () => {
+      const rundown = splitRundown();
+
+      expect(eventNamed(rundown, 'Praise & Worship').duration).toBe(10 * MILLIS_PER_MINUTE);
+      expect(eventNamed(rundown, 'MC Communion Thought').timeStart).toBe(at(9, 10));
+      expect(eventNamed(rundown, 'Praise & Worship (cont.)').timeStart).toBe(at(9, 14));
+      expect(eventNamed(rundown, 'Praise & Worship (cont.)').duration).toBe(8 * MILLIS_PER_MINUTE);
+    });
+
+    it('keeps each run listing its own songs', () => {
+      const rundown = splitRundown();
+
+      expect(eventNamed(rundown, 'Praise & Worship').note).toBe('Praise\nCornerstone');
+      expect(eventNamed(rundown, 'Praise & Worship (cont.)').note).toBe(
+        'O Praise The Name\nChrist And Christ Crucified TAG',
+      );
+    });
+  });
+
+  it('leaves a heading to the header rule when the fold swallows nothing after it', () => {
+    // nothing under the heading matches, so there is no fold and no empty event
+    const { rundown } = folded({ title: 'Praise & Worship', membersMatch: { itemType: 'media' } });
+
+    expect(titles(rundown)).not.toContain('Praise & Worship');
+    expect(titles(rundown)).toContain('I Thank God');
+  });
+
   it('survives a rule that drops every heading, since the fold needs the heading', () => {
     const { rundown } = build({
       rules: {
@@ -1035,7 +1151,10 @@ describe('the corrected rundown', () => {
     ['Doors Open', at(8, 45), at(0, 13, 20)],
     ['Pre Service Video', at(8, 58, 20), at(0, 1, 40)],
     // five songs and the MC moment, folded into one segment
-    ['Praise & Worship', at(9), at(0, 22)],
+    // the four songs fold; the MC moment between the set and the welcome is cued,
+    // so it keeps the row Planning Center gives it
+    ['Praise & Worship', at(9), at(0, 18)],
+    ['MC Moment', at(9, 18), at(0, 4)],
     ['Welcome & Meet & Greet', at(9, 22), at(0, 1)],
     ['Fun', at(9, 23), at(0, 4)],
     ['Honour All Men', at(9, 27), at(0, 2)],
@@ -1083,11 +1202,9 @@ describe('the corrected rundown', () => {
   });
 
   it('keeps the set list on the folded worship segment', () => {
-    // folding five songs into one segment would otherwise lose them entirely
+    // folding four songs into one segment would otherwise lose them entirely
     expect(eventNamed(result.rundown, 'Praise & Worship').note).toBe(
-      ['Just That Good *NEW', 'I Know That I Know', 'Jesus Have It All', 'Here I Am To Worship TAG', 'MC Moment'].join(
-        '\n',
-      ),
+      ['Just That Good *NEW', 'I Know That I Know', 'Jesus Have It All', 'Here I Am To Worship TAG'].join('\n'),
     );
   });
 

@@ -6,6 +6,7 @@ import {
   applyToggle,
   describeEffect,
   effectForTitle,
+  foldChoiceOf,
   handWrittenRules,
   hasServiceTypeEffect,
   importAsOf,
@@ -16,6 +17,7 @@ import {
   serviceTypeEffectFor,
   timingOf,
   withEffectForTitle,
+  withFoldChoice,
   withRunSteps,
   withServiceTypeEffect,
 } from '../pcoRuleUtils';
@@ -302,5 +304,48 @@ describe('importAsOf', () => {
     // its row is disabled with a reason, so the select is only ever read here
     expect(importAsOf('collapsed')).toBe('event');
     expect(importAsOf('merged')).toBe('event');
+  });
+});
+
+describe('how much of a folded section folds', () => {
+  const withFolds = (collapseSections: PcoRules['collapseSections']) => ({ collapseSections }) as PcoRules;
+  const worship = { name: 'worship', match: { itemType: 'header' as const, titleContains: 'praise & worship' } };
+
+  it('reads the shipped default as songs only', () => {
+    expect(foldChoiceOf(withFolds([{ ...worship, membersMatch: { itemType: 'song' } }]))).toBe('songs');
+  });
+
+  it('reads a rule with no member match as folding the whole section', () => {
+    expect(foldChoiceOf(withFolds([worship]))).toBe('section');
+  });
+
+  it('needs every fold to agree before it claims songs only', () => {
+    const mixed = withFolds([{ ...worship, membersMatch: { itemType: 'song' } }, { ...worship, name: 'other' }]);
+    expect(foldChoiceOf(mixed)).toBe('section');
+  });
+
+  it('says section when there is nothing folded at all, so the control reads as off', () => {
+    expect(foldChoiceOf(withFolds([]))).toBe('section');
+  });
+
+  it('switches every fold to the songs', () => {
+    const next = withFoldChoice(withFolds([worship]), 'songs');
+    expect(next.collapseSections[0].membersMatch).toEqual({ itemType: 'song' });
+  });
+
+  it('takes the member match off rather than writing one that matches everything', () => {
+    const songs = withFoldChoice(withFolds([worship]), 'songs');
+    const back = withFoldChoice(songs, 'section');
+
+    expect(back.collapseSections[0]).not.toHaveProperty('membersMatch');
+    expect(foldChoiceOf(back)).toBe('section');
+  });
+
+  it('leaves the rest of a fold rule alone', () => {
+    const named = withFolds([{ ...worship, title: 'Praise & Worship', listContents: false }]);
+    const next = withFoldChoice(named, 'songs');
+
+    expect(next.collapseSections[0].title).toBe('Praise & Worship');
+    expect(next.collapseSections[0].listContents).toBe(false);
   });
 });

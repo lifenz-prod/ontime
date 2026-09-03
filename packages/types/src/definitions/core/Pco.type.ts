@@ -110,6 +110,19 @@ export type PcoCollapseRule = {
    * survives the fold. Defaults to true.
    */
   listContents?: boolean;
+  /**
+   * Which of the section's items are folded in. Absent folds the whole section.
+   *
+   * The worship set is not only songs: an MC moment sits in the middle of it, and
+   * Planning Center types it `item` where every song is typed `song`. Somebody does
+   * cue that moment, so folding it into the block takes away the one cue the
+   * section has. With `{ itemType: 'song' }` the songs fold and it does not.
+   *
+   * Only **consecutive** matching items fold together, so a section that goes
+   * songs, MC moment, songs becomes three entries in that order rather than one
+   * block and a moment that has moved.
+   */
+  membersMatch?: PcoRuleMatch;
 };
 
 /**

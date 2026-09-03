@@ -17,6 +17,7 @@
 
 import {
   isOntimeEvent,
+  type PcoCollapseRule,
   type PcoInferredEntry,
   type PcoRuleEffect,
   type PcoRuleMatch,
@@ -242,6 +243,96 @@ export function rehearsalSteps(times: PcoPlanTime[], timezone: string): DerivedS
   }
 
   return steps;
+}
+
+/* -------------------------------------------------------------------------- */
+/* folding a section                                                           */
+/* -------------------------------------------------------------------------- */
+
+/** one fold: the item that opens it, and everything it swallows */
+export type SectionFold = {
+  title: string;
+  rule: PcoCollapseRule;
+  /** in run sheet order, the opening item first */
+  members: PcoItem[];
+};
+
+export type SectionFolds = {
+  /** item id -> the fold it opens */
+  opens: Map<string, SectionFold>;
+  /** item ids a fold swallows, which never become entries of their own */
+  swallowed: Set<string>;
+};
+
+/**
+ * Which items each fold takes, for one `service_position` group in sequence order.
+ *
+ * Shared by the builder and the import page, because a row that says "folded in
+ * with its section" has to be one the build will actually fold. The two used to
+ * disagree: nothing knew the section's shape but the builder.
+ *
+ * A section runs from the matched item to the item before the next heading, which
+ * is how Planning Center delimits one. `membersMatch` then decides how much of it
+ * folds -- and only **consecutive** matches fold together, so a set that goes
+ * songs, MC moment, songs stays in that order instead of becoming one block and a
+ * moment that has moved. A second run is named "... (cont.)".
+ */
+export function planSectionFolds(sectionItems: PcoItem[], rules: PcoRules): SectionFolds {
+  const opens = new Map<string, SectionFold>();
+  const swallowed = new Set<string>();
+  const stripper = compileMatcher(rules.titleStrip);
+  const titleOf = (item: PcoItem): string => {
+    const raw = item.attributes.title ?? '';
+    return stripper ? raw.replace(stripper, '').trim() : raw;
+  };
+
+  for (let index = 0; index < sectionItems.length; index++) {
+    const opener = sectionItems[index];
+    const rule = rules.collapseSections.find((candidate) => matchesRule(candidate.match, itemCandidate(opener)));
+    if (!rule) {
+      continue;
+    }
+
+    const members: PcoItem[] = [];
+    while (index + 1 < sectionItems.length && sectionItems[index + 1].attributes.item_type !== 'header') {
+      index += 1;
+      members.push(sectionItems[index]);
+    }
+
+    const base = rule.title?.trim() || titleOf(opener);
+
+    if (!rule.membersMatch) {
+      opens.set(opener.id, { title: base, rule, members: [opener, ...members] });
+      members.forEach((member) => swallowed.add(member.id));
+      continue;
+    }
+
+    let run: PcoItem[] = [];
+    let ordinal = 0;
+    const flush = () => {
+      // a run holding nothing but the opening heading folded nothing, so it is not a
+      // fold at all -- the heading goes back to following `headersBecome`
+      if (run.filter((entry) => entry !== opener).length === 0) {
+        run = [];
+        return;
+      }
+      opens.set(run[0].id, { title: ordinal === 0 ? base : `${base} (cont.)`, rule, members: run });
+      run.slice(1).forEach((member) => swallowed.add(member.id));
+      ordinal += 1;
+      run = [];
+    };
+
+    for (const entry of [opener, ...members]) {
+      if (entry === opener || matchesRule(rule.membersMatch, itemCandidate(entry))) {
+        run.push(entry);
+      } else {
+        flush();
+      }
+    }
+    flush();
+  }
+
+  return { opens, swallowed };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -552,29 +643,35 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
 
   const toUnits = (sectionItems: PcoItem[]): BuildUnit[] => {
     const units: BuildUnit[] = [];
+    const folds = planSectionFolds(sectionItems, rules);
 
     for (let index = 0; index < sectionItems.length; index++) {
       const item = sectionItems[index];
-      const collapse = rules.collapseSections.find((rule) => matchesRule(rule.match, itemCandidate(item)));
 
-      if (collapse) {
-        // the section runs to the item before the next heading, which is how the
-        // run sheet delimits one in the first place
-        const members: PcoItem[] = [];
-        while (index + 1 < sectionItems.length && sectionItems[index + 1].attributes.item_type !== 'header') {
-          index += 1;
-          members.push(sectionItems[index]);
-        }
+      const fold = folds.opens.get(item.id);
+      if (fold) {
         units.push({
-          title: collapse.title?.trim() || titleOf(item),
-          // the set list is the entire content of the section, and folding it away
+          title: fold.title,
+          // the set list is the entire content of the fold, and folding it away
           // silently is the one thing the person calling the show cannot undo
-          note: collapse.listContents === false ? '' : members.map(titleOf).filter(Boolean).join('\n'),
-          duration: members.reduce((total, member) => total + durationOf(member), durationOf(item)),
-          effect: { ...resolveEffect(item, rules).effect, ...collapse.effect },
+          note:
+            fold.rule.listContents === false
+              ? ''
+              : fold.members
+                  .filter((member) => member.attributes.item_type !== 'header')
+                  .map(titleOf)
+                  .filter(Boolean)
+                  .join('\n'),
+          duration: fold.members.reduce((total, member) => total + durationOf(member), 0),
+          effect: { ...resolveEffect(item, rules).effect, ...fold.rule.effect },
           isBlock: false,
-          itemIds: [item.id, ...members.map((member) => member.id)],
+          itemIds: fold.members.map((member) => member.id),
         });
+        continue;
+      }
+
+      // swallowed by a fold above, so it never takes a row of its own
+      if (folds.swallowed.has(item.id)) {
         continue;
       }
 
