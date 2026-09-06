@@ -35,7 +35,7 @@ import { dayInMs, generateId } from 'ontime-utils';
 
 import { event as eventDef } from '../../models/eventsDefinition.js';
 
-import { compileMatcher, matchesRule, respellWords, stripTitle } from './pcoRules.js';
+import { compileMatcher, matchesRule, respellWords, splitIncludedParts, stripTitle } from './pcoRules.js';
 import { localDateKey, localDayLabel, localTimeOfDayMs } from './pcoTime.js';
 import type { PcoItem, PcoItemTime, PcoItemType, PcoPlan, PcoPlanTime, PcoServicePosition } from './pcoTypes.js';
 
@@ -727,6 +727,7 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
       }
 
       const isHeader = item.attributes.item_type === 'header';
+      const servicePosition = item.attributes.service_position;
 
       if (effect.importAs === 'omit') {
         continue;
@@ -735,14 +736,35 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
         continue;
       }
 
+      /**
+       * An item listing what it includes becomes one entry per thing. The first
+       * keeps the whole length; the rest are placeholders at nothing, for whoever is
+       * calling the show to give a time to on the day or delete when the week does
+       * not need them.
+       */
+      const split = splitIncludedParts(titleOf(item), rules.splitIncluded);
+
       units.push({
-        title: titleOf(item),
+        title: split.title,
         note: item.attributes.description ?? '',
         duration: durationOf(item),
         effect,
         isBlock: effect.importAs ? effect.importAs === 'block' : isHeader && rules.headersBecome === 'block',
         itemIds: [item.id],
       });
+
+      for (const part of split.parts) {
+        units.push({
+          title: part,
+          note: '',
+          duration: 0,
+          // resolved by title like any entry, so a rule can reach "Altar Call"
+          effect: resolveEffectFor({ title: part, itemType: 'item', servicePosition }, rules).effect,
+          isBlock: false,
+          // no item of its own: the divergence report describes the row it came from
+          itemIds: [],
+        });
+      }
     }
 
     return units;

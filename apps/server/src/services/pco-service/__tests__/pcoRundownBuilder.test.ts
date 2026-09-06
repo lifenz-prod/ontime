@@ -447,7 +447,7 @@ describe('the service itself accumulates forward from 9:00', () => {
     ['MC Moment', at(9, 20, 0), at(9, 24, 0)],
     ['Welcome', at(9, 24, 0), at(9, 25, 0)],
     ['Meet & Greet', at(9, 25, 0), at(9, 26, 0)],
-    ['Message (Incl. Ministry & Altar Call)', at(9, 26, 0), at(10, 11, 0)],
+    ['Message', at(9, 26, 0), at(10, 11, 0)],
     ['EOS Announcements', at(10, 11, 0), at(10, 12, 0)],
     ['End', at(10, 12, 0), at(10, 12, 0)],
   ])('%s runs %d to %d', (title, expectedStart, expectedEnd) => {
@@ -528,7 +528,7 @@ describe('per-service item variants', () => {
 
 describe('timer rules', () => {
   it('makes the message a fixed-duration countdown', () => {
-    const message = eventNamed(build().rundown, 'Message (Incl. Ministry & Altar Call)');
+    const message = eventNamed(build().rundown, 'Message');
 
     expect(message.timerType).toBe(TimerType.CountDown);
     expect(message.countToEnd).toBe(false);
@@ -653,7 +653,7 @@ describe('handing off to the existing dual-service mirror', () => {
     expect(clone('Pre Service Video').timeStart).toBe(at(10, 58, 20));
     expect(clone('I Thank God').timeStart).toBe(at(11));
     expect(clone('Jesus Have It All').timeStart).toBe(at(11, 9, 30));
-    expect(clone('Message (Incl. Ministry & Altar Call)').timeStart).toBe(at(11, 26));
+    expect(clone('Message').timeStart).toBe(at(11, 26));
     expect(clone('EOS Announcements').timeStart).toBe(at(12, 11));
     expect(clone('End').timeStart).toBe(at(12, 12));
   });
@@ -701,7 +701,7 @@ describe('rules the settings panel writes', () => {
       },
     ]);
 
-    expect(eventNamed(rundown, 'Message (Incl. Ministry & Altar Call)').showAsAuxTimer).toBe(true);
+    expect(eventNamed(rundown, 'Message').showAsAuxTimer).toBe(true);
   });
 
   it('makes an item a fixed-duration countdown instead of counting to a time', () => {
@@ -713,7 +713,7 @@ describe('rules the settings panel writes', () => {
       },
     ]);
 
-    const message = eventNamed(rundown, 'Message (Incl. Ministry & Altar Call)');
+    const message = eventNamed(rundown, 'Message');
     expect(message.countToEnd).toBe(false);
     expect(message.timeStrategy).toBe(TimeStrategy.LockDuration);
 
@@ -940,11 +940,13 @@ describe('what a heading becomes', () => {
   it('can be dropped entirely', () => {
     const { rundown } = build({ rules: { ...rules, headersBecome: 'nothing' } });
 
-    for (const title of ['Praise & Worship', 'Welcome & Announcements', 'Message']) {
+    for (const title of ['Praise & Worship', 'Welcome & Announcements']) {
       expect(titles(rundown)).not.toContain(title);
     }
-    // the sheet closes with a heading and an item both called End, so one survives
+    // End and Message are each a heading AND an item on this sheet, so one of each
+    // survives: what is dropped is the heading
     expect(titles(rundown).filter((title) => title === 'End')).toHaveLength(1);
+    expect(titles(rundown).filter((title) => title === 'Message')).toHaveLength(1);
     // dropping the headings moves nothing: they carry no length
     expect(eventNamed(rundown, 'I Thank God').timeStart).toBe(at(9));
   });
@@ -960,12 +962,12 @@ describe('renaming an event', () => {
     const { rundown } = build({
       rules: {
         ...rules,
-        timerRules: [{ name: 'shorter', match: { titleContains: 'ministry' }, effect: { title: 'Message' } }],
+        timerRules: [{ name: 'shorter', match: { titleContains: 'meet & greet' }, effect: { title: 'Greeting' } }],
       },
     });
 
-    expect(titles(rundown)).toContain('Message');
-    expect(titles(rundown)).not.toContain('Message (Incl. Ministry & Altar Call)');
+    expect(titles(rundown)).toContain('Greeting');
+    expect(titles(rundown)).not.toContain('Meet & Greet');
   });
 
   it('is ignored in the default effect, which would otherwise retitle the rundown', () => {
@@ -1171,6 +1173,8 @@ describe('the corrected rundown', () => {
     ['Honour All Men', at(9, 27), at(0, 2)],
     ["Father's Day Vid", at(9, 29), at(0, 2)],
     ['Message - LINK', at(9, 31), at(0, 40)],
+    // the sheet says the message includes the altar call; the desk wants to cue it
+    ['Altar Call', at(10, 11), 0],
     ['EOS Announcements', at(10, 11), at(0, 1)],
     ['End', at(10, 12), 0],
   ];
@@ -1343,8 +1347,8 @@ describe('what a run sheet carries and a timer screen does not', () => {
   });
 
   it('leaves a bracket that is not a length alone', () => {
-    expect(titleAfterRules('Message (Incl. Ministry & Altar Call)')).toContain(
-      'Message (Incl. Ministry & Altar Call)',
+    expect(titleAfterRules('Message')).toContain(
+      'Message',
     );
   });
 
@@ -1368,5 +1372,84 @@ describe('what a run sheet carries and a timer screen does not', () => {
     expect(titleAfterRules('EOS Announcements', { titleWords: { EOS: 'End of Service' } })).toContain(
       'End of Service Announcements',
     );
+  });
+});
+
+describe('an item that lists what it includes', () => {
+  const splitOf = (raw: string, length = '40:00') =>
+    buildRundownFromPlan({
+      plan,
+      planTimes,
+      items: [item('m-1', 1, raw, length)],
+      itemTimes: [],
+      rules: shippedRules,
+    }).rundown.filter(isOntimeEvent);
+
+  it('becomes one entry per thing, in the order the sheet lists them', () => {
+    const events = splitOf('Message (Incl. Ministry & Altar Call)');
+    const service = events.slice(-3);
+
+    expect(service.map((event) => event.title)).toEqual(['Message', 'Ministry', 'Altar Call']);
+  });
+
+  it('leaves the whole length on the message and nothing on the rest', () => {
+    const [message, ministry, altarCall] = splitOf('Message (Incl. Ministry & Altar Call)').slice(-3);
+
+    expect(message.duration).toBe(40 * MILLIS_PER_MINUTE);
+    expect(ministry.duration).toBe(0);
+    expect(altarCall.duration).toBe(0);
+    // the placeholders sit where the message ends, for the desk to give a time to
+    expect(ministry.timeStart).toBe(message.timeEnd);
+    expect(altarCall.timeStart).toBe(message.timeEnd);
+  });
+
+  it('handles a single one just as well', () => {
+    expect(splitOf('Message (Incl. Altar Call)').slice(-2).map((event) => event.title)).toEqual([
+      'Message',
+      'Altar Call',
+    ]);
+  });
+
+  it('reads the clause however the sheet writes it', () => {
+    expect(splitOf('Message (incl ministry and altar call)').slice(-3).map((event) => event.title)).toEqual([
+      'Message',
+      'Ministry',
+      'Altar Call',
+    ]);
+  });
+
+  it('leaves a bracket that lists nothing alone', () => {
+    expect(splitOf("Father's Day Vid (1:58)").slice(-1)[0].title).toBe("Father's Day Vid");
+    expect(splitOf('Welcome (Ps B. Speaker)').slice(-1)[0].title).toBe('Welcome (Ps B. Speaker)');
+  });
+
+  it('lets a rule reach a part, which is why they resolve like any entry', () => {
+    const { rundown } = buildRundownFromPlan({
+      plan,
+      planTimes,
+      items: [item('m-1', 1, 'Message (Incl. Altar Call)', '40:00')],
+      itemTimes: [],
+      rules: {
+        ...shippedRules,
+        timerRules: [
+          { name: 'altar call', match: { titleContains: 'altar call' }, effect: { showAsAuxTimer: true } },
+        ],
+      },
+    });
+
+    expect(eventNamed(rundown, 'Altar Call').showAsAuxTimer).toBe(true);
+  });
+
+  it('can be turned off', () => {
+    const { rundown } = buildRundownFromPlan({
+      plan,
+      planTimes,
+      items: [item('m-1', 1, 'Message (Incl. Altar Call)', '40:00')],
+      itemTimes: [],
+      rules: { ...shippedRules, splitIncluded: null },
+    });
+
+    expect(titles(rundown)).toContain('Message (Incl. Altar Call)');
+    expect(titles(rundown)).not.toContain('Altar Call');
   });
 });

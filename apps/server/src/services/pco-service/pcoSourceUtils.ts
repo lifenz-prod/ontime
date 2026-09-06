@@ -20,7 +20,7 @@ import type {
 
 import { PcoError, planDateKey } from './PcoClient.js';
 import { localTimeOfDayMs } from './pcoTime.js';
-import { matchesRule, respellWords, stripTitle } from './pcoRules.js';
+import { matchesRule, respellWords, splitIncludedParts, stripTitle } from './pcoRules.js';
 import {
   parseTitleTime,
   planSectionFolds,
@@ -528,6 +528,8 @@ export function planSheetItems(
       return resolved.disposition;
     };
 
+    const split = splitIncludedParts(title, scoped.splitIncluded);
+
     rows.push({
       id: item.id,
       source: 'item',
@@ -537,16 +539,41 @@ export function planSheetItems(
        * the item where the rundown will name the fold would be the page disagreeing
        * with the import over the one thing a person reads first.
        */
-      title: folds.opens.get(item.id)?.title || resolved.effect.title?.trim() || title,
+      title: folds.opens.get(item.id)?.title || resolved.effect.title?.trim() || split.title,
       sourceTitle,
       itemType,
       servicePosition,
       duration: Math.max(0, (item.attributes.length ?? 0) * 1000),
       startsAt,
       alongside: folds.swallowed.has(item.id) ? (foldTitleFor(item.id) ?? null) : null,
+      includedIn: null,
       ...resolved,
       disposition: dispositionOfRow(),
     });
+
+    /**
+     * The parts an item says it includes are entries of their own, so they are rows
+     * of their own -- at nothing, which is the point of them. Without this the page
+     * would list one row where the import makes three, which is the one thing it
+     * must never do.
+     */
+    if (dispositionOfRow() === 'event') {
+      for (const part of split.parts) {
+        rows.push({
+          id: `${item.id}:${part}`,
+          source: 'item',
+          title: part,
+          sourceTitle: part,
+          itemType,
+          servicePosition,
+          duration: 0,
+          startsAt: null,
+          alongside: null,
+          includedIn: split.title,
+          ...resolve(part, 'item', servicePosition),
+        });
+      }
+    }
   }
 
   return rows;

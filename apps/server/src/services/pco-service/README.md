@@ -256,12 +256,15 @@ its start; a run sheet item does not, because its place depends on the whole bui
 
 Each row says what the import will do with it and lets that be changed:
 
-| Control      | What it does                                                     |
-| ------------ | ---------------------------------------------------------------- |
-| Import as    | a timed event, a block, or left out                              |
-| Timing       | countdown to a time of day, or a fixed duration                  |
-| At the end   | the event's end action                                           |
-| Hide timer / Aux timer / Skip | the switches an event carries               |
+| Control        | What it does                                                    |
+| -------------- | --------------------------------------------------------------- |
+| Import as      | a timed event, a block, or left out                             |
+| At the end     | the event's end action, named as the rundown names it           |
+| Fixed duration | on holds its own length; off follows the default, which counts down to a time of day |
+| Hide timer / Aux timer / Skip | the switches an event carries                    |
+
+The heading row stays put while the sheet scrolls, so a switch three quarters of
+the way down a thirty row morning is still under a column you can name.
 
 **Every row can be asked for as a timed event**, and a choice made on a row beats
 every rule that would otherwise claim the item -- a fold, a merge, the ignore list,
@@ -414,6 +417,12 @@ What survives becomes an entry, and the rest of the file shapes it:
   touched, because a single lower case letter means somebody cased it on purpose
   and recasing it would spell `EOS Announcements` as `Eos Announcements`. A word
   glued to a digit is left alone for the same reason, so `8:05AM` survives.
+- `splitIncluded` — an item whose title lists what it includes becomes one entry
+  per thing. "Message (Incl. Ministry & Altar Call)" is three things on one row:
+  the sheet has no reason to separate them and the desk very much does. The message
+  keeps the item's whole length and the parts follow it at nothing, for the stage
+  producer to give a time to on the day or delete when the week does not need them.
+  A part is resolved by title like any entry, so a rule can reach "Altar Call".
 - `titleWords` — how a particular word is spelled, whatever the sheet does with it.
   Casing cannot settle this on its own: `Father's Day VID` and `EOS Announcements`
   are the same shape, and one is short for "video" while the other is said out loud.

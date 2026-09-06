@@ -66,6 +66,7 @@ export type {
   PcoRules,
   PcoServicePosition,
   PcoServiceTypeSummary,
+  PcoSplitRule,
   PcoStatus,
   PcoTimerRule,
 } from './definitions/core/Pco.type.js';

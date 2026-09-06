@@ -16,6 +16,7 @@ import {
   type PcoRuleMatch,
   type PcoRules,
   type PcoServicePosition,
+  type PcoSplitRule,
 } from 'ontime-types';
 
 export const defaultPcoRules: PcoRules = {
@@ -79,6 +80,16 @@ export const defaultPcoRules: PcoRules = {
    * loud, which is the whole reason this is a list rather than a rule.
    */
   titleWords: { VID: 'Vid' },
+
+  /**
+   * "Message (Incl. Ministry & Altar Call)" is three things on one row. The message
+   * keeps the item's length and the two it includes follow it at nothing, for the
+   * stage producer to time on the day or delete when the week does not need them.
+   */
+  splitIncluded: {
+    match: '\\s*\\(\\s*incl\\.?\\s+(.+?)\\s*\\)',
+    separator: '\\s*(?:&|,|\\band\\b)\\s*',
+  },
   respectMasterExclusions: true,
 
   // the message can overrun, so nothing after it counts down to a wall clock time
@@ -210,6 +221,34 @@ export function respellWords(title: string, words: Record<string, string>): stri
 /** a literal, so a word carrying a regex character cannot become a pattern */
 function escapeForRegex(literal: string): string {
   return literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * An item's title with its "includes" clause taken off, and the parts it listed.
+ *
+ * The parts keep the order the sheet lists them in, since that is the order they
+ * happen. A clause listing nothing leaves the title alone.
+ */
+export function splitIncludedParts(title: string, rule: PcoSplitRule | null): { title: string; parts: string[] } {
+  const matcher = compileMatcher(rule?.match);
+  const found = matcher?.exec(title);
+  if (!matcher || !found?.[1]) {
+    return { title, parts: [] };
+  }
+
+  const separator = compileMatcher(rule?.separator);
+  const listed = separator ? found[1].split(new RegExp(separator.source, 'iu')) : [found[1]];
+  const parts = listed
+    .map((part) => part.trim())
+    .filter(Boolean)
+    /**
+     * A part the sheet did not case at all is given leading capitals, on the same
+     * terms as a title: one capital anywhere means somebody cased it on purpose, so
+     * "Altar Call" and "Q&A" are left as they are and "altar call" is not.
+     */
+    .map((part) => (/\p{Lu}/u.test(part) ? part : part.replace(/(?<![\p{L}\p{N}])\p{L}/gu, (c) => c.toUpperCase())));
+
+  return { title: title.replace(matcher, '').trim(), parts };
 }
 
 export function matchesRule(

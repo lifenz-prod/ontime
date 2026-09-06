@@ -622,3 +622,56 @@ describe('a folded section on the import page', () => {
     expect(dropped.find((entry) => entry.title === 'I Thank God')?.disposition).toBe('event');
   });
 });
+
+describe('an item that lists what it includes, on the import page', () => {
+  const rules: PcoRules = { ...defaultPcoRules, timezone: 'Pacific/Auckland' };
+  const message = (title: string): PcoItem => ({
+    type: 'Item',
+    id: 'm-1',
+    attributes: {
+      title,
+      description: '',
+      html_details: null,
+      length: 2400,
+      sequence: 1,
+      item_type: 'item',
+      service_position: 'during',
+    },
+  });
+
+  const sheet = (title: string) => planSheetItems([message(title)], rules, '156118');
+
+  it('lists a row for each thing, as the import makes an entry for each', () => {
+    expect(sheet('Message (Incl. Ministry & Altar Call)').map((row) => row.title)).toEqual([
+      'Message',
+      'Ministry',
+      'Altar Call',
+    ]);
+  });
+
+  it('leaves the length on the message and nothing on the parts', () => {
+    const [main, ministry, altarCall] = sheet('Message (Incl. Ministry & Altar Call)');
+
+    expect(main.duration).toBe(40 * 60 * 1000);
+    expect(ministry.duration).toBe(0);
+    expect(altarCall.duration).toBe(0);
+  });
+
+  it('says which row a part came out of', () => {
+    const [main, altarCall] = sheet('Message (Incl. Altar Call)');
+
+    expect(main.includedIn).toBeNull();
+    expect(altarCall.includedIn).toBe('Message');
+  });
+
+  it('makes no parts from a row the import is not making an entry for', () => {
+    const omitted = planSheetItems([message('Message (Incl. Altar Call)')], {
+      ...rules,
+      serviceTypeRules: {
+        '156118': [{ name: 'Message', match: { titleContains: 'message' }, effect: { importAs: 'omit' } }],
+      },
+    }, '156118');
+
+    expect(omitted.map((row) => row.title)).toEqual(['Message']);
+  });
+});

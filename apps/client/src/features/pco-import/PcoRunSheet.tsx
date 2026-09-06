@@ -5,7 +5,6 @@ import { millisToString, removeLeadingZero } from 'ontime-utils';
 
 import { endActionOptions } from '../../common/utils/endAction';
 import {
-  type TimingChoice,
   type ToggleKey,
   applyEndAction,
   applyImportAs,
@@ -13,7 +12,6 @@ import {
   applyToggle,
   importAsLabels,
   importAsOf,
-  timingLabels,
   timingOf,
   toggleKeys,
   toggleLabels,
@@ -61,8 +59,8 @@ export default function PcoRunSheet({ items, isCustomised, ownEffect, onChange, 
             <th className={style.fit}>Starts</th>
             <th className={style.fit}>Length</th>
             <th className={style.fit}>Import as</th>
-            <th className={style.fit}>Timing</th>
             <th className={style.fit}>At the end</th>
+            <th className={style.fit}>Fixed duration</th>
             <th className={style.fit}>Hide timer</th>
             <th className={style.fit}>Aux timer</th>
             <th className={style.fit}>Skip</th>
@@ -124,6 +122,7 @@ function RunSheetRow({ item, isCustomised, ownEffect, onChange, onReset }: RunSh
         {item.source === 'item' && item.itemType === 'song' && <span className={style.badge}>song</span>}
         {item.source === 'item' && item.itemType === 'header' && <span className={style.badge}>heading</span>}
         {item.source === 'item' && item.servicePosition === 'pre' && <span className={style.badge}>pre-service</span>}
+        {item.includedIn && <span className={style.muted}> · included in {item.includedIn}</span>}
         {item.alongside && item.source === 'rehearsal' && (
           <span className={style.muted}> · alongside {item.alongside}</span>
         )}
@@ -158,23 +157,6 @@ function RunSheetRow({ item, isCustomised, ownEffect, onChange, onReset }: RunSh
           size='sm'
           width='11rem'
           variant='ontime'
-          value={timingOf(shown)}
-          isDisabled={noTimer}
-          onChange={(event) => onChange(applyTiming(effect, event.target.value as TimingChoice))}
-        >
-          {Object.entries(timingLabels).map(([choice, label]) => (
-            <option key={choice} value={choice}>
-              {label}
-            </option>
-          ))}
-        </Select>
-      </td>
-
-      <td className={style.fit}>
-        <Select
-          size='sm'
-          width='11rem'
-          variant='ontime'
           value={shown.endAction ?? EndAction.None}
           isDisabled={noTimer}
           onChange={(event) => onChange(applyEndAction(effect, event.target.value as EndAction))}
@@ -185,6 +167,19 @@ function RunSheetRow({ item, isCustomised, ownEffect, onChange, onReset }: RunSh
             </option>
           ))}
         </Select>
+      </td>
+
+      <td className={style.fit}>
+        {/* off is not "count down to a time", it is "no opinion": the row keeps
+            following defaultEffect, which is what counts down to a time */}
+        <Switch
+          variant='ontime'
+          size='md'
+          aria-label={`Fixed duration for ${item.title}`}
+          isChecked={timingOf(shown) === 'fixed-duration'}
+          isDisabled={noTimer}
+          onChange={(event) => onChange(applyTiming(effect, event.target.checked ? 'fixed-duration' : 'default'))}
+        />
       </td>
 
       {toggleKeys.map((key: ToggleKey) => (

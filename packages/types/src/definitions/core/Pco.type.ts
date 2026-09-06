@@ -55,6 +55,19 @@ export type PcoRuleEffect = {
   importAs?: PcoItemImportAs;
 };
 
+/**
+ * How an item that lists what it includes is broken up.
+ *
+ * The parts are entries of their own at zero length, which is what makes them
+ * something to set a time on rather than something to create.
+ */
+export type PcoSplitRule = {
+  /** regex over the title, with one capture group holding the list */
+  match: string;
+  /** regex splitting the captured list into parts */
+  separator: string;
+};
+
 /** what an item becomes, when a rule decides it rather than the item's kind */
 export type PcoItemImportAs =
   /** a timed event of its own */
@@ -281,6 +294,20 @@ export type PcoRules = {
    * Matched on whole words, case insensitively.
    */
   titleWords: Record<string, string>;
+  /**
+   * Items whose title lists what they include, split into an entry each.
+   *
+   * "Message (Incl. Ministry & Altar Call)" is three things on one row: the sheet
+   * has no reason to separate them and the desk very much does. It becomes the
+   * message, holding the item's whole length, and then Ministry and Altar Call at
+   * nothing -- placeholders the stage producer gives a time to on the day, or
+   * deletes when the week does not need them. Making them by hand every week is the
+   * job this is meant to save.
+   *
+   * `match` is a regex with one capture group holding the list; `separator` splits
+   * that capture into parts. Null does nothing.
+   */
+  splitIncluded: PcoSplitRule | null;
   /**
    * Drop items that PCO excludes from the master service time.
    *
@@ -525,6 +552,11 @@ export type PcoPlanSheetItem = {
    * keeps the row and this is what it carries in its note.
    */
   alongside: string | null;
+  /**
+   * The item this row was split out of, for a part of something that lists what it
+   * includes. Null for a row the run sheet holds in its own right.
+   */
+  includedIn?: string | null;
   /** everything the row's controls edit, already resolved through the rules */
   effect: PcoRuleEffect;
 };

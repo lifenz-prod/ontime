@@ -50,6 +50,17 @@ export const validatePcoRules = [
       }
       return true;
     }),
+  body('splitIncluded')
+    .optional({ nullable: true })
+    .custom((value) => {
+      if (value === null || value === undefined) {
+        return true;
+      }
+      if (typeof value?.match !== 'string' || typeof value?.separator !== 'string') {
+        throw new Error('splitIncluded needs a match and a separator, or null');
+      }
+      return true;
+    }),
   body('respectMasterExclusions').isBoolean(),
   body('fixedDurationCarriesForward').isBoolean(),
   body('collapseSections').isArray(),

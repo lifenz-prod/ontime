@@ -25,6 +25,7 @@
   "titleStrip": ["\\s*//\\s*\\d{1,2}\\s*(am|pm)\\s*$", "\\s*\\(\\s*\\d{1,2}:\\d{2}\\s*\\)"],
   "normaliseTitleCase": true,
   "titleWords": { "VID": "Vid" },
+  "splitIncluded": { "match": "\\s*\\(\\s*incl\\.?\\s+(.+?)\\s*\\)", "separator": "\\s*(?:&|,|\\band\\b)\\s*" },
   "respectMasterExclusions": true,
   "fixedDurationCarriesForward": true,
 
