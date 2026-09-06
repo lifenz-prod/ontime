@@ -41,8 +41,10 @@ export async function getPcoKnownItems(serviceTypeId?: string): Promise<PcoKnown
 }
 
 /** one plan's run sheet, resolved through the rules exactly as the import will */
-export async function getPcoPlanSheet(serviceTypeId: string, planId: string): Promise<PcoPlanSheet> {
-  const res = await axios.get(`${pcoPath}/plan-sheet`, { params: { serviceTypeId, planId } });
+export async function getPcoPlanSheet(serviceTypeId: string, planId: string, refresh = false): Promise<PcoPlanSheet> {
+  const res = await axios.get(`${pcoPath}/plan-sheet`, {
+    params: { serviceTypeId, planId, ...(refresh ? { refresh: 'true' } : {}) },
+  });
   return res.data;
 }
 

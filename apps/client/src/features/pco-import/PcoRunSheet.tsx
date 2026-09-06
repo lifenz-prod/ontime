@@ -3,6 +3,7 @@ import { IconButton, Select, Switch } from '@chakra-ui/react';
 import { type PcoItemImportAs, type PcoPlanSheetItem, type PcoRuleEffect,EndAction } from 'ontime-types';
 import { millisToString, removeLeadingZero } from 'ontime-utils';
 
+import { endActionOptions } from '../../common/utils/endAction';
 import {
   type TimingChoice,
   type ToggleKey,
@@ -10,7 +11,6 @@ import {
   applyImportAs,
   applyTiming,
   applyToggle,
-  endActionLabels,
   importAsLabels,
   importAsOf,
   timingLabels,
@@ -23,7 +23,6 @@ import style from './PcoImport.module.scss';
 
 interface PcoRunSheetProps {
   items: PcoPlanSheetItem[];
-  isSaving: boolean;
   /** true when this service type holds a choice of its own for the title */
   isCustomised: (title: string) => boolean;
   /** what this service type explicitly holds for the title, which is what a change edits */
@@ -49,7 +48,7 @@ const inertReason: Partial<Record<PcoPlanSheetItem['disposition'], string>> = {
   merged: 'merged into the entry above',
 };
 
-export default function PcoRunSheet({ items, isSaving, isCustomised, ownEffect, onChange, onReset }: PcoRunSheetProps) {
+export default function PcoRunSheet({ items, isCustomised, ownEffect, onChange, onReset }: PcoRunSheetProps) {
   if (items.length === 0) {
     return <div className={style.empty}>This plan has no items.</div>;
   }
@@ -76,7 +75,6 @@ export default function PcoRunSheet({ items, isSaving, isCustomised, ownEffect, 
             <RunSheetRow
               key={item.id}
               item={item}
-              isSaving={isSaving}
               isCustomised={isCustomised(item.title)}
               ownEffect={ownEffect(item.title)}
               onChange={(effect) => onChange(item.title, effect)}
@@ -91,14 +89,13 @@ export default function PcoRunSheet({ items, isSaving, isCustomised, ownEffect, 
 
 interface RunSheetRowProps {
   item: PcoPlanSheetItem;
-  isSaving: boolean;
   isCustomised: boolean;
   ownEffect: PcoRuleEffect;
   onChange: (effect: PcoRuleEffect) => void;
   onReset: () => void;
 }
 
-function RunSheetRow({ item, isSaving, isCustomised, ownEffect, onChange, onReset }: RunSheetRowProps) {
+function RunSheetRow({ item, isCustomised, ownEffect, onChange, onReset }: RunSheetRowProps) {
   const reason = inertReason[item.disposition];
   const importAs = importAsOf(item.disposition);
 
@@ -107,7 +104,7 @@ function RunSheetRow({ item, isSaving, isCustomised, ownEffect, onChange, onRese
    * controls would do nothing. Everything else stays editable, including a row set
    * to be left out -- turning it back on is how you undo that.
    */
-  const inert = reason !== undefined || isSaving;
+  const inert = reason !== undefined;
   const noTimer = importAs !== 'event';
 
   /**
@@ -178,7 +175,7 @@ function RunSheetRow({ item, isSaving, isCustomised, ownEffect, onChange, onRese
           isDisabled={inert || noTimer}
           onChange={(event) => onChange(applyEndAction(effect, event.target.value as EndAction))}
         >
-          {Object.entries(endActionLabels).map(([action, label]) => (
+          {endActionOptions.map(([action, label]) => (
             <option key={action} value={action}>
               {label}
             </option>
@@ -205,7 +202,7 @@ function RunSheetRow({ item, isSaving, isCustomised, ownEffect, onChange, onRese
           variant='ontime-ghosted'
           aria-label={`Reset ${item.title} to the defaults`}
           icon={<IoRefresh />}
-          isDisabled={isSaving || !isCustomised}
+          isDisabled={!isCustomised}
           onClick={onReset}
         />
       </td>

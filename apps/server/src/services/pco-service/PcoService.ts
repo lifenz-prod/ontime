@@ -53,7 +53,7 @@ import {
   readStoredCredentials,
   writeStoredCredentials,
 } from './pcoCredentialsFile.js';
-import type { PcoItem, PcoServiceType } from './pcoTypes.js';
+import type { PcoItem, PcoItemTime, PcoPlan, PcoPlanTime, PcoServiceType } from './pcoTypes.js';
 import { ensurePcoRulesFile, readPcoRules } from './pcoRulesFile.js';
 import { buildRundownFromPlan, groupPlanTimesByDay, type PcoBuildResult } from './pcoRundownBuilder.js';
 import {
@@ -90,6 +90,25 @@ let resolvedServiceType: { key: string; id: string; name: string } | null = null
  */
 const SERVICE_TYPE_TTL = 10 * 60 * 1000;
 let serviceTypeCache: { at: number; serviceTypes: PcoServiceType[] } | null = null;
+
+/**
+ * One plan's raw content, cached while somebody is working through it on the
+ * import page.
+ *
+ * Reading a plan is three calls to Planning Center and the item list is paginated,
+ * so it is the better part of a second. The page re-reads the sheet after every row
+ * change -- it has to, since a rule can change what other rows say -- and without
+ * this that is a second of a greyed out table for every switch flipped. The rules
+ * are applied to the cached content instead, which is arithmetic.
+ *
+ * Short lived, because a plan being edited in Planning Center while it is open here
+ * is a real thing. Saving rules deliberately does not drop it -- the rules changing
+ * is exactly the case this exists for -- so the page's refresh is the way to go back
+ * and re-read.
+ */
+const PLAN_CONTENT_TTL = 2 * 60 * 1000;
+type CachedPlan = { at: number; plan: PcoPlan; planTimes: PcoPlanTime[]; items: PcoItem[]; itemTimes: PcoItemTime[] };
+const planContentCache = new Map<string, CachedPlan>();
 
 export type PcoConfig = {
   rules: PcoRules;
@@ -308,6 +327,11 @@ export function resetPcoCache(): void {
   serviceTypeCache = null;
 }
 
+/** drops a cached plan, so the next read goes back to Planning Center */
+export function forgetPcoPlan(serviceTypeId: string, planId: string): void {
+  planContentCache.delete(`${serviceTypeId}/${planId}`);
+}
+
 /* -------------------------------------------------------------------------- */
 /* what the settings panel calls                                               */
 /* -------------------------------------------------------------------------- */
@@ -476,7 +500,10 @@ export async function getPcoKnownItems(serviceTypeId?: string, plansToSample = 4
  * sampling the next few, because the person looking at it is about to import that
  * plan and wants to see the morning, not a summary of the mornings like it.
  */
-export async function getPcoPlanSheet(serviceTypeId: string, planId: string): Promise<PcoPlanSheet> {
+export async function getPcoPlanSheet(serviceTypeId: string, planId: string, refresh = false): Promise<PcoPlanSheet> {
+  if (refresh) {
+    forgetPcoPlan(serviceTypeId, planId);
+  }
   const config = getPcoConfig();
   const client = getClient(config);
 
@@ -485,11 +512,23 @@ export async function getPcoPlanSheet(serviceTypeId: string, planId: string): Pr
     throw new PcoError(`No Planning Center service type with id ${serviceTypeId}`);
   }
 
-  const plan = await client.getPlan(serviceTypeId, planId);
-  const [planTimes, content] = await Promise.all([
-    client.getPlanTimes(serviceTypeId, plan.id),
-    client.getPlanContent(serviceTypeId, plan.id),
-  ]);
+  const cacheKey = `${serviceTypeId}/${planId}`;
+  const cached = planContentCache.get(cacheKey);
+  let entry: CachedPlan;
+
+  if (cached && Date.now() - cached.at < PLAN_CONTENT_TTL) {
+    entry = cached;
+  } else {
+    const plan = await client.getPlan(serviceTypeId, planId);
+    const [planTimes, content] = await Promise.all([
+      client.getPlanTimes(serviceTypeId, plan.id),
+      client.getPlanContent(serviceTypeId, plan.id),
+    ]);
+    entry = { at: Date.now(), plan, planTimes, items: content.items, itemTimes: content.itemTimes };
+    planContentCache.set(cacheKey, entry);
+  }
+
+  const { plan, planTimes } = entry;
 
   /**
    * The day the rundown would be built for. It decides which rehearsal times are
@@ -511,7 +550,7 @@ export async function getPcoPlanSheet(serviceTypeId: string, planId: string): Pr
       label: day.label,
       hasServices: day.serviceTimes.length > 0,
     })),
-    items: planSheetItems(content.items, config.rules, serviceTypeId, buildDay),
+    items: planSheetItems(entry.items, config.rules, serviceTypeId, buildDay),
   };
 }
 

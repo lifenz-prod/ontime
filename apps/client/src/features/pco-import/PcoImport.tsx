@@ -1,11 +1,11 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { IoArrowBack, IoDownloadOutline, IoRefresh } from 'react-icons/io5';
 import { Link } from 'react-router-dom';
 import { Button, IconButton, Select } from '@chakra-ui/react';
 import type { PcoImportResult, PcoPlanSummary, PcoRuleEffect, PcoRules } from 'ontime-types';
 
-import { PCO_PLAN_SHEET } from '../../common/api/constants';
-import { importPcoPlan } from '../../common/api/pco';
+import { PCO_PLAN_SHEET, PCO_RULES } from '../../common/api/constants';
+import { getPcoPlanSheet, importPcoPlan } from '../../common/api/pco';
 import { invalidateAllCaches, maybeAxiosError } from '../../common/api/utils';
 import {
   usePcoPlans,
@@ -51,16 +51,13 @@ export default function PcoImport() {
   const { data: plans, isFetching: isLoadingPlans, refetch: refetchPlans } = usePcoPlans(pinnedIds, pinnedIds.length > 0);
 
   const [selected, setSelected] = useState<PcoPlanSummary | null>(null);
+  const [isRefreshingSheet, setIsRefreshingSheet] = useState(false);
   const [targetDate, setTargetDate] = useState<string>('');
   const [isImporting, setIsImporting] = useState(false);
   const [result, setResult] = useState<PcoImportResult | null>(null);
   const [error, setError] = useState('');
 
-  const {
-    data: sheet,
-    isFetching: isLoadingSheet,
-    error: sheetError,
-  } = usePcoPlanSheet(selected?.serviceTypeId, selected?.planId);
+  const { data: sheet, error: sheetError } = usePcoPlanSheet(selected?.serviceTypeId, selected?.planId);
 
   /** plans keep their soonest-first order inside each campus heading */
   const grouped = useMemo(() => {
@@ -83,26 +80,70 @@ export default function PcoImport() {
   };
 
   /**
+   * Writes run one after another, and each reads the rules as they stand rather than
+   * as they were when the row rendered. Flipping two switches quickly used to be
+   * safe only because the whole table was disabled between them; now that it is not,
+   * the second write would otherwise be computed from rules without the first in
+   * them and would silently undo it.
+   */
+  const writeQueue = useRef<Promise<void>>(Promise.resolve());
+
+  /**
    * A row change writes a rule and re-reads the sheet, because the rules decide what
    * every other row says: turning one item into a block can change nothing else, but
    * a rename or a fold can, and a sheet showing one thing while the import does
    * another is the failure worth avoiding.
+   *
+   * The re-read is cheap -- the server holds the plan while it is being worked
+   * through, so only the rules are applied again -- which is what lets the controls
+   * stay live instead of greying out between every change.
    */
   const changeItem = useCallback(
-    async (title: string, effect: PcoRuleEffect) => {
-      if (!rules || !selected) {
-        return;
+    (title: string, effect: PcoRuleEffect) => {
+      if (!selected) {
+        return writeQueue.current;
       }
-      setError('');
-      try {
-        await saveRules(withServiceTypeEffect(rules, selected.serviceTypeId, title, effect));
-        await ontimeQueryClient.invalidateQueries({ queryKey: PCO_PLAN_SHEET });
-      } catch (maybeError) {
-        setError(maybeAxiosError(maybeError));
-      }
+
+      const write = async () => {
+        const current = ontimeQueryClient.getQueryData<PcoRules>(PCO_RULES);
+        if (!current) {
+          return;
+        }
+        const next = withServiceTypeEffect(current, selected.serviceTypeId, title, effect);
+        setError('');
+        // the badge and the reset button answer at once; the save confirms it
+        ontimeQueryClient.setQueryData(PCO_RULES, next);
+        try {
+          await saveRules(next);
+          await ontimeQueryClient.invalidateQueries({ queryKey: PCO_PLAN_SHEET });
+        } catch (maybeError) {
+          ontimeQueryClient.setQueryData(PCO_RULES, current);
+          setError(maybeAxiosError(maybeError));
+        }
+      };
+
+      writeQueue.current = writeQueue.current.then(write, write);
+      return writeQueue.current;
     },
-    [rules, selected, saveRules],
+    [selected, saveRules],
   );
+
+  /** goes back to Planning Center for the plan itself, which is otherwise held */
+  const refreshSheet = async () => {
+    if (!selected) {
+      return;
+    }
+    setIsRefreshingSheet(true);
+    setError('');
+    try {
+      const fresh = await getPcoPlanSheet(selected.serviceTypeId, selected.planId, true);
+      ontimeQueryClient.setQueryData([...PCO_PLAN_SHEET, selected.serviceTypeId, selected.planId], fresh);
+    } catch (maybeError) {
+      setError(maybeAxiosError(maybeError));
+    } finally {
+      setIsRefreshingSheet(false);
+    }
+  };
 
   const resetItem = useCallback((title: string) => changeItem(title, {}), [changeItem]);
 
@@ -220,6 +261,14 @@ export default function PcoImport() {
           <div className={style.sectionTitle}>
             <span className={style.step}>2</span>
             The run sheet
+            <IconButton
+              size='xs'
+              variant='ontime-ghosted'
+              aria-label='Re-read this plan from Planning Center'
+              icon={<IoRefresh />}
+              isLoading={isRefreshingSheet}
+              onClick={refreshSheet}
+            />
             {days.length > 1 && (
               <Select
                 size='sm'
@@ -247,7 +296,6 @@ export default function PcoImport() {
           {sheet && (
             <PcoRunSheet
               items={sheet.items}
-              isSaving={isSaving || isLoadingSheet}
               isCustomised={isCustomised}
               ownEffect={ownEffect}
               onChange={changeItem}

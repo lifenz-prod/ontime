@@ -17,6 +17,7 @@ import { millisToString } from 'ontime-utils';
 
 import { useEventAction } from '../../../../common/hooks/useEventAction';
 import { millisToDelayString } from '../../../../common/utils/dateConfig';
+import { endActionOptions } from '../../../../common/utils/endAction';
 import * as Editor from '../../../editors/editor-utils/EditorUtils';
 import TimeInputFlow from '../../time-input-flow/TimeInputFlow';
 
@@ -147,11 +148,11 @@ function MobileEventEditorTimes(props: MobileEventEditorTimesProps) {
               onChange={(event) => handleSubmit('endAction', event.target.value)}
               variant='ontime'
             >
-              <option value={EndAction.None}>None</option>
-              <option value={EndAction.Stop}>Stop rundown</option>
-              <option value={EndAction.LoadNext}>Load next event</option>
-              <option value={EndAction.PlayNext}>Play next event</option>
-              <option value={EndAction.PlayNextDelayed}>Play next after delay</option>
+              {endActionOptions.map(([action, label]) => (
+                <option key={action} value={action}>
+                  {label}
+                </option>
+              ))}
             </Select>
           </div>
           <div>

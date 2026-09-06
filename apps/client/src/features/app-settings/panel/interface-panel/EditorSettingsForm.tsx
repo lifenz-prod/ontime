@@ -4,6 +4,7 @@ import { parseUserTime } from 'ontime-utils';
 
 import TimeInput from '../../../../common/components/input/time-input/TimeInput';
 import { editorSettingsDefaults, useEditorSettings } from '../../../../common/stores/editorSettings';
+import { endActionOptions } from '../../../../common/utils/endAction';
 import * as Panel from '../../panel-utils/PanelUtils';
 
 export default function EditorSettingsForm() {
@@ -101,11 +102,11 @@ export default function EditorSettingsForm() {
                 value={defaultEndAction}
                 onChange={(event) => setDefaultEndAction(event.target.value as EndAction)}
               >
-                <option value={EndAction.None}>None</option>
-                <option value={EndAction.Stop}>Stop rundown</option>
-                <option value={EndAction.LoadNext}>Load next event</option>
-                <option value={EndAction.PlayNext}>Play next event</option>
-                <option value={EndAction.PlayNextDelayed}>Play next after delay</option>
+                {endActionOptions.map(([action, label]) => (
+                  <option key={action} value={action}>
+                    {label}
+                  </option>
+                ))}
               </Select>
             </Panel.ListItem>
           </Panel.ListGroup>

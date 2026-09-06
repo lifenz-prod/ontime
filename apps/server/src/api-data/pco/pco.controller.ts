@@ -87,7 +87,10 @@ export async function getPlanSheet(req: Request, res: Response<PcoPlanSheet | Er
     if (!serviceTypeId || !planId) {
       return res.status(400).send({ message: 'serviceTypeId and planId are both required' });
     }
-    res.status(200).send(await getPcoPlanSheet(serviceTypeId, planId));
+    // the plan is cached while a row is being worked through, so a refresh is how
+    // somebody who has just edited it in Planning Center goes back and re-reads
+    const refresh = req.query.refresh === 'true';
+    res.status(200).send(await getPcoPlanSheet(serviceTypeId, planId, refresh));
   } catch (error) {
     sendFailure(res, error);
   }
