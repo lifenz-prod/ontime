@@ -300,10 +300,10 @@ describe('importAsOf', () => {
     expect(importAsOf('ignored')).toBe('omit');
   });
 
-  it('shows a folded or merged item as an event, since it does reach the rundown', () => {
-    // its row is disabled with a reason, so the select is only ever read here
-    expect(importAsOf('collapsed')).toBe('event');
-    expect(importAsOf('merged')).toBe('event');
+  it('shows a folded or merged item as left out, since it gets no cue of its own', () => {
+    // its time is not lost -- the entry it went into carries it -- and the row says so
+    expect(importAsOf('collapsed')).toBe('omit');
+    expect(importAsOf('merged')).toBe('omit');
   });
 });
 

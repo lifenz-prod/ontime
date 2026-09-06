@@ -37,14 +37,13 @@ const lengthLabel = (millis: number): string => (millis > 0 ? removeLeadingZero(
 const clockLabel = (millis: number): string => millisToString(millis).slice(0, 5);
 
 /**
- * Why a row takes no timer settings, and null when it does.
+ * What a row is doing instead of taking a cue of its own, and null when it has one.
  *
- * A row that cannot take them is shown disabled rather than hidden: the run sheet
- * on screen should be the run sheet in Planning Center, and a row that quietly
- * vanished would leave someone hunting for it.
+ * Said rather than enforced: every row can be asked for as a timed event, which is
+ * the only way somebody reading the sheet can give a cue to something the rules
+ * folded or merged away. This is why its time is not where you might look for it.
  */
-const inertReason: Partial<Record<PcoPlanSheetItem['disposition'], string>> = {
-  collapsed: 'folded in with its section',
+const noCueReason: Partial<Record<PcoPlanSheetItem['disposition'], string>> = {
   merged: 'merged into the entry above',
 };
 
@@ -96,15 +95,15 @@ interface RunSheetRowProps {
 }
 
 function RunSheetRow({ item, isCustomised, ownEffect, onChange, onReset }: RunSheetRowProps) {
-  const reason = inertReason[item.disposition];
+  const reason = noCueReason[item.disposition];
   const importAs = importAsOf(item.disposition);
 
   /**
-   * A folded or merged row is decided by a rule that is not per-item, so its timer
-   * controls would do nothing. Everything else stays editable, including a row set
-   * to be left out -- turning it back on is how you undo that.
+   * A row that is not a timed event carries no timer settings, so those controls are
+   * disabled -- but "Import as" never is. Asking for a timed event takes an item out
+   * of a fold, out of a merge or off the ignore list, and there is no other way to
+   * do that from here.
    */
-  const inert = reason !== undefined;
   const noTimer = importAs !== 'event';
 
   /**
@@ -117,7 +116,7 @@ function RunSheetRow({ item, isCustomised, ownEffect, onChange, onReset }: RunSh
   const effect = ownEffect;
 
   return (
-    <tr data-inert={inert || noTimer}>
+    <tr data-inert={noTimer}>
       <td>
         <span className={style.itemTitle}>{item.title || 'Untitled'}</span>
         {item.source === 'rehearsal' && <span className={style.badge}>rehearsal time</span>}
@@ -125,7 +124,13 @@ function RunSheetRow({ item, isCustomised, ownEffect, onChange, onReset }: RunSh
         {item.source === 'item' && item.itemType === 'song' && <span className={style.badge}>song</span>}
         {item.source === 'item' && item.itemType === 'header' && <span className={style.badge}>heading</span>}
         {item.source === 'item' && item.servicePosition === 'pre' && <span className={style.badge}>pre-service</span>}
-        {item.alongside && <span className={style.muted}> · alongside {item.alongside}</span>}
+        {item.alongside && item.source === 'rehearsal' && (
+          <span className={style.muted}> · alongside {item.alongside}</span>
+        )}
+        {/* where a folded row's time went, since "leave out" would otherwise imply it was lost */}
+        {item.alongside && item.disposition === 'collapsed' && (
+          <span className={style.muted}> · its time is in {item.alongside}</span>
+        )}
         {reason && <span className={style.muted}> · {reason}</span>}
         {isCustomised && <span className={`${style.badge} ${style.customised}`}>set for this service type</span>}
       </td>
@@ -138,7 +143,6 @@ function RunSheetRow({ item, isCustomised, ownEffect, onChange, onReset }: RunSh
           width='9rem'
           variant='ontime'
           value={importAs}
-          isDisabled={inert}
           onChange={(event) => onChange(applyImportAs(effect, event.target.value as PcoItemImportAs))}
         >
           {Object.entries(importAsLabels).map(([choice, label]) => (
@@ -155,7 +159,7 @@ function RunSheetRow({ item, isCustomised, ownEffect, onChange, onReset }: RunSh
           width='11rem'
           variant='ontime'
           value={timingOf(shown)}
-          isDisabled={inert || noTimer}
+          isDisabled={noTimer}
           onChange={(event) => onChange(applyTiming(effect, event.target.value as TimingChoice))}
         >
           {Object.entries(timingLabels).map(([choice, label]) => (
@@ -172,7 +176,7 @@ function RunSheetRow({ item, isCustomised, ownEffect, onChange, onReset }: RunSh
           width='11rem'
           variant='ontime'
           value={shown.endAction ?? EndAction.None}
-          isDisabled={inert || noTimer}
+          isDisabled={noTimer}
           onChange={(event) => onChange(applyEndAction(effect, event.target.value as EndAction))}
         >
           {endActionOptions.map(([action, label]) => (
@@ -190,7 +194,7 @@ function RunSheetRow({ item, isCustomised, ownEffect, onChange, onReset }: RunSh
             size='md'
             aria-label={`${toggleLabels[key].title} for ${item.title}`}
             isChecked={Boolean(shown[key])}
-            isDisabled={inert || noTimer}
+            isDisabled={noTimer}
             onChange={(event) => onChange(applyToggle(effect, key, event.target.checked))}
           />
         </td>

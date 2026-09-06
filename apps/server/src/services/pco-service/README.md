@@ -263,8 +263,21 @@ Each row says what the import will do with it and lets that be changed:
 | At the end   | the event's end action                                           |
 | Hide timer / Aux timer / Skip | the switches an event carries               |
 
-A row that cannot take these says why and is disabled rather than offering a control
-that would do nothing: folded into its section, or merged into the entry above.
+**Every row can be asked for as a timed event**, and a choice made on a row beats
+every rule that would otherwise claim the item -- a fold, a merge, the ignore list,
+`headersBecome`. There is no other way for somebody reading the sheet to give a cue
+to something the rules took away, so nothing is out of reach of its own row.
+
+What that changes about how a folded section reads. The heading that opens the fold
+_is_ the event -- it carries the section's time and takes every timer setting -- so
+its row says **Timed event**. The songs folded into it get no cue of their own, so
+theirs say **Leave out**, with a note saying which entry their time went into. Ask
+for one as a timed event and it comes out of the fold with its own length, and the
+block is that much shorter. Leave the heading out and the whole fold goes, songs and
+all, each standing on its own.
+
+A row that is not a timed event carries no timer settings, so those controls are
+disabled -- but "Import as" never is.
 
 A heading whose title states a time is fully editable, and is named the way the
 entry will be named — _SERVICE BRIEFING_, not _SERVICE BRIEFING 8:05AM_ — because a

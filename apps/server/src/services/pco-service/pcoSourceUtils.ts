@@ -191,6 +191,17 @@ export function dispositionOf(
   rules: PcoRules,
   candidate: { title: string; itemType: PcoItemType; servicePosition: PcoServicePosition },
 ): PcoItemDisposition {
+  /**
+   * A choice made on a row beats every rule that would otherwise claim the item.
+   * Nothing on a run sheet is out of reach of its own row: asking for a timed event
+   * takes an item out of a fold or out of a merge, which is the only way somebody
+   * looking at the sheet can give it a cue.
+   */
+  const { importAs } = resolveEffectFor(candidate, rules).effect;
+  if (importAs) {
+    return dispositionFromImportAs(importAs);
+  }
+
   if (rules.collapseSections.some((rule) => matchesRule(rule.match, candidate))) {
     return 'collapsed';
   }
@@ -199,12 +210,6 @@ export function dispositionOf(
   }
   if (rules.ignoreItems.some((match) => matchesRule(match, candidate))) {
     return 'ignored';
-  }
-
-  // a per-item choice from the import page beats what the item's kind would make it
-  const { importAs } = resolveEffectFor(candidate, rules).effect;
-  if (importAs) {
-    return importAs === 'omit' ? 'ignored' : importAs;
   }
 
   if (candidate.itemType === 'header') {
@@ -474,6 +479,16 @@ export function planSheetItems(
     planned.swallowed.forEach((id) => folds.swallowed.add(id));
   }
 
+  /** the fold a swallowed item ended up in, so the row can say where its time went */
+  const foldTitleFor = (id: string): string | undefined => {
+    for (const fold of folds.opens.values()) {
+      if (fold.members.some((member) => member.id === id)) {
+        return fold.title;
+      }
+    }
+    return undefined;
+  };
+
   for (const item of ordered) {
     const sourceTitle = item.attributes.title ?? '';
     const itemType = item.attributes.item_type;
@@ -500,7 +515,9 @@ export function planSheetItems(
      * would otherwise make it, then the ordinary rules.
      */
     const dispositionOfRow = (): PcoItemDisposition => {
-      if (folds.opens.has(item.id)) return 'collapsed';
+      // the heading that opens a fold IS the event: it carries the section's time and
+      // takes every setting an event takes, so the row says so rather than "folded"
+      if (folds.opens.has(item.id)) return 'event';
       if (folds.swallowed.has(item.id)) return 'collapsed';
       if (startsAt !== null) return dispositionFromImportAs(resolved.effect.importAs);
       return resolved.disposition;
@@ -516,7 +533,7 @@ export function planSheetItems(
       servicePosition,
       duration: Math.max(0, (item.attributes.length ?? 0) * 1000),
       startsAt,
-      alongside: null,
+      alongside: folds.swallowed.has(item.id) ? (foldTitleFor(item.id) ?? null) : null,
       ...resolved,
       disposition: dispositionOfRow(),
     });

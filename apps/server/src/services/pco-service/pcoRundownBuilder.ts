@@ -299,6 +299,11 @@ export function planSectionFolds(sectionItems: PcoItem[], rules: PcoRules): Sect
       members.push(sectionItems[index]);
     }
 
+    // a fold whose opening heading was asked to be left out takes nothing with it
+    if (resolveEffectFor(itemCandidate(opener), rules).effect.importAs === 'omit') {
+      continue;
+    }
+
     const base = rule.title?.trim() || titleOf(opener);
 
     if (!rule.membersMatch) {
@@ -323,7 +328,14 @@ export function planSectionFolds(sectionItems: PcoItem[], rules: PcoRules): Sect
     };
 
     for (const entry of [opener, ...members]) {
-      if (entry === opener || matchesRule(rule.membersMatch, itemCandidate(entry))) {
+      /**
+       * A row asked for explicitly is never folded away. That is what makes the
+       * import page's "Import as" mean something on a member of a section: choosing
+       * "Timed event" on a song has to take it out of the block and give it a cue.
+       */
+      const chosen = entry !== opener && resolveEffectFor(itemCandidate(entry), rules).effect.importAs !== undefined;
+
+      if (!chosen && (entry === opener || matchesRule(rule.membersMatch, itemCandidate(entry)))) {
         run.push(entry);
       } else {
         flush();
@@ -675,7 +687,15 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
         continue;
       }
 
-      if (matchesAny(rules.mergeIntoPrevious, item)) {
+      /**
+       * Resolved before the merge and ignore lists are consulted, because a choice
+       * made on the import page's row beats them: nothing on a run sheet should be
+       * out of reach of its own row.
+       */
+      const effect = resolveEffect(item, rules).effect;
+      const chosen = effect.importAs !== undefined;
+
+      if (!chosen && matchesAny(rules.mergeIntoPrevious, item)) {
         const previous = units.at(-1);
         if (previous && !previous.isBlock) {
           previous.duration += durationOf(item);
@@ -685,16 +705,10 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
         }
         // nothing above it to give the time to, so it keeps a row of its own
         strandedMerges.push(titleOf(item) || 'untitled');
-      } else if (matchesAny(rules.ignoreItems, item)) {
+      } else if (!chosen && matchesAny(rules.ignoreItems, item)) {
         continue;
       }
 
-      /**
-       * `importAs` is a per-item override of what the item's kind would make it,
-       * which is what lets the import page decide this a row at a time instead of
-       * sending someone to edit the ignore list.
-       */
-      const effect = resolveEffect(item, rules).effect;
       const isHeader = item.attributes.item_type === 'header';
 
       if (effect.importAs === 'omit') {

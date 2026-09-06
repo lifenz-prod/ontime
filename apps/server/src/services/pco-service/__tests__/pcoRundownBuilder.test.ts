@@ -1227,3 +1227,47 @@ describe('the corrected rundown', () => {
     expect(titles(plain.rundown)).not.toContain('Message - LINK');
   });
 });
+
+describe('a row asked for explicitly beats the rule that would claim it', () => {
+  const withRule = (effect: Record<string, unknown>, titleContains: string) =>
+    buildRundownFromPlan({
+      plan,
+      planTimes,
+      items,
+      itemTimes,
+      rules: {
+        ...shippedRules,
+        serviceTypeRules: { '156118': [{ name: titleContains, match: { titleContains }, effect }] },
+      },
+      serviceTypeId: '156118',
+    }).rundown;
+
+  it('takes a song out of the fold and gives it a cue of its own', () => {
+    const rundown = withRule({ importAs: 'event' }, 'I Thank God');
+
+    expect(titles(rundown)).toContain('I Thank God');
+    // the rest of the set is still one segment, now four minutes shorter
+    expect(eventNamed(rundown, 'Praise & Worship').duration).toBe(16 * MILLIS_PER_MINUTE);
+  });
+
+  it('takes an item out of a merge, so the entry above stops carrying its time', () => {
+    // the online message is merged into doors by the shipped rules
+    const rundown = withRule({ importAs: 'event' }, 'Online Pre Service Message');
+
+    expect(titles(rundown)).toContain('Online Pre Service Message');
+    expect(eventNamed(rundown, 'Doors Open').duration).toBe(12 * MILLIS_PER_MINUTE + 20 * MILLIS_PER_SECOND);
+  });
+
+  it('gives a heading the run sheet drops a cue when asked', () => {
+    const rundown = withRule({ importAs: 'event' }, 'WELCOME & ANNOUNCEMENTS');
+    expect(titles(rundown)).toContain('WELCOME & ANNOUNCEMENTS');
+  });
+
+  it('drops the whole fold when its heading is left out', () => {
+    const rundown = withRule({ importAs: 'omit' }, 'PRAISE & WORSHIP');
+
+    expect(titles(rundown)).not.toContain('Praise & Worship');
+    // the songs are no longer folded into anything, so they stand on their own
+    expect(titles(rundown)).toContain('I Thank God');
+  });
+});

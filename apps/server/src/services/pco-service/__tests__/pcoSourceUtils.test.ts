@@ -473,8 +473,9 @@ describe('one plan as the import page lists it', () => {
     it('is imported rather than dropped with the other headings', () => {
       expect(row('SERVICE BRIEFING')?.disposition).toBe('event');
       expect(row('SERVICE BRIEFING')?.startsAt).toBe(8 * 3600_000 + 5 * 60_000);
-      // the headings that state no time still follow headersBecome
-      expect(row('PRAISE & WORSHIP')?.disposition).toBe('collapsed');
+      // the headings that state no time still follow headersBecome, except the one
+      // opening a fold, which is the event the fold makes
+      expect(row('PRAISE & WORSHIP')?.disposition).toBe('event');
       expect(row('WELCOME & ANNOUNCEMENTS')?.disposition).toBe('ignored');
     });
 
@@ -564,5 +565,60 @@ describe('one plan as the import page lists it', () => {
       expect(withRule({ importAs: 'omit' })).toBe('ignored');
       expect(withRule({ importAs: 'event' })).toBe('event');
     });
+  });
+});
+
+describe('a folded section on the import page', () => {
+  const rules: PcoRules = { ...defaultPcoRules, timezone: 'Pacific/Auckland' };
+  const days = groupPlanTimesByDay(centralAmPlanTimes, rules.timezone);
+  const sunday = days.find((day) => day.serviceTimes.length > 0);
+
+  const sheet = (overrides: Partial<PcoRules> = {}) =>
+    planSheetItems(centralAmItems, { ...rules, ...overrides }, '156118', sunday);
+  const row = (title: string) => sheet().find((entry) => entry.title === title);
+
+  it('reads the heading as the event, because that is what it becomes', () => {
+    expect(row('PRAISE & WORSHIP')?.disposition).toBe('event');
+  });
+
+  it('reads a folded song as left out, and says where its time went', () => {
+    const song = row('I Thank God');
+
+    expect(song?.disposition).toBe('collapsed');
+    expect(song?.alongside).toBe('Praise & Worship');
+  });
+
+  it('leaves the item a fold did not claim alone', () => {
+    // the MC moment is not a song, so the fold does not take it
+    expect(row('MC Moment')?.disposition).toBe('event');
+    expect(row('MC Moment')?.alongside).toBeNull();
+  });
+
+  it('takes a song out of the fold when a row asks for it as an event', () => {
+    const pulled = sheet({
+      serviceTypeRules: {
+        '156118': [
+          { name: 'I Thank God', match: { titleContains: 'I Thank God' }, effect: { importAs: 'event' } },
+        ],
+      },
+    });
+
+    expect(pulled.find((entry) => entry.title === 'I Thank God')?.disposition).toBe('event');
+    // and the rest of the set is still folded
+    expect(pulled.find((entry) => entry.title === 'Jesus Have It All')?.disposition).toBe('collapsed');
+  });
+
+  it('drops the whole fold when the heading is asked to be left out', () => {
+    const dropped = sheet({
+      serviceTypeRules: {
+        '156118': [
+          { name: 'PRAISE & WORSHIP', match: { titleContains: 'praise & worship' }, effect: { importAs: 'omit' } },
+        ],
+      },
+    });
+
+    expect(dropped.find((entry) => entry.title === 'PRAISE & WORSHIP')?.disposition).toBe('ignored');
+    // nothing is folded into a fold that no longer exists, so the songs stand on their own
+    expect(dropped.find((entry) => entry.title === 'I Thank God')?.disposition).toBe('event');
   });
 });

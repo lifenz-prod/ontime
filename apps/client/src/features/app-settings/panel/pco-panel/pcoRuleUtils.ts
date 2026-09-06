@@ -225,7 +225,9 @@ export const importAsLabels: Record<PcoItemImportAs, string> = {
  */
 export function importAsOf(disposition: PcoItemDisposition): PcoItemImportAs {
   if (disposition === 'block') return 'block';
-  if (disposition === 'ignored') return 'omit';
+  // folded and merged items get no cue of their own, which is what "leave out" says
+  // from the desk; their time is not lost, it is carried by the entry they went into
+  if (disposition === 'ignored' || disposition === 'collapsed' || disposition === 'merged') return 'omit';
   return 'event';
 }
 
