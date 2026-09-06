@@ -28,7 +28,28 @@ export const validatePcoRules = [
   body('preAnchor').isIn(['plan-time', 'back-from-service']),
   body('serviceNames').isArray(),
   body('headersBecome').isIn(['block', 'event', 'nothing']),
-  body('titleStrip').isString(),
+  // a list of patterns, or the single one it used to be
+  body('titleStrip').custom((value) => {
+    if (typeof value === 'string') {
+      return true;
+    }
+    if (Array.isArray(value) && value.every((pattern) => typeof pattern === 'string')) {
+      return true;
+    }
+    throw new Error('titleStrip must be a pattern or a list of patterns');
+  }),
+  body('normaliseTitleCase').isBoolean(),
+  body('titleWords')
+    .optional()
+    .custom((value) => {
+      if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        throw new Error('titleWords must be an object of word -> spelling');
+      }
+      if (!Object.values(value).every((spelling) => typeof spelling === 'string')) {
+        throw new Error('every titleWords spelling must be a string');
+      }
+      return true;
+    }),
   body('respectMasterExclusions').isBoolean(),
   body('fixedDurationCarriesForward').isBoolean(),
   body('collapseSections').isArray(),

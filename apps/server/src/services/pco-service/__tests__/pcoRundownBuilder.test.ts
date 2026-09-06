@@ -1169,7 +1169,7 @@ describe('the corrected rundown', () => {
     ['Welcome & Meet & Greet', at(9, 22), at(0, 1)],
     ['Fun', at(9, 23), at(0, 4)],
     ['Honour All Men', at(9, 27), at(0, 2)],
-    ["Father's Day VID", at(9, 29), at(0, 2)],
+    ["Father's Day Vid", at(9, 29), at(0, 2)],
     ['Message - LINK', at(9, 31), at(0, 40)],
     ['EOS Announcements', at(10, 11), at(0, 1)],
     ['End', at(10, 12), 0],
@@ -1327,5 +1327,46 @@ describe('a title the run sheet shouts', () => {
     });
 
     expect(titles(rundown)).toContain('SERVICE BRIEFING');
+  });
+});
+
+describe('what a run sheet carries and a timer screen does not', () => {
+  const titleAfterRules = (raw: string, overrides: Partial<PcoRules> = {}) => {
+    const rules = { ...shippedRules, ...overrides };
+    const only = [item('x-1', 1, raw, '1:00')];
+    return titles(buildRundownFromPlan({ plan, planTimes, items: only, itemTimes: [], rules }).rundown);
+  };
+
+  it('takes a video length off the title', () => {
+    // the sheet says how long the video runs; the event already holds that
+    expect(titleAfterRules("Father's Day VID (1:58)")).toContain("Father's Day Vid");
+  });
+
+  it('leaves a bracket that is not a length alone', () => {
+    expect(titleAfterRules('Message (Incl. Ministry & Altar Call)')).toContain(
+      'Message (Incl. Ministry & Altar Call)',
+    );
+  });
+
+  it('still takes the per-service suffix off, which was the first thing it stripped', () => {
+    expect(titleAfterRules('Doors Open // 9am')).toContain('Doors Open');
+  });
+
+  it('re-spells only the words it is told to', () => {
+    // both are a three letter word in caps inside a title that is not, and only one
+    // of them is short for something; no rule reads that off the letters
+    expect(titleAfterRules("Father's Day VID")).toContain("Father's Day Vid");
+    expect(titleAfterRules('EOS Announcements')).toContain('EOS Announcements');
+    expect(titleAfterRules('MC Moment')).toContain('MC Moment');
+  });
+
+  it('matches a word rather than a fragment of one', () => {
+    expect(titleAfterRules('Pre Service Video')).toContain('Pre Service Video');
+  });
+
+  it('can be given other spellings, and is not one shipped rule', () => {
+    expect(titleAfterRules('EOS Announcements', { titleWords: { EOS: 'End of Service' } })).toContain(
+      'End of Service Announcements',
+    );
   });
 });

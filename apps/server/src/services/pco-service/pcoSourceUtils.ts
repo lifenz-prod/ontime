@@ -20,7 +20,7 @@ import type {
 
 import { PcoError, planDateKey } from './PcoClient.js';
 import { localTimeOfDayMs } from './pcoTime.js';
-import { compileMatcher, matchesRule } from './pcoRules.js';
+import { matchesRule, respellWords, stripTitle } from './pcoRules.js';
 import {
   parseTitleTime,
   planSectionFolds,
@@ -241,11 +241,7 @@ export function ruleMatching(rules: PcoTimerRule[], candidate: PcoKnownItem): st
  * The most common spelling wins the label.
  */
 export function knownItemsFromPlans(plans: PcoItem[][], rules: PcoRules): PcoKnownItem[] {
-  const stripMatcher = rules.titleStrip ? new RegExp(rules.titleStrip, 'i') : null;
-  const normalise = (title: string): string => {
-    const stripped = stripMatcher ? title.replace(stripMatcher, '') : title;
-    return stripped.trim();
-  };
+  const normalise = (title: string): string => stripTitle(title, rules.titleStrip);
 
   type Tally = {
     labels: Map<string, number>;
@@ -403,7 +399,6 @@ export function planSheetItems(
 ): PcoPlanSheetItem[] {
   const scoped = scopeRulesToServiceType(rules, serviceTypeId);
   const ownRuleNames = new Set((rules.serviceTypeRules?.[serviceTypeId] ?? []).map((rule) => rule.name));
-  const stripMatcher = compileMatcher(scoped.titleStrip);
   const serviceStartOfDay = day?.serviceTimes[0]
     ? localTimeOfDayMs(day.serviceTimes[0].attributes.starts_at, scoped.timezone)
     : undefined;
@@ -494,8 +489,11 @@ export function planSheetItems(
     const sourceTitle = item.attributes.title ?? '';
     const itemType = item.attributes.item_type;
     const servicePosition = item.attributes.service_position;
-    const cleaned = (stripMatcher ? sourceTitle.replace(stripMatcher, '') : sourceTitle).trim();
-    const stripped = scoped.normaliseTitleCase ? toLeadingCapitals(cleaned) : cleaned;
+    const cleaned = stripTitle(sourceTitle, scoped.titleStrip);
+    const stripped = respellWords(
+      scoped.normaliseTitleCase ? toLeadingCapitals(cleaned) : cleaned,
+      scoped.titleWords,
+    );
 
     /**
      * A lengthless heading stating a time before the service is not dropped: it
@@ -510,7 +508,9 @@ export function planSheetItems(
     // cased again once the time is off it, for the same reason the builder does
     const withoutTime = titleWithoutTime(stripped);
     const title =
-      startsAt === null ? stripped : scoped.normaliseTitleCase ? toLeadingCapitals(withoutTime) : withoutTime;
+      startsAt === null
+        ? stripped
+        : respellWords(scoped.normaliseTitleCase ? toLeadingCapitals(withoutTime) : withoutTime, scoped.titleWords);
 
     const resolved = resolve(startsAt !== null ? title : sourceTitle, itemType, servicePosition);
 

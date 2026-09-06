@@ -400,8 +400,13 @@ What survives becomes an entry, and the rest of the file shapes it:
   anchor (`pre-start`, `service-start`, `service-end`) plus a signed offset. The
   settings panel owns the `pre-start` chain as a table of lengths and recomputes
   the offsets; entries on other anchors are left alone.
-- `titleStrip` — regex removed from every title, which is how
-  `Doors Open // 9am` becomes `Doors Open`.
+- `titleStrip` — patterns removed from every title: what the run sheet carries for
+  the people reading it and a timer screen has no use for. The shipped pair are the
+  per-service suffix, which is how `Doors Open // 9am` becomes `Doors Open`, and a
+  video's own running time, which is how `Father's Day VID (1:58)` loses the
+  `(1:58)`. A duration is matched as a clock inside brackets on purpose, so it
+  takes `(1:58)` and leaves `(Incl. Ministry & Altar Call)` alone. A bare string is
+  still read as a list of one.
 - `normaliseTitleCase` — give a title the run sheet SHOUTS leading capitals, so
   `PRAISE & WORSHIP` becomes `Praise & Worship`. A printed run sheet is scanned
   across a page and a rundown is read at a glance off a timer screen; the two do
@@ -409,6 +414,11 @@ What survives becomes an entry, and the rest of the file shapes it:
   touched, because a single lower case letter means somebody cased it on purpose
   and recasing it would spell `EOS Announcements` as `Eos Announcements`. A word
   glued to a digit is left alone for the same reason, so `8:05AM` survives.
+- `titleWords` — how a particular word is spelled, whatever the sheet does with it.
+  Casing cannot settle this on its own: `Father's Day VID` and `EOS Announcements`
+  are the same shape, and one is short for "video" while the other is said out loud.
+  Nothing reads that off the letters, so `VID` is named here and everything else is
+  left as the sheet writes it.
 - `respectMasterExclusions` — drop items PCO excludes from the master service, so
   the mirror is the only thing that generates the other service.
 - `serviceNames` — the block names, chronologically.

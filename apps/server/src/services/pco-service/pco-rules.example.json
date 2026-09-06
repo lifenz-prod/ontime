@@ -22,8 +22,9 @@
   "mergeIntoPrevious": [{ "titleContains": "online pre service message" }],
   "ignoreItems": [],
 
-  "titleStrip": "\\s*//\\s*\\d{1,2}\\s*(am|pm)\\s*$",
+  "titleStrip": ["\\s*//\\s*\\d{1,2}\\s*(am|pm)\\s*$", "\\s*\\(\\s*\\d{1,2}:\\d{2}\\s*\\)"],
   "normaliseTitleCase": true,
+  "titleWords": { "VID": "Vid" },
   "respectMasterExclusions": true,
   "fixedDurationCarriesForward": true,
 

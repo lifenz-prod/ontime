@@ -35,7 +35,7 @@ import { dayInMs, generateId } from 'ontime-utils';
 
 import { event as eventDef } from '../../models/eventsDefinition.js';
 
-import { compileMatcher, matchesRule } from './pcoRules.js';
+import { compileMatcher, matchesRule, respellWords, stripTitle } from './pcoRules.js';
 import { localDateKey, localDayLabel, localTimeOfDayMs } from './pcoTime.js';
 import type { PcoItem, PcoItemTime, PcoItemType, PcoPlan, PcoPlanTime, PcoServicePosition } from './pcoTypes.js';
 
@@ -299,11 +299,9 @@ export type SectionFolds = {
 export function planSectionFolds(sectionItems: PcoItem[], rules: PcoRules): SectionFolds {
   const opens = new Map<string, SectionFold>();
   const swallowed = new Set<string>();
-  const stripper = compileMatcher(rules.titleStrip);
   const titleOf = (item: PcoItem): string => {
-    const raw = item.attributes.title ?? '';
-    const stripped = (stripper ? raw.replace(stripper, '') : raw).trim();
-    return rules.normaliseTitleCase ? toLeadingCapitals(stripped) : stripped;
+    const stripped = stripTitle(item.attributes.title ?? '', rules.titleStrip);
+    return respellWords(rules.normaliseTitleCase ? toLeadingCapitals(stripped) : stripped, rules.titleWords);
   };
 
   for (let index = 0; index < sectionItems.length; index++) {
@@ -658,11 +656,9 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
   };
 
   const durationOf = (item: PcoItem): number => Math.max(0, (item.attributes.length ?? 0) * 1000);
-  const stripper = compileMatcher(rules.titleStrip);
   const titleOf = (item: PcoItem): string => {
-    const raw = item.attributes.title ?? '';
-    const stripped = (stripper ? raw.replace(stripper, '') : raw).trim();
-    return rules.normaliseTitleCase ? toLeadingCapitals(stripped) : stripped;
+    const stripped = stripTitle(item.attributes.title ?? '', rules.titleStrip);
+    return respellWords(rules.normaliseTitleCase ? toLeadingCapitals(stripped) : stripped, rules.titleWords);
   };
   const matchesAny = (matches: PcoRuleMatch[], item: PcoItem): boolean =>
     matches.some((match) => matchesRule(match, itemCandidate(item)));
@@ -829,7 +825,10 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
        * pass leaves it alone and only this one sees it for what it is.
        */
       const withoutTime = titleWithoutTime(titleOf(item));
-      const title = rules.normaliseTitleCase ? toLeadingCapitals(withoutTime) : withoutTime;
+      const title = respellWords(
+        rules.normaliseTitleCase ? toLeadingCapitals(withoutTime) : withoutTime,
+        rules.titleWords,
+      );
       derivedSteps.push({ id: item.id, title, note: '', start: stated, end: null });
     }
   }

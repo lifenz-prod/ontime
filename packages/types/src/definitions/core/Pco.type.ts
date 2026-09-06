@@ -243,7 +243,19 @@ export type PcoRules = {
    * master's variant survives the exclusion filter, so the suffix is noise by
    * the time it reaches the rundown. Empty string disables the cleanup.
    */
-  titleStrip: string;
+  /**
+   * Patterns removed from every title: what a run sheet carries for the people
+   * reading it and a timer screen has no use for.
+   *
+   * The shipped pair are the per-service suffix -- "Doors Open // 9am" alongside
+   * "Doors Open // 11am", where only the master's variant survives the exclusion
+   * filter anyway -- and a video's own running time, "Father's Day VID (1:58)".
+   * Applied in order, and a bare string is still read as a list of one.
+   *
+   * A duration is matched as a clock inside brackets on purpose, so it takes
+   * "(1:58)" and leaves "(Incl. Ministry & Altar Call)" alone.
+   */
+  titleStrip: string | string[];
   /**
    * Give a title the run sheet SHOUTS leading capitals.
    *
@@ -257,6 +269,18 @@ export type PcoRules = {
    * Announcements" into "Eos Announcements".
    */
   normaliseTitleCase: boolean;
+  /**
+   * How a particular word is spelled in a title, whatever the sheet does with it.
+   *
+   * Casing alone cannot settle this. "Father's Day VID" and "EOS Announcements" are
+   * the same shape -- a three letter word in caps inside a title that is not -- and
+   * one is short for "video" while the other is an acronym somebody says out loud.
+   * No rule reads that off the letters, so the ones that matter are named here and
+   * everything else is left exactly as the sheet writes it.
+   *
+   * Matched on whole words, case insensitively.
+   */
+  titleWords: Record<string, string>;
   /**
    * Drop items that PCO excludes from the master service time.
    *

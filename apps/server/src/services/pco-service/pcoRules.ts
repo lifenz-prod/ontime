@@ -65,8 +65,20 @@ export const defaultPcoRules: PcoRules = {
 
   ignoreItems: [],
 
-  titleStrip: '\\s*//\\s*\\d{1,2}\\s*(am|pm)\\s*$',
+  titleStrip: [
+    // "Doors Open // 9am" -> "Doors Open"
+    '\\s*//\\s*\\d{1,2}\\s*(am|pm)\\s*$',
+    // "Father's Day VID (1:58)" -> "Father's Day VID"
+    '\\s*\\(\\s*\\d{1,2}:\\d{2}\\s*\\)',
+  ],
   normaliseTitleCase: true,
+
+  /**
+   * "VID" is short for video, not an acronym, and a timer screen does not need it
+   * shouted. "EOS" is left alone deliberately: it is the same shape and is said out
+   * loud, which is the whole reason this is a list rather than a rule.
+   */
+  titleWords: { VID: 'Vid' },
   respectMasterExclusions: true,
 
   // the message can overrun, so nothing after it counts down to a wall clock time
@@ -158,6 +170,46 @@ export function compileMatcher(source: string | undefined): RegExp | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * A title with the run sheet's own annotations taken off it.
+ *
+ * `titleStrip` is a list because there is more than one kind of annotation and one
+ * regex holding all of them would be unreadable. A bare string is read as a list of
+ * one, so a file written before this stays valid.
+ */
+export function stripTitle(raw: string, patterns: string | string[]): string {
+  const list = Array.isArray(patterns) ? patterns : [patterns];
+
+  return list
+    .reduce((title, pattern) => {
+      const matcher = compileMatcher(pattern);
+      return matcher ? title.replace(matcher, '') : title;
+    }, raw)
+    .trim();
+}
+
+/**
+ * Re-spells the words named in `titleWords`, on whole words and case insensitively.
+ *
+ * Applied after the case pass, so it has the last word on anything it names.
+ */
+export function respellWords(title: string, words: Record<string, string>): string {
+  const entries = Object.entries(words ?? {});
+  if (entries.length === 0) {
+    return title;
+  }
+
+  return entries.reduce((current, [word, spelling]) => {
+    const matcher = compileMatcher(`(?<![\\p{L}\\p{N}])${escapeForRegex(word)}(?![\\p{L}\\p{N}])`);
+    return matcher ? current.replace(new RegExp(matcher.source, 'giu'), spelling) : current;
+  }, title);
+}
+
+/** a literal, so a word carrying a regex character cannot become a pattern */
+function escapeForRegex(literal: string): string {
+  return literal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 export function matchesRule(
