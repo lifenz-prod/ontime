@@ -19,7 +19,12 @@ import { describe, expect, it } from 'vitest';
 
 import { regenerateInstances } from '../../rundown-service/serviceInstanceUtils.js';
 import { defaultPcoRules } from '../pcoRules.js';
-import { buildRundownFromPlan, groupPlanTimesByDay, parseTitleTime } from '../pcoRundownBuilder.js';
+import {
+  buildRundownFromPlan,
+  groupPlanTimesByDay,
+  parseTitleTime,
+  toLeadingCapitals,
+} from '../pcoRundownBuilder.js';
 import { localTimeOfDayMs } from '../pcoTime.js';
 import type { PcoItem } from '../pcoTypes.js';
 
@@ -222,8 +227,8 @@ describe('the production run, read off the plan', () => {
       'Link Worship Record',
       'Worship Rehearsal',
       'Production Checks',
-      'SERVICE BRIEFING',
-      'BROADCAST BRIEF',
+      'Service Briefing',
+      'Broadcast Brief',
       'Prayer Meeting',
     ]);
   });
@@ -260,11 +265,11 @@ describe('the production run, read off the plan', () => {
   it('runs the briefs at the times their titles state, handing over to the run sheet', () => {
     const { rundown } = derived();
 
-    expect(eventNamed(rundown, 'SERVICE BRIEFING').timeStart).toBe(at(8, 5));
-    expect(eventNamed(rundown, 'SERVICE BRIEFING').timeEnd).toBe(at(8, 10));
-    expect(eventNamed(rundown, 'BROADCAST BRIEF').timeStart).toBe(at(8, 10));
+    expect(eventNamed(rundown, 'Service Briefing').timeStart).toBe(at(8, 5));
+    expect(eventNamed(rundown, 'Service Briefing').timeEnd).toBe(at(8, 10));
+    expect(eventNamed(rundown, 'Broadcast Brief').timeStart).toBe(at(8, 10));
     // the prayer meeting back-times to 8:20, and the brief ends exactly there
-    expect(eventNamed(rundown, 'BROADCAST BRIEF').timeEnd).toBe(at(8, 20));
+    expect(eventNamed(rundown, 'Broadcast Brief').timeEnd).toBe(at(8, 20));
     expect(eventNamed(rundown, 'Prayer Meeting').timeStart).toBe(at(8, 20));
   });
 
@@ -371,7 +376,7 @@ describe('the production run, read off the plan', () => {
       },
     });
 
-    expect(eventNamed(rundown, 'SERVICE BRIEFING').showAsAuxTimer).toBe(true);
+    expect(eventNamed(rundown, 'Service Briefing').showAsAuxTimer).toBe(true);
   });
 
   it('says so when the plan holds no rehearsal times to read', () => {
@@ -478,9 +483,11 @@ describe('sectioning', () => {
   it('turns every PCO header into an Ontime block', () => {
     const { rundown } = build();
     // the briefing header is absent by rule, see ignoreItems
-    for (const title of ['PRAISE & WORSHIP', 'WELCOME & ANNOUNCEMENTS', 'MESSAGE', 'END']) {
-      const found = rundown.find((entry) => titleOf(entry) === title);
-      expect(found && isOntimeBlock(found), `${title} should be a block`).toBe(true);
+    for (const title of ['Praise & Worship', 'Welcome & Announcements', 'Message', 'End']) {
+      // a block with that title, not the first entry carrying it: the sheet ends with
+      // a heading and an item both called End
+      const found = rundown.some((entry) => isOntimeBlock(entry) && titleOf(entry) === title);
+      expect(found, `${title} should be a block`).toBe(true);
     }
   });
 
@@ -760,7 +767,7 @@ describe('folding a section into one event', () => {
   it('replaces the section with a single event of its total length', () => {
     const { rundown } = folded();
     // 4:00 + 5:30 + 7:00 + 3:30 + 4:00 = 24:00
-    const worship = eventNamed(rundown, 'PRAISE & WORSHIP');
+    const worship = eventNamed(rundown, 'Praise & Worship');
 
     expect(worship.timeStart).toBe(at(9));
     expect(worship.duration).toBe(24 * MILLIS_PER_MINUTE);
@@ -781,13 +788,13 @@ describe('folding a section into one event', () => {
   });
 
   it('keeps the set list as the note', () => {
-    expect(eventNamed(folded().rundown, 'PRAISE & WORSHIP').note).toBe(
+    expect(eventNamed(folded().rundown, 'Praise & Worship').note).toBe(
       ['I Thank God', 'O Praise The Name (Anástasis)', 'Jesus Have It All', 'I Exalt Thee', 'MC Moment'].join('\n'),
     );
   });
 
   it('can be asked not to', () => {
-    expect(eventNamed(folded({ listContents: false }).rundown, 'PRAISE & WORSHIP').note).toBe('');
+    expect(eventNamed(folded({ listContents: false }).rundown, 'Praise & Worship').note).toBe('');
   });
 
   it('folds only the members a rule names, leaving the rest their own rows', () => {
@@ -874,10 +881,12 @@ describe('folding a section into one event', () => {
   });
 
   it('leaves a heading to the header rule when the fold swallows nothing after it', () => {
-    // nothing under the heading matches, so there is no fold and no empty event
+    // nothing under the heading matches, so there is no fold and no empty event: the
+    // heading follows headersBecome, which is a block in this configuration
     const { rundown } = folded({ title: 'Praise & Worship', membersMatch: { itemType: 'media' } });
+    const heading = rundown.find((entry) => titleOf(entry) === 'Praise & Worship');
 
-    expect(titles(rundown)).not.toContain('Praise & Worship');
+    expect(heading).toSatisfy(isOntimeBlock);
     expect(titles(rundown)).toContain('I Thank God');
   });
 
@@ -890,7 +899,7 @@ describe('folding a section into one event', () => {
       },
     });
 
-    expect(titles(rundown)).toContain('PRAISE & WORSHIP');
+    expect(titles(rundown)).toContain('Praise & Worship');
     expect(titles(rundown)).not.toContain('MESSAGE');
   });
 });
@@ -925,22 +934,24 @@ describe('merging an item into the one above it', () => {
 
 describe('what a heading becomes', () => {
   it('is a block by default in this configuration', () => {
-    expect(build().rundown.find((entry) => titleOf(entry) === 'MESSAGE')).toSatisfy(isOntimeBlock);
+    expect(build().rundown.find((entry) => titleOf(entry) === 'Message')).toSatisfy(isOntimeBlock);
   });
 
   it('can be dropped entirely', () => {
     const { rundown } = build({ rules: { ...rules, headersBecome: 'nothing' } });
 
-    for (const title of ['PRAISE & WORSHIP', 'WELCOME & ANNOUNCEMENTS', 'MESSAGE', 'END']) {
+    for (const title of ['Praise & Worship', 'Welcome & Announcements', 'Message']) {
       expect(titles(rundown)).not.toContain(title);
     }
+    // the sheet closes with a heading and an item both called End, so one survives
+    expect(titles(rundown).filter((title) => title === 'End')).toHaveLength(1);
     // dropping the headings moves nothing: they carry no length
     expect(eventNamed(rundown, 'I Thank God').timeStart).toBe(at(9));
   });
 
   it('can be an event, for a sheet whose headings carry length', () => {
     const { rundown } = build({ rules: { ...rules, headersBecome: 'event' } });
-    expect(rundown.find((entry) => titleOf(entry) === 'MESSAGE')).toSatisfy(isOntimeEvent);
+    expect(rundown.find((entry) => titleOf(entry) === 'Message')).toSatisfy(isOntimeEvent);
   });
 });
 
@@ -1142,8 +1153,8 @@ describe('the corrected rundown', () => {
     ['Worship Rehearsal', at(7, 20), at(0, 25)],
     ['Production Checks', at(7, 45), at(0, 20)],
     // the two times the opening headers claim, in their titles and nowhere else
-    ['SERVICE BRIEFING', at(8, 5), at(0, 5)],
-    ['LINK BRIEF', at(8, 10), at(0, 10)],
+    ['Service Briefing', at(8, 5), at(0, 5)],
+    ['Link Brief', at(8, 10), at(0, 10)],
     // the run sheet's own first item, which the briefs hand over to
     ['Prayer Meeting', at(8, 20), at(0, 25)],
     // -- 9AM SERVICE ---------------------------------------------------------
@@ -1260,7 +1271,7 @@ describe('a row asked for explicitly beats the rule that would claim it', () => 
 
   it('gives a heading the run sheet drops a cue when asked', () => {
     const rundown = withRule({ importAs: 'event' }, 'WELCOME & ANNOUNCEMENTS');
-    expect(titles(rundown)).toContain('WELCOME & ANNOUNCEMENTS');
+    expect(titles(rundown)).toContain('Welcome & Announcements');
   });
 
   it('drops the whole fold when its heading is left out', () => {
@@ -1269,5 +1280,52 @@ describe('a row asked for explicitly beats the rule that would claim it', () => 
     expect(titles(rundown)).not.toContain('Praise & Worship');
     // the songs are no longer folded into anything, so they stand on their own
     expect(titles(rundown)).toContain('I Thank God');
+  });
+});
+
+describe('a title the run sheet shouts', () => {
+  it('is given leading capitals', () => {
+    expect(toLeadingCapitals('PRAISE & WORSHIP')).toBe('Praise & Worship');
+    expect(toLeadingCapitals('SERVICE BRIEFING')).toBe('Service Briefing');
+    expect(toLeadingCapitals('WELCOME & ANNOUNCEMENTS')).toBe('Welcome & Announcements');
+    expect(toLeadingCapitals('END')).toBe('End');
+  });
+
+  it('leaves a title somebody cased deliberately alone', () => {
+    // the test that matters: recasing these would spell the acronyms wrong
+    expect(toLeadingCapitals('EOS Announcements')).toBe('EOS Announcements');
+    expect(toLeadingCapitals('MC Moment')).toBe('MC Moment');
+    expect(toLeadingCapitals('Just That Good *NEW')).toBe('Just That Good *NEW');
+    expect(toLeadingCapitals("Father's Day VID (1:58) // BROADCAST")).toBe("Father's Day VID (1:58) // BROADCAST");
+  });
+
+  it('leaves a word glued to a digit alone, so a meridiem keeps its case', () => {
+    expect(toLeadingCapitals('SERVICE BRIEFING 8:05AM')).toBe('Service Briefing 8:05AM');
+  });
+
+  it('reaches the rundown, not only the import page', () => {
+    const { rundown } = buildRundownFromPlan({ plan, planTimes, items, itemTimes, rules: shippedRules });
+
+    expect(titles(rundown)).toContain('Service Briefing');
+    expect(titles(rundown)).toContain('Broadcast Brief');
+    expect(titles(rundown)).not.toContain('SERVICE BRIEFING');
+  });
+
+  it('recases a brief whose lower case meridiem hid that it was shouting', () => {
+    // "BROADCAST BRIEF 8:10am" is not all caps until the time comes off it
+    const { rundown } = buildRundownFromPlan({ plan, planTimes, items, itemTimes, rules: shippedRules });
+    expect(titles(rundown)).toContain('Broadcast Brief');
+  });
+
+  it('can be turned off, for a sheet whose caps are meant', () => {
+    const { rundown } = buildRundownFromPlan({
+      plan,
+      planTimes,
+      items,
+      itemTimes,
+      rules: { ...shippedRules, normaliseTitleCase: false },
+    });
+
+    expect(titles(rundown)).toContain('SERVICE BRIEFING');
   });
 });

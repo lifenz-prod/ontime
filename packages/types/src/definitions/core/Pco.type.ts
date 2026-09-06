@@ -245,6 +245,19 @@ export type PcoRules = {
    */
   titleStrip: string;
   /**
+   * Give a title the run sheet SHOUTS leading capitals.
+   *
+   * Planning Center headings are written in caps -- "PRAISE & WORSHIP", "SERVICE
+   * BRIEFING", "END" -- because a printed run sheet is scanned across a page. A
+   * rundown is read at a glance off a timer screen and does not want the same
+   * typography.
+   *
+   * Only a title that is entirely upper case is touched; anything with a lower case
+   * letter in it was cased deliberately, and recasing it would turn "EOS
+   * Announcements" into "Eos Announcements".
+   */
+  normaliseTitleCase: boolean;
+  /**
    * Drop items that PCO excludes from the master service time.
    *
    * This matters: a plan holding both "Doors Open // 9am" and "Doors Open // 11am"

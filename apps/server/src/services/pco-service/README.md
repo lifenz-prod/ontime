@@ -402,6 +402,13 @@ What survives becomes an entry, and the rest of the file shapes it:
   the offsets; entries on other anchors are left alone.
 - `titleStrip` — regex removed from every title, which is how
   `Doors Open // 9am` becomes `Doors Open`.
+- `normaliseTitleCase` — give a title the run sheet SHOUTS leading capitals, so
+  `PRAISE & WORSHIP` becomes `Praise & Worship`. A printed run sheet is scanned
+  across a page and a rundown is read at a glance off a timer screen; the two do
+  not want the same typography. Only a title that is **entirely** upper case is
+  touched, because a single lower case letter means somebody cased it on purpose
+  and recasing it would spell `EOS Announcements` as `Eos Announcements`. A word
+  glued to a digit is left alone for the same reason, so `8:05AM` survives.
 - `respectMasterExclusions` — drop items PCO excludes from the master service, so
   the mirror is the only thing that generates the other service.
 - `serviceNames` — the block names, chronologically.

@@ -426,7 +426,7 @@ describe('one plan as the import page lists it', () => {
         'Link Worship Record',
         'Worship Rehearsal',
         'Production Checks',
-        'SERVICE BRIEFING',
+        'Service Briefing',
       ]);
     });
 
@@ -466,17 +466,17 @@ describe('one plan as the import page lists it', () => {
 
   describe('a heading whose title states a time', () => {
     it('is named as the entry will be named, so a rule written here reaches it', () => {
-      expect(row('SERVICE BRIEFING')?.sourceTitle).toBe('SERVICE BRIEFING 8:05AM');
-      expect(row('BROADCAST BRIEF')?.sourceTitle).toBe('BROADCAST BRIEF 8:10am');
+      expect(row('Service Briefing')?.sourceTitle).toBe('SERVICE BRIEFING 8:05AM');
+      expect(row('Broadcast Brief')?.sourceTitle).toBe('BROADCAST BRIEF 8:10am');
     });
 
     it('is imported rather than dropped with the other headings', () => {
-      expect(row('SERVICE BRIEFING')?.disposition).toBe('event');
-      expect(row('SERVICE BRIEFING')?.startsAt).toBe(8 * 3600_000 + 5 * 60_000);
+      expect(row('Service Briefing')?.disposition).toBe('event');
+      expect(row('Service Briefing')?.startsAt).toBe(8 * 3600_000 + 5 * 60_000);
       // the headings that state no time still follow headersBecome, except the one
       // opening a fold, which is the event the fold makes
-      expect(row('PRAISE & WORSHIP')?.disposition).toBe('event');
-      expect(row('WELCOME & ANNOUNCEMENTS')?.disposition).toBe('ignored');
+      expect(row('Praise & Worship')?.disposition).toBe('event');
+      expect(row('Welcome & Announcements')?.disposition).toBe('ignored');
     });
 
     it('takes a per-row choice like any other row', () => {
@@ -487,14 +487,14 @@ describe('one plan as the import page lists it', () => {
           ],
         },
       });
-      expect(omitted.find((entry) => entry.title === 'SERVICE BRIEFING')?.disposition).toBe('ignored');
+      expect(omitted.find((entry) => entry.title === 'Service Briefing')?.disposition).toBe('ignored');
     });
   });
 
   describe('the run sheet', () => {
     it('keeps the order Planning Center holds it in', () => {
       expect(titles().slice(11, 16)).toEqual([
-        'BROADCAST BRIEF',
+        'Broadcast Brief',
         'Prayer Meeting',
         'Doors Open',
         'Doors Open',
@@ -578,7 +578,7 @@ describe('a folded section on the import page', () => {
   const row = (title: string) => sheet().find((entry) => entry.title === title);
 
   it('reads the heading as the event, because that is what it becomes', () => {
-    expect(row('PRAISE & WORSHIP')?.disposition).toBe('event');
+    expect(row('Praise & Worship')?.disposition).toBe('event');
   });
 
   it('reads a folded song as left out, and says where its time went', () => {
@@ -617,7 +617,7 @@ describe('a folded section on the import page', () => {
       },
     });
 
-    expect(dropped.find((entry) => entry.title === 'PRAISE & WORSHIP')?.disposition).toBe('ignored');
+    expect(dropped.find((entry) => entry.title === 'Praise & Worship')?.disposition).toBe('ignored');
     // nothing is folded into a fold that no longer exists, so the songs stand on their own
     expect(dropped.find((entry) => entry.title === 'I Thank God')?.disposition).toBe('event');
   });

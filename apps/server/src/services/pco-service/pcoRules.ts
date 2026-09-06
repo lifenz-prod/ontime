@@ -66,6 +66,7 @@ export const defaultPcoRules: PcoRules = {
   ignoreItems: [],
 
   titleStrip: '\\s*//\\s*\\d{1,2}\\s*(am|pm)\\s*$',
+  normaliseTitleCase: true,
   respectMasterExclusions: true,
 
   // the message can overrun, so nothing after it counts down to a wall clock time

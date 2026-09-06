@@ -24,6 +24,7 @@ import { compileMatcher, matchesRule } from './pcoRules.js';
 import {
   parseTitleTime,
   planSectionFolds,
+  toLeadingCapitals,
   rehearsalSteps,
   resolveEffectFor,
   scopeRulesToServiceType,
@@ -493,7 +494,8 @@ export function planSheetItems(
     const sourceTitle = item.attributes.title ?? '';
     const itemType = item.attributes.item_type;
     const servicePosition = item.attributes.service_position;
-    const stripped = stripMatcher ? sourceTitle.replace(stripMatcher, '').trim() : sourceTitle.trim();
+    const cleaned = (stripMatcher ? sourceTitle.replace(stripMatcher, '') : sourceTitle).trim();
+    const stripped = scoped.normaliseTitleCase ? toLeadingCapitals(cleaned) : cleaned;
 
     /**
      * A lengthless heading stating a time before the service is not dropped: it
@@ -505,7 +507,10 @@ export function planSheetItems(
         ? parseTitleTime(sourceTitle)
         : null;
     const startsAt = stated !== null && (serviceStartOfDay === undefined || stated < serviceStartOfDay) ? stated : null;
-    const title = startsAt !== null ? titleWithoutTime(stripped) : stripped;
+    // cased again once the time is off it, for the same reason the builder does
+    const withoutTime = titleWithoutTime(stripped);
+    const title =
+      startsAt === null ? stripped : scoped.normaliseTitleCase ? toLeadingCapitals(withoutTime) : withoutTime;
 
     const resolved = resolve(startsAt !== null ? title : sourceTitle, itemType, servicePosition);
 
@@ -526,8 +531,13 @@ export function planSheetItems(
     rows.push({
       id: item.id,
       source: 'item',
-      // a rename applies to the entry, so it is what the row should be called
-      title: resolved.effect.title?.trim() || title,
+      /**
+       * What the entry will be called, in the order the build decides it: a fold
+       * names its own event, then a rename, then the item's own title. A row naming
+       * the item where the rundown will name the fold would be the page disagreeing
+       * with the import over the one thing a person reads first.
+       */
+      title: folds.opens.get(item.id)?.title || resolved.effect.title?.trim() || title,
       sourceTitle,
       itemType,
       servicePosition,

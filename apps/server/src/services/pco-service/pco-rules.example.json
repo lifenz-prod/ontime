@@ -23,6 +23,7 @@
   "ignoreItems": [],
 
   "titleStrip": "\\s*//\\s*\\d{1,2}\\s*(am|pm)\\s*$",
+  "normaliseTitleCase": true,
   "respectMasterExclusions": true,
   "fixedDurationCarriesForward": true,
 

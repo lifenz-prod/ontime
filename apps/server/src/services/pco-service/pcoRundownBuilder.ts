@@ -200,6 +200,25 @@ export function titleWithoutTime(title: string): string {
   return title.replace(/(\d{1,2})[:.](\d{2})\s*(am|pm)\b/i, '').trim() || title.trim();
 }
 
+/**
+ * A title the run sheet SHOUTS, given leading capitals.
+ *
+ * A run sheet is printed and scanned across a page; a rundown is read at a glance
+ * off a timer screen, and the two do not want the same typography. Planning Center
+ * headings are written in caps and the rundown does not have to be.
+ *
+ * Only a title that is **entirely** upper case is recased. A single lower case
+ * letter anywhere means somebody cased it deliberately, and recasing that would
+ * turn "EOS Announcements" into "Eos Announcements". A word glued to a digit is
+ * left alone for the same reason, so "8:05AM" does not become "8:05Am".
+ */
+export function toLeadingCapitals(title: string): string {
+  if (/\p{Ll}/u.test(title)) {
+    return title;
+  }
+  return title.replace(/(?<![\p{L}\p{N}])\p{L}[\p{L}']*/gu, (word) => word[0] + word.slice(1).toLowerCase());
+}
+
 /** a step of the production run, before it is given a duration */
 export type DerivedStep = {
   /** the plan time it came from, so the import page can key a row by it */
@@ -283,7 +302,8 @@ export function planSectionFolds(sectionItems: PcoItem[], rules: PcoRules): Sect
   const stripper = compileMatcher(rules.titleStrip);
   const titleOf = (item: PcoItem): string => {
     const raw = item.attributes.title ?? '';
-    return stripper ? raw.replace(stripper, '').trim() : raw;
+    const stripped = (stripper ? raw.replace(stripper, '') : raw).trim();
+    return rules.normaliseTitleCase ? toLeadingCapitals(stripped) : stripped;
   };
 
   for (let index = 0; index < sectionItems.length; index++) {
@@ -641,7 +661,8 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
   const stripper = compileMatcher(rules.titleStrip);
   const titleOf = (item: PcoItem): string => {
     const raw = item.attributes.title ?? '';
-    return stripper ? raw.replace(stripper, '').trim() : raw;
+    const stripped = (stripper ? raw.replace(stripper, '') : raw).trim();
+    return rules.normaliseTitleCase ? toLeadingCapitals(stripped) : stripped;
   };
   const matchesAny = (matches: PcoRuleMatch[], item: PcoItem): boolean =>
     matches.some((match) => matchesRule(match, itemCandidate(item)));
@@ -802,7 +823,14 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
       }
       timedHeaderIds.add(item.id);
       // the time was the title's only reason for carrying it; the entry sits there now
-      derivedSteps.push({ id: item.id, title: titleWithoutTime(titleOf(item)), note: '', start: stated, end: null });
+      /**
+       * Cased again after the time comes off. "BROADCAST BRIEF 8:10am" is not an
+       * all-caps title while it still carries a lower case meridiem, so the first
+       * pass leaves it alone and only this one sees it for what it is.
+       */
+      const withoutTime = titleWithoutTime(titleOf(item));
+      const title = rules.normaliseTitleCase ? toLeadingCapitals(withoutTime) : withoutTime;
+      derivedSteps.push({ id: item.id, title, note: '', start: stated, end: null });
     }
   }
 
