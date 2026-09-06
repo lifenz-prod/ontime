@@ -31,8 +31,19 @@ interface PcoRunSheetProps {
 
 const lengthLabel = (millis: number): string => (millis > 0 ? removeLeadingZero(millisToString(millis)) : '--');
 
-/** a time of day, for the heading whose title is the only record of when it happens */
-const clockLabel = (millis: number): string => millisToString(millis).slice(0, 5);
+/**
+ * The time of day a row starts.
+ *
+ * Seconds only when there are any. The production run sits on whole minutes and a
+ * column of "08:20:00" reads worse than "08:20", but the run sheet's own rows are
+ * laid out by adding up lengths and land wherever that puts them -- doors running
+ * 13:20 puts the video at 08:58:20, and rounding that off would be a lie the
+ * Length column beside it immediately contradicts.
+ */
+const clockLabel = (millis: number): string => {
+  const clock = millisToString(millis);
+  return clock.endsWith(':00') ? clock.slice(0, 5) : clock;
+};
 
 /**
  * What a row is doing instead of taking a cue of its own, and null when it has one.
@@ -123,6 +134,12 @@ function RunSheetRow({ item, isCustomised, ownEffect, onChange, onReset }: RunSh
         {item.source === 'item' && item.itemType === 'header' && <span className={style.badge}>heading</span>}
         {item.source === 'item' && item.servicePosition === 'pre' && <span className={style.badge}>pre-service</span>}
         {item.includedIn && <span className={style.muted}> · included in {item.includedIn}</span>}
+        {item.follows && <span className={style.muted}> · added after {item.follows}</span>}
+        {/* not a rule anybody set: PCO itself says this half of the pair is the other
+            service's, and the mirror is what generates that one */}
+        {item.excludedFrom && (
+          <span className={style.muted}> · not in {item.excludedFrom} in Planning Center</span>
+        )}
         {item.alongside && item.source === 'rehearsal' && (
           <span className={style.muted}> · alongside {item.alongside}</span>
         )}

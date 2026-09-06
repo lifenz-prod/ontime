@@ -12,6 +12,7 @@ import {
   EndAction,
   TimeStrategy,
   TimerType,
+  type PcoFollowOnRule,
   type PcoItemType,
   type PcoRuleMatch,
   type PcoRules,
@@ -90,6 +91,26 @@ export const defaultPcoRules: PcoRules = {
     match: '\\s*\\(\\s*incl\\.?\\s+(.+?)\\s*\\)',
     separator: '\\s*(?:&|,|\\band\\b)\\s*',
   },
+
+  /**
+   * The plan gives the prayer meeting the whole stretch from 8:20 to doors, because
+   * that is when the auditorium is spoken for. The room is only praying for the
+   * first ten minutes of it: the rest is the band clearing the stage and the doors
+   * team getting into place, and that changeover wants a cue of its own rather than
+   * one timer covering both halves.
+   *
+   * Holding the meeting rather than shortening it is what keeps doors where the
+   * sheet puts them -- the pre-service run back-times to the service, so time taken
+   * out of it would move the published doors time.
+   */
+  followOn: [
+    {
+      name: 'end of prayer meeting',
+      match: { titleContains: 'prayer meeting' },
+      title: 'End Of Prayer Meeting',
+      hold: 10 * 60 * 1000,
+    },
+  ],
   respectMasterExclusions: true,
 
   // the message can overrun, so nothing after it counts down to a wall clock time
@@ -249,6 +270,19 @@ export function splitIncludedParts(title: string, rule: PcoSplitRule | null): { 
     .map((part) => (/\p{Lu}/u.test(part) ? part : part.replace(/(?<![\p{L}\p{N}])\p{L}/gu, (c) => c.toUpperCase())));
 
   return { title: title.replace(matcher, '').trim(), parts };
+}
+
+/**
+ * The follow-on rule claiming an item, if any. First match wins, as everywhere else.
+ *
+ * Exported because the import page has to find the same rule the build will, or the
+ * page would list one row where the import makes two.
+ */
+export function followOnFor(
+  candidate: { title: string; itemType: PcoItemType; servicePosition: PcoServicePosition },
+  rules: PcoRules,
+): PcoFollowOnRule | null {
+  return rules.followOn?.find((rule) => matchesRule(rule.match, candidate)) ?? null;
 }
 
 export function matchesRule(

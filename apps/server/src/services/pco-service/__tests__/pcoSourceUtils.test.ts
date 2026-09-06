@@ -1,8 +1,8 @@
-import type { PcoPinnedServiceType, PcoRules } from 'ontime-types';
+import { isOntimeEvent, type PcoPinnedServiceType, type PcoRules } from 'ontime-types';
 import { describe, expect, it } from 'vitest';
 
 import { defaultPcoRules } from '../pcoRules.js';
-import { groupPlanTimesByDay } from '../pcoRundownBuilder.js';
+import { buildRundownFromPlan, groupPlanTimesByDay } from '../pcoRundownBuilder.js';
 import type { PcoItem, PcoPlan, PcoServiceType } from '../pcoTypes.js';
 import {
   findPinnedBySourceName,
@@ -19,9 +19,11 @@ import {
 
 import {
   items as centralAmItems,
+  itemTimes as centralAmItemTimes,
   plan as centralAmPlan,
   planTimes as centralAmPlanTimes,
 } from './fixtures/centralAm.js';
+import { items as fullItems, itemTimes as fullItemTimes } from './fixtures/centralAmFullSheet.js';
 
 const serviceType = (id: string, name: string): PcoServiceType => ({
   type: 'ServiceType',
@@ -408,7 +410,7 @@ describe('one plan as the import page lists it', () => {
   const sunday = days.find((day) => day.serviceTimes.length > 0);
 
   const sheet = (overrides: Partial<PcoRules> = {}, serviceTypeId = '156118') =>
-    planSheetItems(centralAmItems, { ...rules, ...overrides }, serviceTypeId, sunday);
+    planSheetItems(centralAmItems, { ...rules, ...overrides }, serviceTypeId, sunday, centralAmItemTimes);
 
   const titles = () => sheet().map((row) => row.title);
   const row = (title: string) => sheet().find((entry) => entry.title === title);
@@ -430,11 +432,9 @@ describe('one plan as the import page lists it', () => {
       ]);
     });
 
-    it('places each one on the clock, which the run sheet items cannot be', () => {
+    it('places each one on the clock', () => {
       expect(row('Service Sync')?.startsAt).toBe(6 * 3600_000 + 15 * 60_000);
       expect(row('Service Sync')?.duration).toBe(10 * 60_000);
-      // an item's place depends on the whole build, so the page does not claim one
-      expect(row('Prayer Meeting')?.startsAt).toBeNull();
     });
 
     it('opens with the lead-in, ending where the first rehearsal time starts', () => {
@@ -493,9 +493,11 @@ describe('one plan as the import page lists it', () => {
 
   describe('the run sheet', () => {
     it('keeps the order Planning Center holds it in', () => {
-      expect(titles().slice(11, 16)).toEqual([
+      expect(titles().slice(11, 17)).toEqual([
         'Broadcast Brief',
         'Prayer Meeting',
+        // the entry the follow-on rule adds, listed where the import will put it
+        'End Of Prayer Meeting',
         'Doors Open',
         'Doors Open',
         'Online Pre Service Message',
@@ -513,7 +515,18 @@ describe('one plan as the import page lists it', () => {
     });
 
     it('carries the length the plan states, in milliseconds', () => {
-      expect(row('Prayer Meeting')?.duration).toBe(25 * 60 * 1000);
+      expect(row('Doors Open')?.duration).toBe(13 * 60 * 1000 + 20 * 1000);
+    });
+
+    /**
+     * The held length, not the plan's. A page saying twenty-five minutes where the
+     * import makes ten would be the page disagreeing with the import over the one
+     * number a person checks.
+     */
+    it('shows a held item at the length it will be held to', () => {
+      expect(row('Prayer Meeting')?.duration).toBe(10 * 60 * 1000);
+      expect(row('End Of Prayer Meeting')?.duration).toBe(15 * 60 * 1000);
+      expect(row('End Of Prayer Meeting')?.follows).toBe('Prayer Meeting');
     });
   });
 
@@ -623,6 +636,61 @@ describe('a folded section on the import page', () => {
   });
 });
 
+describe('an item held to a length, on the import page', () => {
+  const rules: PcoRules = { ...defaultPcoRules, timezone: 'Pacific/Auckland' };
+  const meeting = (title: string, seconds = 1500): PcoItem => ({
+    type: 'Item',
+    id: 'p-1',
+    attributes: {
+      title,
+      description: '',
+      html_details: null,
+      length: seconds,
+      sequence: 1,
+      item_type: 'item',
+      service_position: 'pre',
+    },
+  });
+
+  const sheet = (overrides: Partial<PcoRules> = {}) =>
+    planSheetItems([meeting('Prayer Meeting')], { ...rules, ...overrides }, '156118');
+
+  it('lists the entry the rule adds, as the import makes one', () => {
+    expect(sheet().map((row) => [row.title, row.duration])).toEqual([
+      ['Prayer Meeting', 10 * 60 * 1000],
+      ['End Of Prayer Meeting', 15 * 60 * 1000],
+    ]);
+  });
+
+  it('says which row the added entry follows', () => {
+    const [meetingRow, endRow] = sheet();
+
+    expect(meetingRow.follows).toBeNull();
+    expect(endRow.follows).toBe('Prayer Meeting');
+    // and it takes the settings any entry takes, so the row's controls do something
+    expect(endRow.disposition).toBe('event');
+  });
+
+  it('adds nothing after a row the import is not making an entry for', () => {
+    const omitted = sheet({
+      serviceTypeRules: {
+        '156118': [
+          { name: 'Prayer Meeting', match: { titleContains: 'prayer meeting' }, effect: { importAs: 'omit' } },
+        ],
+      },
+    });
+
+    expect(omitted.map((row) => row.title)).toEqual(['Prayer Meeting']);
+    expect(omitted[0].disposition).toBe('ignored');
+  });
+
+  it('can be turned off, and then the row keeps the length the plan states', () => {
+    expect(sheet({ followOn: [] }).map((row) => [row.title, row.duration])).toEqual([
+      ['Prayer Meeting', 25 * 60 * 1000],
+    ]);
+  });
+});
+
 describe('an item that lists what it includes, on the import page', () => {
   const rules: PcoRules = { ...defaultPcoRules, timezone: 'Pacific/Auckland' };
   const message = (title: string): PcoItem => ({
@@ -673,5 +741,56 @@ describe('an item that lists what it includes, on the import page', () => {
     }, '156118');
 
     expect(omitted.map((row) => row.title)).toEqual(['Message']);
+  });
+});
+
+/**
+ * The page's whole job is to say what the import is about to do, so the two are
+ * asserted against each other on the real 23 August Central AM sheet rather than
+ * against numbers typed out twice.
+ *
+ * Sheet order and rundown order coincide here because the plan's timed headings are
+ * its first two items. A plan that stated a time halfway down its sheet would list
+ * that row where the sheet puts it and import it where the clock puts it, which this
+ * would catch as an ordering failure.
+ */
+describe('the import page and the import itself', () => {
+  const rules: PcoRules = { ...defaultPcoRules, timezone: 'Pacific/Auckland' };
+  const days = groupPlanTimesByDay(centralAmPlanTimes, rules.timezone);
+  const sunday = days.find((day) => day.serviceTimes.length > 0);
+
+  it('agree on the title, the clock time and the length of every entry', () => {
+    const built = buildRundownFromPlan({
+      plan: centralAmPlan,
+      planTimes: centralAmPlanTimes,
+      items: fullItems,
+      itemTimes: fullItemTimes,
+      rules,
+      serviceTypeId: '156118',
+    })
+      .rundown.filter(isOntimeEvent)
+      .map((event) => [event.title, event.timeStart, event.duration]);
+
+    const listed = planSheetItems(fullItems, rules, '156118', sunday, fullItemTimes)
+      .filter((row) => row.disposition === 'event')
+      .map((row) => [row.title, row.startsAt, row.duration]);
+
+    expect(listed).toEqual(built);
+    // and the fixture is worth something: an empty comparison would pass too
+    expect(listed.length).toBeGreaterThan(20);
+  });
+
+  it('keeps out of the master the half of a per-service pair PCO keeps out of it', () => {
+    const doors = planSheetItems(centralAmItems, rules, '156118', sunday, centralAmItemTimes).filter(
+      (row) => row.title === 'Doors Open',
+    );
+
+    expect(doors.map((row) => [row.sourceTitle, row.disposition])).toEqual([
+      ['Doors Open // 11am', 'ignored'],
+      ['Doors Open // 9am', 'event'],
+    ]);
+    expect(doors[0].excludedFrom).toBe('9AM SERVICE');
+    // and the one that is imported carries the online message merged into it
+    expect(doors[1].duration).toBe(13 * 60_000 + 20 * 1000);
   });
 });

@@ -46,6 +46,7 @@ export type {
   PcoCollapseRule,
   PcoCredentialSource,
   PcoCredentialsRequest,
+  PcoFollowOnRule,
   PcoHeaderHandling,
   PcoImportRequest,
   PcoImportResult,

@@ -140,6 +140,12 @@ A blank pattern is a decision rather than a failure, so it does not warn: PRE is
 then only the derived production run, and every PCO item is part of the master. A
 pattern that matches nothing still warns.
 
+An entry generated from the boundary item goes with it: a part it lists as
+included, or the entry a `followOn` rule adds after it. The shipped pair would get
+there anyway — `End Of Prayer Meeting` matches `prayer meeting` and the search
+takes the last match — and this is what stops that being load-bearing, so renaming
+the follow-on cannot put it on the service side for the mirror to duplicate.
+
 `preAnchor` decides where the pre-service run starts:
 
 - `back-from-service` (default) — how PCO itself works, and what the real sheet
@@ -251,8 +257,23 @@ listed and every row is editable.
 
 Only the build day's rehearsal times. A plan routinely carries a midweek rehearsal
 alongside the Sunday one, and a rundown is a single day: the Wednesday times belong
-to a morning this import is not building. A row the plan fixes on the clock shows
-its start; a run sheet item does not, because its place depends on the whole build.
+to a morning this import is not building.
+
+**Every row shows the clock time and length the import will give it**, laid out the
+way the build lays a section out: `pre` back-times as one run ending at the service
+start, `during` accumulates forward from it, `post` carries on after that. So the
+page has to agree with the builder about folds, merges, holds and per-service
+exclusions, not only about titles — a fold shows its whole section's length, doors
+shows the online message merged into it, and an item Planning Center keeps out of
+the master is marked and takes no time. `the import page and the import itself` in
+`pcoSourceUtils.test.ts` asserts the two against each other row by row on the real
+23 August sheet, which is what keeps them honest; it caught the pre-service run
+being handed over to at the wrong end when this was written.
+
+That makes the page worth reading before an import rather than only for editing. A
+plan whose per-service exclusions have not been set in Planning Center — both
+`Doors Open // 9am` and `Doors Open // 11am` still in the 9am — shows its whole
+pre-service run starting minutes early, which is exactly what the import would do.
 
 Each row says what the import will do with it and lets that be changed:
 
@@ -423,6 +444,14 @@ What survives becomes an entry, and the rest of the file shapes it:
   keeps the item's whole length and the parts follow it at nothing, for the stage
   producer to give a time to on the day or delete when the week does not need them.
   A part is resolved by title like any entry, so a rule can reach "Altar Call".
+- `followOn` — an entry added straight after a matched item, taking time the item
+  is held back from. `hold` is what the item is given and the entry that follows
+  takes the remainder, so the run's total is unchanged and nothing after it moves.
+  The shipped rule holds the prayer meeting to ten minutes and gives the rest of
+  its slot to `End Of Prayer Meeting`: the plan books the auditorium from 8:20 to
+  doors, but the room is only praying for the first ten minutes and the changeover
+  wants a cue of its own. An item the plan makes *shorter* than its hold keeps the
+  hold and warns, because a back-timed run lengthens at its start.
 - `titleWords` — how a particular word is spelled, whatever the sheet does with it.
   Casing cannot settle this on its own: `Father's Day VID` and `EOS Announcements`
   are the same shape, and one is short for "video" while the other is said out loud.

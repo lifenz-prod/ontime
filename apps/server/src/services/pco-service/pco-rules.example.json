@@ -26,6 +26,14 @@
   "normaliseTitleCase": true,
   "titleWords": { "VID": "Vid" },
   "splitIncluded": { "match": "\\s*\\(\\s*incl\\.?\\s+(.+?)\\s*\\)", "separator": "\\s*(?:&|,|\\band\\b)\\s*" },
+  "followOn": [
+    {
+      "name": "end of prayer meeting",
+      "match": { "titleContains": "prayer meeting" },
+      "title": "End Of Prayer Meeting",
+      "hold": 600000
+    }
+  ],
   "respectMasterExclusions": true,
   "fixedDurationCarriesForward": true,
 

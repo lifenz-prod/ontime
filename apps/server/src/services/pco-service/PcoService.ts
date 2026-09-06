@@ -550,7 +550,7 @@ export async function getPcoPlanSheet(serviceTypeId: string, planId: string, ref
       label: day.label,
       hasServices: day.serviceTimes.length > 0,
     })),
-    items: planSheetItems(entry.items, config.rules, serviceTypeId, buildDay),
+    items: planSheetItems(entry.items, config.rules, serviceTypeId, buildDay, entry.itemTimes),
   };
 }
 

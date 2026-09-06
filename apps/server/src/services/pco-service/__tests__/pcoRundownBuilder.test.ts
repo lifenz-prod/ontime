@@ -51,6 +51,7 @@ const rules: PcoRules = {
   preBoundaryTitleMatch: 'prayer meeting',
   collapseSections: [],
   mergeIntoPrevious: [],
+  followOn: [],
   deriveRehearsalTimes: false,
   deriveTimedHeaders: false,
   leadIn: null,
@@ -230,6 +231,8 @@ describe('the production run, read off the plan', () => {
       'Service Briefing',
       'Broadcast Brief',
       'Prayer Meeting',
+      // not a rehearsal time: the house rule that ends the meeting ten minutes in
+      'End Of Prayer Meeting',
     ]);
   });
 
@@ -1157,8 +1160,11 @@ describe('the corrected rundown', () => {
     // the two times the opening headers claim, in their titles and nowhere else
     ['Service Briefing', at(8, 5), at(0, 5)],
     ['Link Brief', at(8, 10), at(0, 10)],
-    // the run sheet's own first item, which the briefs hand over to
-    ['Prayer Meeting', at(8, 20), at(0, 25)],
+    // the run sheet's own first item, which the briefs hand over to. The plan books
+    // it for the whole 25 minutes to doors; the room prays for ten of them and the
+    // changeover takes the rest, so doors still open at 8:45
+    ['Prayer Meeting', at(8, 20), at(0, 10)],
+    ['End Of Prayer Meeting', at(8, 30), at(0, 15)],
     // -- 9AM SERVICE ---------------------------------------------------------
     // 13:20 is doors plus the online message merged into it
     ['Doors Open', at(8, 45), at(0, 13, 20)],
@@ -1212,7 +1218,8 @@ describe('the corrected rundown', () => {
     expect(blocks[0].title).toBe('9AM SERVICE');
 
     const index = boundaryIndexOf(result);
-    expect(titleOf(result.rundown[index - 1])).toBe('Prayer Meeting');
+    // the entry the follow-on adds belongs to PRE with the meeting it ends
+    expect(titleOf(result.rundown[index - 1])).toBe('End Of Prayer Meeting');
     expect(titleOf(result.rundown[index + 1])).toBe('Doors Open');
   });
 
@@ -1372,6 +1379,124 @@ describe('what a run sheet carries and a timer screen does not', () => {
     expect(titleAfterRules('EOS Announcements', { titleWords: { EOS: 'End of Service' } })).toContain(
       'End of Service Announcements',
     );
+  });
+});
+
+/**
+ * The shipped rule holds the prayer meeting to ten minutes and gives the rest of its
+ * slot to "End Of Prayer Meeting". The plan books the auditorium from 8:20 to doors,
+ * but the room only prays for the first ten minutes of it.
+ *
+ * The item is placed in `during` here so a single-item plan lays out from a known
+ * 9:00 and the assertions are about the pair rather than about back-timing, which
+ * "the corrected rundown" already covers on the real sheet.
+ */
+describe('an item held to a length, handing the rest to what follows', () => {
+  const held = (length: string, overrides: Partial<PcoRules> = {}) =>
+    buildRundownFromPlan({
+      plan,
+      planTimes,
+      items: [item('p-1', 1, 'Prayer Meeting', length)],
+      itemTimes: [],
+      rules: {
+        ...shippedRules,
+        deriveRehearsalTimes: false,
+        deriveTimedHeaders: false,
+        leadIn: null,
+        ...overrides,
+      },
+    });
+
+  const pair = (length: string, overrides: Partial<PcoRules> = {}) =>
+    held(length, overrides).rundown.filter(isOntimeEvent);
+
+  it('holds the item to the length the rule states and gives the rest to the entry after it', () => {
+    expect(pair('25:00').map((event) => [event.title, event.duration])).toEqual([
+      ['Prayer Meeting', 10 * MILLIS_PER_MINUTE],
+      ['End Of Prayer Meeting', 15 * MILLIS_PER_MINUTE],
+    ]);
+  });
+
+  it('leaves the run total alone, so nothing after it moves', () => {
+    const events = pair('25:00');
+
+    expect(events[0].timeStart).toBe(at(9));
+    expect(events[1].timeStart).toBe(at(9, 10));
+    // where the item on its own would have ended, which is where doors open
+    expect(events[1].timeEnd).toBe(at(9, 25));
+    expect(events[1].linkStart).toBe(events[0].id);
+  });
+
+  it('keeps the hold when the plan is shorter, and says so', () => {
+    const result = held('5:00');
+
+    expect(result.rundown.filter(isOntimeEvent).map((event) => event.duration)).toEqual([10 * MILLIS_PER_MINUTE, 0]);
+    // holding it to more than the plan gives lengthens the run, which is worth saying
+    expect(result.warnings.join('\n')).toMatch(/held to.*"Prayer Meeting"/);
+  });
+
+  it('adds a placeholder at nothing when the rule states no hold', () => {
+    const events = pair('25:00', {
+      followOn: [{ name: 'end of prayer meeting', match: { titleContains: 'prayer meeting' }, title: 'Stage Reset' }],
+    });
+
+    expect(events.map((event) => [event.title, event.duration])).toEqual([
+      ['Prayer Meeting', 25 * MILLIS_PER_MINUTE],
+      ['Stage Reset', 0],
+    ]);
+  });
+
+  it('does not report the entry it adds as a plan row with no length', () => {
+    const result = held('25:00', {
+      followOn: [{ name: 'end of prayer meeting', match: { titleContains: 'prayer meeting' }, title: 'Stage Reset' }],
+    });
+
+    expect(result.warnings.join('\n')).not.toMatch(/No length in Planning Center.*Stage Reset/);
+  });
+
+  it('lets a rule reach the entry it adds, which is why it resolves like any other', () => {
+    const { rundown } = held('25:00', {
+      timerRules: [
+        { name: 'end of prayer meeting', match: { titleContains: 'end of prayer' }, effect: { showAsAuxTimer: true } },
+      ],
+    });
+
+    expect(eventNamed(rundown, 'End Of Prayer Meeting').showAsAuxTimer).toBe(true);
+    expect(eventNamed(rundown, 'Prayer Meeting').showAsAuxTimer).toBe(false);
+  });
+
+  it('adds nothing to an item that was left out, or made a divider', () => {
+    const omitted = pair('25:00', {
+      timerRules: [{ name: 'no meeting', match: { titleContains: 'prayer meeting' }, effect: { importAs: 'omit' } }],
+    });
+    expect(omitted).toHaveLength(0);
+
+    const asBlock = held('25:00', {
+      timerRules: [{ name: 'divider', match: { titleContains: 'prayer meeting' }, effect: { importAs: 'block' } }],
+    });
+    // a block hands over no time, so there is nothing for a follow-on to take
+    expect(asBlock.rundown.filter(isOntimeEvent)).toHaveLength(0);
+    expect(titles(asBlock.rundown)).toContain('Prayer Meeting');
+  });
+
+  /**
+   * The shipped pair get this for free, since "End Of Prayer Meeting" matches the
+   * boundary pattern itself. Renaming it must not put it on the service side, where
+   * the dual-service mirror would generate a second one an hour later.
+   */
+  it('keeps the entry it adds on the PRE side of the boundary, whatever it is called', () => {
+    const result = held('25:00', {
+      followOn: [{ name: 'end of prayer meeting', match: { titleContains: 'prayer meeting' }, title: 'Stage Reset' }],
+    });
+
+    expect(titles(result.rundown)).toEqual(['Prayer Meeting', 'Stage Reset', '9AM SERVICE']);
+    expect(boundaryIndexOf(result)).toBe(2);
+  });
+
+  it('can be turned off', () => {
+    expect(pair('25:00', { followOn: [] }).map((event) => [event.title, event.duration])).toEqual([
+      ['Prayer Meeting', 25 * MILLIS_PER_MINUTE],
+    ]);
   });
 });
 

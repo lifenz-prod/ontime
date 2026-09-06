@@ -61,6 +61,11 @@ export const validatePcoRules = [
       }
       return true;
     }),
+  // absent is fine: mergePcoRules falls back to the shipped list
+  body('followOn').optional().isArray(),
+  body('followOn.*.name').isString().notEmpty(),
+  body('followOn.*.title').isString().notEmpty(),
+  body('followOn.*.hold').optional().isInt({ min: 0 }),
   body('respectMasterExclusions').isBoolean(),
   body('fixedDurationCarriesForward').isBoolean(),
   body('collapseSections').isArray(),

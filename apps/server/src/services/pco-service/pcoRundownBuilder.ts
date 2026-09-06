@@ -35,7 +35,7 @@ import { dayInMs, generateId } from 'ontime-utils';
 
 import { event as eventDef } from '../../models/eventsDefinition.js';
 
-import { compileMatcher, matchesRule, respellWords, splitIncludedParts, stripTitle } from './pcoRules.js';
+import { compileMatcher, followOnFor, matchesRule, respellWords, splitIncludedParts, stripTitle } from './pcoRules.js';
 import { localDateKey, localDayLabel, localTimeOfDayMs } from './pcoTime.js';
 import type { PcoItem, PcoItemTime, PcoItemType, PcoPlan, PcoPlanTime, PcoServicePosition } from './pcoTypes.js';
 
@@ -104,8 +104,13 @@ export function scopeRulesToServiceType(rules: PcoRules, serviceTypeId?: string)
 /* timezone helpers                                                            */
 /* -------------------------------------------------------------------------- */
 
-/** keeps a time of day inside a single day */
-function wrapTimeOfDay(ms: number): number {
+/**
+ * Keeps a time of day inside a single day.
+ *
+ * Exported because the import page lays the same run sheet on the same clock, and a
+ * morning that starts before midnight has to wrap there too.
+ */
+export function wrapTimeOfDay(ms: number): number {
   return ((ms % dayInMs) + dayInMs) % dayInMs;
 }
 
@@ -653,6 +658,13 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
     isBlock: boolean;
     /** every item this accounts for, which is what scopes the divergence report */
     itemIds: string[];
+    /**
+     * Generated from the entry above rather than from a row of its own: a part an
+     * item lists as included, or the entry a follow-on rule adds after it. Where the
+     * one it came from goes, it goes -- which is what keeps the PRE boundary from
+     * landing between them.
+     */
+    attached?: boolean;
   };
 
   const durationOf = (item: PcoItem): number => Math.max(0, (item.attributes.length ?? 0) * 1000);
@@ -665,6 +677,8 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
 
   const zeroLength: string[] = [];
   const strandedMerges: string[] = [];
+  /** items the plan makes shorter than the length a follow-on rule holds them to */
+  const shortHolds: string[] = [];
   /** items folded into the entry above them, which the divergence report leaves alone */
   const mergedItemIds = new Set<string>();
   /** generated entry id -> the PCO items behind it */
@@ -743,13 +757,26 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
        * not need them.
        */
       const split = splitIncludedParts(titleOf(item), rules.splitIncluded);
+      const isBlockUnit = effect.importAs ? effect.importAs === 'block' : isHeader && rules.headersBecome === 'block';
+
+      /**
+       * An item held to a length the sheet does not give it hands what is left to the
+       * entry that follows it, so the run's total is unchanged and nothing after it
+       * moves. A block takes no follow-on: there would be no time to hand over.
+       */
+      const follow = isBlockUnit ? null : followOnFor(itemCandidate(item), rules);
+      const full = durationOf(item);
+      const held = follow?.hold ?? full;
+      if (follow?.hold !== undefined && full < follow.hold) {
+        shortHolds.push(titleOf(item) || 'untitled');
+      }
 
       units.push({
         title: split.title,
         note: item.attributes.description ?? '',
-        duration: durationOf(item),
+        duration: held,
         effect,
-        isBlock: effect.importAs ? effect.importAs === 'block' : isHeader && rules.headersBecome === 'block',
+        isBlock: isBlockUnit,
         itemIds: [item.id],
       });
 
@@ -763,7 +790,26 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
           isBlock: false,
           // no item of its own: the divergence report describes the row it came from
           itemIds: [],
+          attached: true,
         });
+      }
+
+      if (follow) {
+        const followEffect = {
+          ...resolveEffectFor({ title: follow.title, itemType: 'item', servicePosition }, rules).effect,
+          ...follow.effect,
+        };
+        if (followEffect.importAs !== 'omit') {
+          units.push({
+            title: follow.title,
+            note: '',
+            duration: Math.max(0, full - held),
+            effect: followEffect,
+            isBlock: false,
+            itemIds: [],
+            attached: true,
+          });
+        }
       }
     }
 
@@ -781,6 +827,9 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
 
   type Positioned = { sortKey: number; entry: OntimeRundownEntry };
 
+  /** entries generated from the one above them, which travel with it */
+  const attachedEntryIds = new Set<string>();
+
   const layOutUnits = (units: BuildUnit[], start: number): { entries: Positioned[]; end: number } => {
     const entries: Positioned[] = [];
     let cursor = start;
@@ -795,7 +844,9 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
         continue;
       }
 
-      if (unit.duration === 0) {
+      // an attached entry is zero because we made it zero; only the plan's own
+      // lengthless rows are worth reporting
+      if (unit.duration === 0 && !unit.attached) {
         zeroLength.push(unit.title || 'untitled');
       }
       const event = makeEvent({
@@ -806,6 +857,9 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
         effect: unit.effect,
       });
       entryToItems.set(event.id, unit.itemIds);
+      if (unit.attached) {
+        attachedEntryIds.add(event.id);
+      }
       entries.push({ sortKey: cursor, entry: event });
       cursor += unit.duration;
     }
@@ -904,6 +958,14 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
   if (zeroLength.length > 0) {
     warnings.push(`No length in Planning Center, imported as 0:00: ${zeroLength.map((t) => `"${t}"`).join(', ')}.`);
   }
+  if (shortHolds.length > 0) {
+    // holding an item to more than the plan gives it lengthens the run, and a
+    // back-timed pre-service run lengthens at its start
+    warnings.push(
+      `Shorter in Planning Center than the length they are held to, so the run starts earlier: ` +
+        `${shortHolds.map((title) => `"${title}"`).join(', ')}.`,
+    );
+  }
 
   /* --- split PRE from the master section ----------------------------------- */
 
@@ -922,6 +984,19 @@ export function buildRundownFromPlan(input: PcoBuildInput): PcoBuildResult {
       }
     }
   }
+  /**
+   * An entry generated from the boundary item goes where the boundary item goes: a
+   * part it lists as included, or the entry a follow-on rule adds after it.
+   *
+   * The shipped pair get there anyway, since "End Of Prayer Meeting" matches
+   * /prayer meeting/i and the search takes the last match. This is what stops that
+   * being load-bearing: rename the follow-on and it still belongs to PRE, rather
+   * than crossing the boundary and having the mirror generate a second one at 10:20.
+   */
+  while (preEndIndex !== -1 && attachedEntryIds.has(allPositioned[preEndIndex + 1]?.entry.id ?? '')) {
+    preEndIndex += 1;
+  }
+
   if (preEndIndex === -1 && rules.preBoundaryTitleMatch) {
     warnings.push(
       `No item matched the PRE boundary /${rules.preBoundaryTitleMatch}/i, so every item was treated as part of the service section.`,

@@ -68,6 +68,31 @@ export type PcoSplitRule = {
   separator: string;
 };
 
+/**
+ * An entry added straight after a matched item, taking time the item was held back
+ * from.
+ *
+ * The prayer meeting is the case this exists for. The plan gives it the whole
+ * stretch from 8:20 to doors, but the room is only praying for the first ten
+ * minutes of it; the rest is the band clearing the stage and the doors team getting
+ * into place, and the person calling the morning wants a cue on that changeover
+ * rather than one timer covering both.
+ *
+ * `hold` is what the item is given, and the entry that follows takes the remainder,
+ * so the run's total is unchanged and nothing after it moves. Without a `hold` the
+ * entry is added at nothing, a placeholder to give a time to on the day.
+ */
+export type PcoFollowOnRule = {
+  /** label shown in the settings panel and in import warnings, not matched against anything */
+  name: string;
+  match: PcoRuleMatch;
+  /** what the added entry is called */
+  title: string;
+  /** milliseconds the matched item is held to; absent leaves its own length alone */
+  hold?: number;
+  effect?: PcoRuleEffect;
+};
+
 /** what an item becomes, when a rule decides it rather than the item's kind */
 export type PcoItemImportAs =
   /** a timed event of its own */
@@ -309,6 +334,16 @@ export type PcoRules = {
    */
   splitIncluded: PcoSplitRule | null;
   /**
+   * Entries added after an item, taking time the item is held back from.
+   *
+   * The shipped rule holds the prayer meeting to ten minutes and gives the rest of
+   * its slot to "End Of Prayer Meeting", so the changeover between praying and doors
+   * has a cue of its own. The total is unchanged, so doors still open when the sheet
+   * says. An item shorter than its hold keeps the hold and warns, since that does
+   * move the run's start.
+   */
+  followOn: PcoFollowOnRule[];
+  /**
    * Drop items that PCO excludes from the master service time.
    *
    * This matters: a plan holding both "Doors Open // 9am" and "Doors Open // 11am"
@@ -532,12 +567,16 @@ export type PcoPlanSheetItem = {
   /** milliseconds, as the plan states it */
   duration: number;
   /**
-   * Milliseconds since midnight, for the rows the plan fixes on the clock: a
-   * rehearsal time, the lead-in before it, and a heading whose title states a time.
+   * Milliseconds since midnight: where the row lands once the whole morning is laid
+   * out, which is what the import will give it.
    *
-   * Null for an ordinary run sheet item, whose place depends on the whole build --
-   * the pre-service run back-times to the service, so nothing before it is known
-   * until every length is in.
+   * Some rows the plan fixes directly -- a rehearsal time, the lead-in before it, a
+   * heading whose title states a time. The run sheet's own rows are placed the way
+   * the build places them: the pre-service run back-times to the service start,
+   * `during` accumulates forward from it, and `post` carries on after that.
+   *
+   * Null only when no day was resolved, since nothing can be placed without a
+   * service time to place it against.
    */
   startsAt: number | null;
   /** what the import will do with it as the rules stand */
@@ -557,6 +596,19 @@ export type PcoPlanSheetItem = {
    * includes. Null for a row the run sheet holds in its own right.
    */
   includedIn?: string | null;
+  /**
+   * The item this row was added after, for an entry a `followOn` rule creates. Null
+   * for a row the run sheet holds in its own right.
+   */
+  follows?: string | null;
+  /**
+   * The service this item is excluded from in Planning Center, for one half of a
+   * per-service pair -- a plan routinely holds "Doors Open // 9am" and
+   * "Doors Open // 11am" as two items, each excluded from the other's time. Only the
+   * master's half is imported; the mirror generates the rest, so importing both
+   * would double them. Null for a row that belongs to every service.
+   */
+  excludedFrom?: string | null;
   /** everything the row's controls edit, already resolved through the rules */
   effect: PcoRuleEffect;
 };

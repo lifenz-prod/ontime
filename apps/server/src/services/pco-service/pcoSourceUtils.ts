@@ -20,8 +20,9 @@ import type {
 
 import { PcoError, planDateKey } from './PcoClient.js';
 import { localTimeOfDayMs } from './pcoTime.js';
-import { matchesRule, respellWords, splitIncludedParts, stripTitle } from './pcoRules.js';
+import { followOnFor, matchesRule, respellWords, splitIncludedParts, stripTitle } from './pcoRules.js';
 import {
+  buildExclusionLookup,
   parseTitleTime,
   planSectionFolds,
   toLeadingCapitals,
@@ -29,10 +30,11 @@ import {
   resolveEffectFor,
   scopeRulesToServiceType,
   titleWithoutTime,
+  wrapTimeOfDay,
   type PcoPlanDay,
   type SectionFold,
 } from './pcoRundownBuilder.js';
-import type { PcoItem, PcoPlan, PcoServiceType } from './pcoTypes.js';
+import type { PcoItem, PcoItemTime, PcoPlan, PcoServicePosition as PcoItemPosition, PcoServiceType } from './pcoTypes.js';
 
 /** the parts of the configuration that identify a service type */
 export type ServiceTypeSelector = {
@@ -396,12 +398,23 @@ export function planSheetItems(
   serviceTypeId: string,
   /** the day the rundown will be built for; without it only the run sheet is listed */
   day?: PcoPlanDay,
+  /**
+   * The plan's ItemTimes, which is how Planning Center says an item belongs to one
+   * service and not the other. Without them the page lists both halves of a
+   * per-service pair as if the import kept both, and the clock it lays them on is
+   * wrong by the length of the one the import drops.
+   */
+  itemTimes: PcoItemTime[] = [],
 ): PcoPlanSheetItem[] {
   const scoped = scopeRulesToServiceType(rules, serviceTypeId);
   const ownRuleNames = new Set((rules.serviceTypeRules?.[serviceTypeId] ?? []).map((rule) => rule.name));
-  const serviceStartOfDay = day?.serviceTimes[0]
-    ? localTimeOfDayMs(day.serviceTimes[0].attributes.starts_at, scoped.timezone)
-    : undefined;
+  const masterTime = day?.serviceTimes[0];
+  const serviceStartOfDay = masterTime ? localTimeOfDayMs(masterTime.attributes.starts_at, scoped.timezone) : undefined;
+
+  const exclusions = buildExclusionLookup(itemTimes);
+  /** kept out of the master service by Planning Center, so the mirror generates it instead */
+  const excludedFromMaster = (item: PcoItem): boolean =>
+    scoped.respectMasterExclusions && masterTime !== undefined && exclusions.isExcludedFrom(item.id, masterTime.id);
 
   /** the shared half of a row: how the rules resolve a title */
   const resolve = (title: string, itemType: PcoItemType, servicePosition: PcoServicePosition) => {
@@ -437,22 +450,29 @@ export function planSheetItems(
     });
   }
 
-  for (let index = 0; index < steps.length; index++) {
-    const step = steps[index];
-    // the same rule the builder uses: a step runs until the plan says it ends
-    const duration = Math.max(0, (step.end ?? steps[index + 1]?.start ?? step.start) - step.start);
-    rows.push({
+  /**
+   * The production run, whose rows are placed by the plan rather than by the run
+   * sheet's own clock. A step the plan gave no end to runs until whatever happens
+   * next -- and the last of them until the run sheet's first item, which is not known
+   * until every length below is in. So they are collected here and timed at the end.
+   */
+  const derived: { row: PcoPlanSheetItem; start: number; end: number | null }[] = [];
+
+  for (const step of steps) {
+    const row: PcoPlanSheetItem = {
       id: step.id,
       source: 'rehearsal',
       title: step.title,
       sourceTitle: step.title,
       itemType: 'item',
       servicePosition: 'pre',
-      duration,
+      duration: 0,
       startsAt: step.start,
       alongside: step.note || null,
       ...resolve(step.title, 'item', 'pre'),
-    });
+    };
+    rows.push(row);
+    derived.push({ row, start: step.start, end: step.end });
   }
 
   /* --- the run sheet -------------------------------------------------------- */
@@ -485,15 +505,19 @@ export function planSheetItems(
     return undefined;
   };
 
+  /** how far each row moves the run sheet's clock, which is not always its own length */
+  const placed: { row: PcoPlanSheetItem; position: PcoItemPosition; advance: number }[] = [];
+  /** the last row of each group that takes a cue, which is what a merge hands its time to */
+  const absorbing = new Map<PcoItemPosition, PcoPlanSheetItem>();
+  const lengthOf = (candidate: PcoItem): number => Math.max(0, (candidate.attributes.length ?? 0) * 1000);
+  const masterName = masterTime ? (scoped.serviceNames[0] ?? masterTime.attributes.name ?? 'the first service') : '';
+
   for (const item of ordered) {
     const sourceTitle = item.attributes.title ?? '';
     const itemType = item.attributes.item_type;
     const servicePosition = item.attributes.service_position;
     const cleaned = stripTitle(sourceTitle, scoped.titleStrip);
-    const stripped = respellWords(
-      scoped.normaliseTitleCase ? toLeadingCapitals(cleaned) : cleaned,
-      scoped.titleWords,
-    );
+    const stripped = respellWords(scoped.normaliseTitleCase ? toLeadingCapitals(cleaned) : cleaned, scoped.titleWords);
 
     /**
      * A lengthless heading stating a time before the service is not dropped: it
@@ -512,14 +536,19 @@ export function planSheetItems(
         ? stripped
         : respellWords(scoped.normaliseTitleCase ? toLeadingCapitals(withoutTime) : withoutTime, scoped.titleWords);
 
-    const resolved = resolve(startsAt !== null ? title : sourceTitle, itemType, servicePosition);
+    /** the title the rules see, which is the entry's own once a timed heading is read */
+    const ruleTitle = startsAt !== null ? title : sourceTitle;
+    const resolved = resolve(ruleTitle, itemType, servicePosition);
+    const excluded = excludedFromMaster(item);
 
     /**
-     * What the build will do with this row, in the order the build decides it: a
-     * fold claims an item first, then a timed heading is imported whatever its kind
-     * would otherwise make it, then the ordinary rules.
+     * What the build will do with this row, in the order the build decides it: an
+     * item Planning Center keeps out of the master never gets there at all, then a
+     * fold claims one, then a timed heading is imported whatever its kind would
+     * otherwise make it, then the ordinary rules.
      */
     const dispositionOfRow = (): PcoItemDisposition => {
+      if (excluded) return 'ignored';
       // the heading that opens a fold IS the event: it carries the section's time and
       // takes every setting an event takes, so the row says so rather than "folded"
       if (folds.opens.has(item.id)) return 'event';
@@ -528,9 +557,32 @@ export function planSheetItems(
       return resolved.disposition;
     };
 
+    const disposition = dispositionOfRow();
     const split = splitIncludedParts(title, scoped.splitIncluded);
+    const fold = folds.opens.get(item.id);
 
-    rows.push({
+    /**
+     * A follow-on holds the item to a length the sheet does not give it, so the row
+     * has to show the held length rather than the plan's -- otherwise the page says
+     * the prayer meeting is twenty-five minutes and the import makes it ten. A fold
+     * never takes one: the build claims it before it ever gets that far.
+     */
+    const follow =
+      disposition === 'event' && !fold
+        ? followOnFor({ title: ruleTitle, itemType, servicePosition }, scoped)
+        : null;
+    const full = lengthOf(item);
+
+    /**
+     * What the entry will be, and what the row moves the clock by. The two differ
+     * wherever a row accounts for time that is not its own: a fold shows its whole
+     * section and moves the clock only by its own length, because its members move it
+     * by theirs. A row that never reaches the rundown moves it by nothing.
+     */
+    const shown = fold ? fold.members.reduce((total, member) => total + lengthOf(member), 0) : (follow?.hold ?? full);
+    const advance = disposition === 'ignored' || startsAt !== null ? 0 : fold ? full : shown;
+
+    const row: PcoPlanSheetItem = {
       id: item.id,
       source: 'item',
       /**
@@ -539,17 +591,42 @@ export function planSheetItems(
        * the item where the rundown will name the fold would be the page disagreeing
        * with the import over the one thing a person reads first.
        */
-      title: folds.opens.get(item.id)?.title || resolved.effect.title?.trim() || split.title,
+      title: fold?.title || resolved.effect.title?.trim() || split.title,
       sourceTitle,
       itemType,
       servicePosition,
-      duration: Math.max(0, (item.attributes.length ?? 0) * 1000),
+      duration: shown,
       startsAt,
       alongside: folds.swallowed.has(item.id) ? (foldTitleFor(item.id) ?? null) : null,
       includedIn: null,
+      follows: null,
+      excludedFrom: excluded ? masterName : null,
       ...resolved,
-      disposition: dispositionOfRow(),
-    });
+      disposition,
+    };
+
+    rows.push(row);
+    placed.push({ row, position: servicePosition, advance });
+
+    // a heading read as a time of its own is part of the production run, not the run
+    // sheet: it is timed by what follows it, exactly as a rehearsal time is
+    if (startsAt !== null) {
+      derived.push({ row, start: startsAt, end: null });
+    }
+
+    /**
+     * A merged item gives its length to the entry above it, so that entry is longer
+     * than the plan states -- doors plus the online message it carries. The page has
+     * to say so, or its own times will not add up on the screen.
+     */
+    if (disposition === 'merged') {
+      const previous = absorbing.get(servicePosition);
+      if (previous) {
+        previous.duration += full;
+      }
+    } else if (disposition === 'event' || disposition === 'block') {
+      absorbing.set(servicePosition, row);
+    }
 
     /**
      * The parts an item says it includes are entries of their own, so they are rows
@@ -557,9 +634,9 @@ export function planSheetItems(
      * would list one row where the import makes three, which is the one thing it
      * must never do.
      */
-    if (dispositionOfRow() === 'event') {
+    if (disposition === 'event') {
       for (const part of split.parts) {
-        rows.push({
+        const partRow: PcoPlanSheetItem = {
           id: `${item.id}:${part}`,
           source: 'item',
           title: part,
@@ -570,9 +647,99 @@ export function planSheetItems(
           startsAt: null,
           alongside: null,
           includedIn: split.title,
+          follows: null,
+          excludedFrom: null,
           ...resolve(part, 'item', servicePosition),
-        });
+        };
+        rows.push(partRow);
+        placed.push({ row: partRow, position: servicePosition, advance: 0 });
       }
+    }
+
+    /**
+     * The entry a follow-on rule adds is a row of its own, taking the time the item
+     * was held back from. Listing one row where the import makes two is the one thing
+     * this page must never do.
+     */
+    if (follow) {
+      const resolvedFollow = resolve(follow.title, 'item', servicePosition);
+      const effect = { ...resolvedFollow.effect, ...follow.effect };
+      const remainder = Math.max(0, full - (follow.hold ?? full));
+      const followRow: PcoPlanSheetItem = {
+        id: `${item.id}:follows`,
+        source: 'item',
+        title: follow.title,
+        sourceTitle: follow.title,
+        itemType: 'item',
+        servicePosition,
+        duration: remainder,
+        startsAt: null,
+        alongside: null,
+        includedIn: null,
+        follows: split.title,
+        excludedFrom: null,
+        ...resolvedFollow,
+        effect,
+        disposition: effect.importAs ? dispositionFromImportAs(effect.importAs) : resolvedFollow.disposition,
+      };
+      rows.push(followRow);
+      placed.push({ row: followRow, position: servicePosition, advance: remainder });
+    }
+  }
+
+  /* --- the run sheet on the clock -------------------------------------------
+   * Exactly how the build places a section: `pre` is one contiguous run ending at
+   * the service start, `during` accumulates forward from it, and `post` carries on
+   * where `during` finishes. Laying them out any other way would put times on the
+   * page that the import is not going to produce.
+   *
+   * Without a day there is no service time to place anything against, so the run
+   * sheet rows keep the blank they have always had.
+   */
+
+  if (serviceStartOfDay !== undefined) {
+    const totalOf = (position: PcoItemPosition): number =>
+      placed.reduce((total, entry) => (entry.position === position ? total + entry.advance : total), 0);
+
+    // a rehearsal time that has become an entry of its own cannot also be what the
+    // run sheet hangs off, which is the rule the build anchors by
+    const preAnchorTime = day?.otherTimes.find(
+      (time) => !(scoped.deriveRehearsalTimes && time.attributes.time_type === 'rehearsal'),
+    );
+    /** where the run sheet opens, which is also what the production run hands over to */
+    const preStart =
+      scoped.preAnchor === 'plan-time' && preAnchorTime
+        ? localTimeOfDayMs(preAnchorTime.attributes.starts_at, scoped.timezone)
+        : serviceStartOfDay - totalOf('pre');
+
+    const cursors: Record<PcoItemPosition, number> = {
+      pre: preStart,
+      during: serviceStartOfDay,
+      post: serviceStartOfDay + totalOf('during'),
+    };
+
+    for (const entry of placed) {
+      // a heading that states its own time keeps it; nothing else knows where it sits
+      // until every length above it is in
+      if (entry.row.startsAt === null) {
+        entry.row.startsAt = wrapTimeOfDay(cursors[entry.position]);
+      }
+      cursors[entry.position] += entry.advance;
+    }
+
+    /**
+     * Each step of the production run lasts until the next one starts, and the last
+     * of them hands over to the run sheet. So the briefing is five minutes because
+     * the broadcast brief follows it, and the broadcast brief is ten because the
+     * prayer meeting back-times to 8:20.
+     */
+    const runHandsOverAt = preStart;
+    const inClockOrder = [...derived].sort((a, b) => a.start - b.start);
+
+    for (let index = 0; index < inClockOrder.length; index++) {
+      const step = inClockOrder[index];
+      const end = step.end ?? inClockOrder[index + 1]?.start ?? runHandsOverAt;
+      step.row.duration = Math.max(0, end - step.start);
     }
   }
 
