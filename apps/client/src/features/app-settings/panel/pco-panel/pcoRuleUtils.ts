@@ -231,11 +231,18 @@ export function applyImportAs(effect: PcoRuleEffect, choice: PcoItemImportAs): P
   return { ...effect, importAs: choice };
 }
 
+/**
+ * Word for word what the rundown's own event editor offers, and in its order.
+ *
+ * The same setting under two different names is a way to make somebody doubt they
+ * set it, so these track `EventEditorTimes` -- and its iPad and mobile twins, which
+ * already say the same thing. Change them together.
+ */
 export const endActionLabels: Record<EndAction, string> = {
-  [EndAction.None]: 'Stop at end',
-  [EndAction.Stop]: 'Stop playback',
-  [EndAction.LoadNext]: 'Load next',
-  [EndAction.PlayNext]: 'Play next',
+  [EndAction.None]: 'None',
+  [EndAction.Stop]: 'Stop rundown',
+  [EndAction.LoadNext]: 'Load next event',
+  [EndAction.PlayNext]: 'Play next event',
   [EndAction.PlayNextDelayed]: 'Play next after delay',
 };
 

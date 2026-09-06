@@ -1,4 +1,11 @@
-import { type PcoInferredEntry, type PcoRules, type PcoTimerRule, TimerType, TimeStrategy } from 'ontime-types';
+import {
+  type PcoInferredEntry,
+  type PcoRules,
+  type PcoTimerRule,
+  EndAction,
+  TimerType,
+  TimeStrategy,
+} from 'ontime-types';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -6,6 +13,7 @@ import {
   applyToggle,
   describeEffect,
   effectForTitle,
+  endActionLabels,
   foldChoiceOf,
   handWrittenRules,
   hasServiceTypeEffect,
@@ -347,5 +355,26 @@ describe('how much of a folded section folds', () => {
 
     expect(next.collapseSections[0].title).toBe('Praise & Worship');
     expect(next.collapseSections[0].listContents).toBe(false);
+  });
+});
+
+describe('end action labels', () => {
+  /**
+   * Read off `EventEditorTimes`, which is what the screenshot in the rundown shows.
+   * The import page offering the same setting under a different name is a way to
+   * make somebody doubt they set it.
+   */
+  it('says what the rundown editor says, in the order it says it', () => {
+    expect(Object.entries(endActionLabels)).toEqual([
+      [EndAction.None, 'None'],
+      [EndAction.Stop, 'Stop rundown'],
+      [EndAction.LoadNext, 'Load next event'],
+      [EndAction.PlayNext, 'Play next event'],
+      [EndAction.PlayNextDelayed, 'Play next after delay'],
+    ]);
+  });
+
+  it('offers every end action the rundown holds', () => {
+    expect(Object.keys(endActionLabels).sort()).toEqual(Object.values(EndAction).sort());
   });
 });
