@@ -102,9 +102,9 @@ export default function EditorSettingsForm() {
                 onChange={(event) => setDefaultEndAction(event.target.value as EndAction)}
               >
                 <option value={EndAction.None}>None</option>
-                <option value={EndAction.Stop}>Stop</option>
-                <option value={EndAction.LoadNext}>Load next</option>
-                <option value={EndAction.PlayNext}>Play next</option>
+                <option value={EndAction.Stop}>Stop rundown</option>
+                <option value={EndAction.LoadNext}>Load next event</option>
+                <option value={EndAction.PlayNext}>Play next event</option>
                 <option value={EndAction.PlayNextDelayed}>Play next after delay</option>
               </Select>
             </Panel.ListItem>
