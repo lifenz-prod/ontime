@@ -583,6 +583,7 @@ describe('test views import', () => {
       },
     };
     const expectedParsedViewSettings = {
+      countdownSource: 'qlab',
       normalColor: '#ffffffcc',
       warningColor: '#FFAB33',
       dangerColor: '#ED3333',

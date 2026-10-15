@@ -1,5 +1,7 @@
 import {
+  countdownStatePlaceholder,
   LogOrigin,
+  mittiStatePlaceholder,
   Playback,
   qlabStatePlaceholder,
   rundownSourcesPlaceholder,
@@ -48,6 +50,8 @@ import { initialiseProject } from './services/project-service/ProjectService.js'
 import { getShowWelcomeDialog } from './services/app-state-service/AppStateService.js';
 import { oscServer } from './adapters/OscAdapter.js';
 import { qlabService } from './services/qlab-service/QlabService.js';
+import { mittiService } from './services/mitti-service/MittiService.js';
+import { countdownService } from './services/countdown-service/CountdownService.js';
 import { init as initSheetService } from './services/sheet-service/SheetService.js';
 import { init as initRundownSources } from './services/rundown-source-service/RundownSourceService.js';
 
@@ -207,6 +211,8 @@ export const startServer = async (
       direction: SimpleDirection.CountDown,
     },
     qlab: qlabStatePlaceholder,
+    mitti: mittiStatePlaceholder,
+    countdown: countdownStatePlaceholder,
     rundownSources: rundownSourcesPlaceholder,
     ping: -1,
   });
@@ -256,8 +262,14 @@ export const startIntegrations = async () => {
     logger.info(LogOrigin.Server, 'Skipping OSC integration');
   }
 
+  // the countdown views follow whichever source is selected, so it needs to know before the integrations start
+  countdownService.setSource(getDataProvider().getViewSettings().countdownSource);
+
   const qlabSettings = getDataProvider().getQlab();
   qlabService.init(qlabSettings);
+
+  const mittiSettings = getDataProvider().getMitti();
+  mittiService.init(mittiSettings);
 };
 
 /**
@@ -280,6 +292,7 @@ export const shutdown = async (exitCode = 0) => {
   expressServer?.close();
   runtimeService.shutdown();
   qlabService.shutdown();
+  mittiService.shutdown();
   logger.shutdown();
   oscServer.shutdown();
   socket.shutdown();

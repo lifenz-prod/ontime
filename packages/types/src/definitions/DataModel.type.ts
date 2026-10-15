@@ -1,6 +1,7 @@
 import type {
   AutomationSettings,
   CustomFields,
+  MittiSettings,
   OntimeRundown,
   ProjectData,
   QlabSettings,
@@ -19,5 +20,6 @@ export type DatabaseModel = {
   customFields: CustomFields;
   automation: AutomationSettings;
   qlab: QlabSettings;
+  mitti: MittiSettings;
   serviceProfiles: ServiceProfiles;
 };

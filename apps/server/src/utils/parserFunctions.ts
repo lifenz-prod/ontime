@@ -152,6 +152,7 @@ export function parseViewSettings(data: Partial<DatabaseModel>, emitError?: Erro
   console.log('Found view settings, importing...');
 
   return {
+    countdownSource: data.viewSettings.countdownSource === 'mitti' ? 'mitti' : dbModel.viewSettings.countdownSource,
     dangerColor: data.viewSettings.dangerColor ?? dbModel.viewSettings.dangerColor,
     endMessage: data.viewSettings.endMessage ?? dbModel.viewSettings.endMessage,
     freezeEnd: data.viewSettings.freezeEnd ?? dbModel.viewSettings.freezeEnd,

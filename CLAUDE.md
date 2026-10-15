@@ -45,7 +45,7 @@ Default dev server runs at `http://localhost:4001`. Views are reached as path ro
 ### Server (`apps/server/src`)
 - The server is the single source of truth. The **rundown cache** (`services/rundown-service/rundownCache.ts`) holds the normalised rundown and is recomputed on edits; `RundownService.ts` is the orchestration entry point for rundown mutations.
 - The **runtime/playback engine** (`services/runtime-service`, `EventTimer.ts`, `Clock.ts`, `timerUtils.ts`, `rollUtils.ts`) tracks the live state: what's playing, elapsed/remaining time, roll mode, added time, delays. `effectiveSchedule.ts` computes projected times.
-- State is broadcast to clients over WebSocket; integrations (OSC, HTTP, Websocket API, qlab-service) live under `api-integration` / `services`. `sheet-service` handles Google Sheets import/export.
+- State is broadcast to clients over WebSocket; integrations (OSC, HTTP, Websocket API, qlab-service, mitti-service) live under `api-integration` / `services`. QLab is polled, Mitti pushes its own OSC feedback; `countdown-service` holds both and publishes whichever one `viewSettings.countdownSource` selects, which is the only countdown the views read. Both only read, and are built to share a device with Bitfocus Companion, which also controls it: QLab takes a reply port of its own via `/udpReplyPort` (it keeps one per client), and Mitti, which feeds a single destination, is relayed onward verbatim by `MittiService`. `sheet-service` handles Google Sheets import/export.
 - Data persists to a project file DB; E2E runs against a separate test-db.
 - Entry: built from `app.js` → output `index.cjs` (an Electron quirk; `index.ts` only takes over init when Electron is absent). See `DEVELOPMENT.md` "APP Building".
 

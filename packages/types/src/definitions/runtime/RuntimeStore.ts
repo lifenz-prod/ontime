@@ -16,6 +16,23 @@ export const qlabStatePlaceholder: RuntimeStore['qlab'] = {
   phase: TimerPhase.None,
 };
 
+export const mittiStatePlaceholder: RuntimeStore['mitti'] = {
+  enabled: false,
+  connected: false,
+  cueName: '',
+  cueNumber: '',
+  duration: 0,
+  elapsed: 0,
+  remaining: 0,
+  isPaused: false,
+  phase: TimerPhase.None,
+};
+
+export const countdownStatePlaceholder: RuntimeStore['countdown'] = {
+  source: 'qlab',
+  ...qlabStatePlaceholder,
+};
+
 export const rundownSourcesPlaceholder: RuntimeStore['rundownSources'] = {
   provider: null,
   containerId: null,
@@ -78,6 +95,8 @@ export const runtimeStorePlaceholder: Readonly<RuntimeStore> = {
     playback: SimplePlayback.Stop,
   },
   qlab: qlabStatePlaceholder,
+  mitti: mittiStatePlaceholder,
+  countdown: countdownStatePlaceholder,
   rundownSources: rundownSourcesPlaceholder,
   ping: -1,
 };

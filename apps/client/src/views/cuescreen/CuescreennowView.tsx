@@ -60,7 +60,7 @@ function useAutoScaleTitle(
 export default function CuescreennowView({ time, auxTimer, eventNow, eventNext }: CuescreennowViewProps) {
   useWindowTitle('Cuescreen NOW');
 
-  const qlab = useRuntimeStore((state) => state.qlab);
+  const countdown = useRuntimeStore((state) => state.countdown);
   const externalMessage = useRuntimeStore((state) => state.message.external);
   const showExternal = useRuntimeStore((state) => state.message.timer.secondarySource === 'external');
   const overrideMessage = showExternal && externalMessage ? externalMessage : null;
@@ -133,7 +133,7 @@ export default function CuescreennowView({ time, auxTimer, eventNow, eventNext }
           </span>
         </div>
       </div>
-      {qlab.enabled && <div className='cuescreennow__qlab-timer'>{formatMs(qlab.remaining)}</div>}
+      {countdown.enabled && <div className='cuescreennow__qlab-timer'>{formatMs(countdown.remaining)}</div>}
     </div>
   );
 }

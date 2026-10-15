@@ -6,6 +6,7 @@ import AboutPanel from './panel/about-panel/AboutPanel';
 import AutomationPanel from './panel/automations-panel/AutomationPanel';
 import FeatureSettingsPanel from './panel/feature-settings-panel/FeatureSettingsPanel';
 import GeneralPanel from './panel/general-panel/GeneralPanel';
+import MittiPanel from './panel/mitti-panel/MittiPanel';
 import NetworkLogPanel from './panel/network-panel/NetworkLogPanel';
 import ProjectPanel from './panel/project-panel/ProjectPanel';
 import QlabPanel from './panel/qlab-panel/QlabPanel';
@@ -33,6 +34,7 @@ export default function AppSettings() {
           {panel === 'sources' && <SourcesPanel location={location} onClose={close} />}
           {panel === 'automation' && <AutomationPanel location={location} />}
           {panel === 'qlab' && <QlabPanel />}
+          {panel === 'mitti' && <MittiPanel />}
           {panel === 'service_profiles' && <ServiceProfilesPanel />}
           {panel === 'network' && <NetworkLogPanel location={location} />}
           {panel === 'about' && <AboutPanel />}

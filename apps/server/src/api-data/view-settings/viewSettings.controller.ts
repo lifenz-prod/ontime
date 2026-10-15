@@ -4,6 +4,7 @@ import { getErrorMessage } from 'ontime-utils';
 import type { Request, Response } from 'express';
 
 import { getDataProvider } from '../../classes/data-provider/DataProvider.js';
+import { countdownService } from '../../services/countdown-service/CountdownService.js';
 
 export async function getViewSettings(_req: Request, res: Response<ViewSettings>) {
   const views = getDataProvider().getViewSettings();
@@ -13,6 +14,7 @@ export async function getViewSettings(_req: Request, res: Response<ViewSettings>
 export async function postViewSettings(req: Request, res: Response<ViewSettings | ErrorResponse>) {
   try {
     const newData = {
+      countdownSource: req.body.countdownSource === 'mitti' ? 'mitti' : 'qlab',
       dangerColor: req.body.dangerColor,
       endMessage: req.body.endMessage,
       freezeEnd: req.body.freezeEnd,
@@ -21,6 +23,7 @@ export async function postViewSettings(req: Request, res: Response<ViewSettings 
       warningColor: req.body.warningColor,
     } as ViewSettings;
     await getDataProvider().setViewSettings(newData);
+    countdownService.setSource(newData.countdownSource);
     res.status(200).send(newData);
   } catch (error) {
     const message = getErrorMessage(error);

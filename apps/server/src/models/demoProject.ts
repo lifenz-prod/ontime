@@ -453,6 +453,7 @@ export const demoDb: DatabaseModel = {
     endActionDelay: 30,
   },
   viewSettings: {
+    countdownSource: 'qlab',
     dangerColor: '#ED3333',
     endMessage: '',
     freezeEnd: false,
@@ -497,6 +498,17 @@ export const demoDb: DatabaseModel = {
     warningThreshold: 30000,
     dangerThreshold: 10000,
     timeout: 3000,
+  },
+  mitti: {
+    enabled: false,
+    host: '127.0.0.1',
+    port: 51000,
+    listenPort: 51001,
+    warningThreshold: 30000,
+    dangerThreshold: 10000,
+    timeout: 5000,
+    relayHost: null,
+    relayPort: null,
   },
   serviceProfiles: { boundaryBlockId: null, services: [] },
 };

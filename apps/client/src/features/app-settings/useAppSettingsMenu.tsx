@@ -63,6 +63,13 @@ const staticOptions = [
     ],
   },
   {
+    id: 'mitti',
+    label: 'Mitti',
+    secondary: [
+      { id: 'mitti__settings', label: 'Mitti settings' },
+    ],
+  },
+  {
     id: 'service_profiles',
     label: 'Service Profiles',
     secondary: [

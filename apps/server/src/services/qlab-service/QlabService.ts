@@ -1,10 +1,12 @@
 import { LogOrigin, QlabSettings, QlabState, TimerPhase, qlabStatePlaceholder } from 'ontime-types';
 
-import { toBuffer as oscToBuffer, fromBuffer, type OscPacketOutput } from 'osc-min';
+import { toBuffer as oscToBuffer, fromBuffer, type OscArgInput, type OscPacketOutput } from 'osc-min';
 import * as dgram from 'node:dgram';
 
 import { logger } from '../../classes/Logger.js';
 import { eventStore } from '../../stores/EventStore.js';
+import { ListenSocket } from '../../utils/listenSocket.js';
+import { countdownService } from '../countdown-service/CountdownService.js';
 
 const defaultQlabSettings: QlabSettings = {
   enabled: false,
@@ -21,6 +23,17 @@ const defaultQlabSettings: QlabSettings = {
 
 export { defaultQlabSettings };
 
+/** the port QLab sends UDP replies to unless a client asks for another one */
+const qlabDefaultReplyPort = 53001;
+
+/**
+ * How often we remind QLab where to send our replies.
+ *
+ * QLab keeps this per client and forgets a UDP client after 61 seconds of silence, so a QLab
+ * restart would otherwise leave it replying to the default port, where we are not listening.
+ */
+const replyPortInterval = 5000;
+
 interface QlabCue {
   uniqueID: string;
   number: string;
@@ -29,7 +42,7 @@ interface QlabCue {
   colorName: string;
   // QLab includes these timing fields directly on each cue in the /runningOrPausedCues response
   currentDuration?: number; // seconds (float)
-  actionElapsed?: number;   // seconds (float) — elapsed playback time
+  actionElapsed?: number; // seconds (float) — elapsed playback time
   isPaused?: boolean;
 }
 
@@ -44,10 +57,14 @@ interface PendingCueData {
 
 class QlabService {
   private sendSocket: dgram.Socket | null = null;
-  private receiveSocket: dgram.Socket | null = null;
+  private listenSocket: ListenSocket | null = null;
   private pollInterval: NodeJS.Timeout | null = null;
   private settings: QlabSettings = { ...defaultQlabSettings };
   private lastResponseTime = 0;
+  private startedAt = 0;
+  private replyPortAssertedAt = 0;
+  private hasReportedSilence = false;
+  private hasReportedDenied = false;
   private pendingCue: PendingCueData | null = null;
   private currentState: QlabState = { ...qlabStatePlaceholder };
 
@@ -100,21 +117,17 @@ class QlabService {
       logger.error(LogOrigin.Tx, `QLab send socket error: ${error.message}`);
     });
 
-    // create receive socket
-    this.receiveSocket = dgram.createSocket('udp4');
-    this.receiveSocket.on('error', (error) => {
-      logger.error(LogOrigin.Rx, `QLab receive socket error: ${error.message}`);
+    // listen for the replies, which QLab sends to this port rather than back to the sender
+    this.listenSocket = new ListenSocket({
+      label: 'QLab',
+      port: this.settings.listenPort,
+      onMessage: (buf) => this.handleResponse(buf),
     });
-    this.receiveSocket.on('message', (buf) => this.handleResponse(buf));
 
-    try {
-      this.receiveSocket.bind(this.settings.listenPort, () => {
-        logger.info(LogOrigin.Rx, `QLab: Listening for responses on port ${this.settings.listenPort}`);
-      });
-    } catch (error) {
-      logger.error(LogOrigin.Rx, `QLab: Failed to bind receive socket: ${error}`);
-      return;
-    }
+    this.startedAt = Date.now();
+    this.replyPortAssertedAt = 0;
+    this.hasReportedSilence = false;
+    this.hasReportedDenied = false;
 
     // start polling
     this.pollInterval = setInterval(() => this.poll(), 250);
@@ -135,17 +148,15 @@ class QlabService {
       this.sendSocket = null;
     }
 
-    if (this.receiveSocket) {
-      try {
-        this.receiveSocket.close();
-      } catch {
-        // ignore close errors
-      }
-      this.receiveSocket = null;
+    if (this.listenSocket) {
+      this.listenSocket.close();
+      this.listenSocket = null;
     }
 
     this.pendingCue = null;
     this.lastResponseTime = 0;
+    this.startedAt = 0;
+    this.replyPortAssertedAt = 0;
 
     this.currentState = { ...qlabStatePlaceholder };
     this.broadcastState();
@@ -154,6 +165,19 @@ class QlabService {
   }
 
   private poll() {
+    // QLab has never answered: the most common causes are worth spelling out, once
+    if (
+      this.lastResponseTime === 0 &&
+      !this.hasReportedSilence &&
+      Date.now() - this.startedAt > this.settings.timeout
+    ) {
+      this.hasReportedSilence = true;
+      logger.warning(
+        LogOrigin.Rx,
+        `QLab: no reply from ${this.settings.host}:${this.settings.port}. Check that OSC is enabled in QLab (Workspace Settings > Network) and that nothing else is holding port ${this.settings.listenPort}.`,
+      );
+    }
+
     // check for timeout
     if (this.lastResponseTime > 0 && Date.now() - this.lastResponseTime > this.settings.timeout) {
       if (this.currentState.connected) {
@@ -167,14 +191,36 @@ class QlabService {
       }
     }
 
+    this.maybeClaimReplyPort();
+
     // send polling request
     this.sendOSC('/runningOrPausedCues');
   }
 
-  private sendOSC(address: string) {
+  /**
+   * Asks QLab to send our replies to the port we are listening on.
+   *
+   * QLab holds this per client, so Ontime can take a port of its own without moving anybody
+   * else's replies - which is what lets Ontime read a QLab that Companion is also driving.
+   * We leave QLab alone when we are on its default port, so nothing changes for setups that
+   * never had a clash.
+   */
+  private maybeClaimReplyPort() {
+    if (this.settings.listenPort === qlabDefaultReplyPort) {
+      return;
+    }
+    if (Date.now() - this.replyPortAssertedAt < replyPortInterval) {
+      return;
+    }
+
+    this.replyPortAssertedAt = Date.now();
+    this.sendOSC('/udpReplyPort', [{ type: 'integer', value: this.settings.listenPort }]);
+  }
+
+  private sendOSC(address: string, args: OscArgInput[] = []) {
     if (!this.sendSocket) return;
 
-    const buffer = oscToBuffer({ address, args: [] });
+    const buffer = oscToBuffer({ address, args });
     this.sendSocket.send(buffer, 0, buffer.byteLength, this.settings.port, this.settings.host, (error) => {
       if (error) {
         logger.warning(LogOrigin.Tx, `QLab: Failed to send OSC: ${error.message}`);
@@ -203,10 +249,27 @@ class QlabService {
       return;
     }
 
-    let parsed: { data: unknown };
+    let parsed: { data: unknown; status?: unknown };
     try {
       parsed = JSON.parse(jsonString);
     } catch {
+      return;
+    }
+
+    // QLab refuses everything but /version and /workspaces until it is given the workspace passcode
+    if (parsed.status === 'denied') {
+      if (!this.hasReportedDenied) {
+        this.hasReportedDenied = true;
+        logger.error(
+          LogOrigin.Rx,
+          'QLab: refused the request. The workspace has an OSC passcode, which Ontime does not send.',
+        );
+      }
+      return;
+    }
+
+    // QLab answers some queries with an error rather than no data, eg when nothing is active
+    if (parsed.status === 'error') {
       return;
     }
 
@@ -292,9 +355,9 @@ class QlabService {
       uniqueID: cue.uniqueID,
       cueName: cue.listName || '',
       cueNumber: cue.number || '',
-      duration: isSameCue ? (this.pendingCue?.duration ?? null) : null,
+      duration: isSameCue ? this.pendingCue?.duration ?? null : null,
       elapsed: null, // always refresh elapsed – it changes every tick
-      isPaused: isSameCue ? (this.pendingCue?.isPaused ?? null) : null,
+      isPaused: isSameCue ? this.pendingCue?.isPaused ?? null : null,
     };
 
     // Always request elapsed (changes each tick). Only request duration and isPaused
@@ -391,6 +454,7 @@ class QlabService {
 
   private broadcastState() {
     eventStore.set('qlab', this.currentState);
+    countdownService.update('qlab', this.currentState);
   }
 
   getState(): QlabState {

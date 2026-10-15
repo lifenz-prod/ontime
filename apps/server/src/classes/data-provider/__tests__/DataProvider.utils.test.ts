@@ -24,6 +24,7 @@ describe('safeMerge', () => {
       endActionDelay: 30,
     },
     viewSettings: {
+      countdownSource: 'qlab',
       overrideStyles: false,
       freezeEnd: false,
       endMessage: 'existing endMessage',
@@ -54,6 +55,17 @@ describe('safeMerge', () => {
       warningThreshold: 30000,
       dangerThreshold: 10000,
       timeout: 3000,
+    },
+    mitti: {
+      enabled: false,
+      host: '127.0.0.1',
+      port: 51000,
+      listenPort: 51001,
+      warningThreshold: 30000,
+      dangerThreshold: 10000,
+      timeout: 5000,
+      relayHost: null,
+      relayPort: null,
     },
     serviceProfiles: { boundaryBlockId: null, services: [] },
   } as DatabaseModel;

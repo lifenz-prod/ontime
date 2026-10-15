@@ -7,6 +7,7 @@ import {
   CustomFields,
   URLPreset,
   AutomationSettings,
+  MittiSettings,
   QlabSettings,
   ServiceProfiles,
 } from 'ontime-types';
@@ -57,6 +58,8 @@ export function getDataProvider() {
     setAutomation,
     getQlab,
     setQlab,
+    getMitti,
+    setMitti,
     getServiceProfiles,
     setServiceProfiles,
     getRundown,
@@ -144,6 +147,16 @@ async function setQlab(newData: QlabSettings): ReadonlyPromise<QlabSettings> {
   return db.data.qlab;
 }
 
+function getMitti(): Readonly<MittiSettings> {
+  return db.data.mitti;
+}
+
+async function setMitti(newData: MittiSettings): ReadonlyPromise<MittiSettings> {
+  db.data.mitti = { ...newData };
+  await persist();
+  return db.data.mitti;
+}
+
 function getServiceProfiles(): Readonly<ServiceProfiles> {
   return db.data.serviceProfiles ?? { boundaryBlockId: null, services: [] };
 }
@@ -168,6 +181,7 @@ async function mergeIntoData(newData: Partial<DatabaseModel>): ReadonlyPromise<D
   db.data.customFields = mergedData.customFields;
   db.data.rundown = mergedData.rundown;
   db.data.qlab = mergedData.qlab;
+  db.data.mitti = mergedData.mitti;
   db.data.serviceProfiles = mergedData.serviceProfiles;
 
   await persist();

@@ -6,6 +6,7 @@ import ErrorBoundary from '../../common/components/error-boundary/ErrorBoundary'
 import { useIsOnline, useRuntimeOverview, useRuntimePlaybackOverview, useTimer } from '../../common/hooks/useSocket';
 import useProjectData from '../../common/hooks-query/useProjectData';
 import { useRuntimeStore } from '../../common/stores/runtime';
+import { countdownSourceLabels } from '../../common/utils/countdownSource';
 import { cx, timerPlaceholder } from '../../common/utils/styleUtils';
 
 import { TimeColumn, TimeRow } from './composite/TimeLayout';
@@ -50,7 +51,7 @@ function _MobileEditorOverview({ children, rightContent }: MobileEditorOverviewP
             muted={maybeExpectedEnd === null}
           />
         </div>
-        <QlabTimerOverview />
+        <PlaybackTimerOverview />
       </Box>
     </OverviewWrapper>
   );
@@ -149,11 +150,11 @@ function RuntimeOverview() {
   );
 }
 
-function QlabTimerOverview() {
-  const qlab = useRuntimeStore((state) => state.qlab);
+function PlaybackTimerOverview() {
+  const countdown = useRuntimeStore((state) => state.countdown);
 
-  if (!qlab.enabled) return null;
+  if (!countdown.enabled) return null;
 
-  const display = removeLeadingZero(millisToString(qlab.remaining));
-  return <TimeColumn label='Qlab timer' value={display} />;
+  const display = removeLeadingZero(millisToString(countdown.remaining));
+  return <TimeColumn label={`${countdownSourceLabels[countdown.source]} timer`} value={display} />;
 }

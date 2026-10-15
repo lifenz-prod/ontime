@@ -41,6 +41,10 @@ export type { ProjectData } from './definitions/core/ProjectData.type.js';
 // ---> Settings
 export type { Settings } from './definitions/core/Settings.type.js';
 
+// ---> Countdown sources
+export type { CountdownSource, CountdownSourceState, CountdownState } from './definitions/core/Countdown.type.js';
+export type { MittiState, MittiSettings } from './definitions/core/Mitti.type.js';
+
 // ---> QLab
 export type { QlabState, QlabSettings } from './definitions/core/Qlab.type.js';
 
@@ -95,7 +99,13 @@ export type { TimerMessage, MessageState, SecondarySource } from './definitions/
 export type { Runtime } from './definitions/runtime/Runtime.type.js';
 export { OffsetMode } from './definitions/runtime/Runtime.type.js';
 export type { RuntimeStore } from './definitions/runtime/RuntimeStore.type.js';
-export { runtimeStorePlaceholder, qlabStatePlaceholder, rundownSourcesPlaceholder } from './definitions/runtime/RuntimeStore.js';
+export {
+  runtimeStorePlaceholder,
+  countdownStatePlaceholder,
+  mittiStatePlaceholder,
+  qlabStatePlaceholder,
+  rundownSourcesPlaceholder,
+} from './definitions/runtime/RuntimeStore.js';
 export type {
   RundownSource,
   RundownSourceProvider,
