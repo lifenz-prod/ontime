@@ -31,7 +31,9 @@ jobs:
 
   build_macos:
     needs: verify_version
-    runs-on: macos-latest
+    # Pinned: macos-latest moved to a macos-26 image (20260907) whose keychain handling
+    # electron-builder 24.x cannot drive - signing fails at set-key-partition-list.
+    runs-on: macos-15
 
     steps:
       - uses: actions/checkout@v4.2.2
@@ -63,6 +65,7 @@ jobs:
         timeout-minutes: 60
 
       - name: Release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           prerelease: ${{ contains(github.ref_name, '-') }}
@@ -100,6 +103,7 @@ jobs:
         run: pnpm dist-win
 
       - name: Release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           prerelease: ${{ contains(github.ref_name, '-') }}
@@ -133,6 +137,7 @@ jobs:
         run: pnpm dist-linux
 
       - name: Release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           prerelease: ${{ contains(github.ref_name, '-') }}
