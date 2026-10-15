@@ -11,9 +11,14 @@ describe('parseMittiTimecode()', () => {
     expect(parseMittiTimecode('01:02:03')).toBe(3723000);
   });
 
-  it('drops the frames field', () => {
+  it('drops the frames field, whatever separates it', () => {
     expect(parseMittiTimecode('-00:00:12:03')).toBe(12000);
     expect(parseMittiTimecode('00:00:12:29')).toBe(12000);
+    // drop-frame timecode separates the frames with a semicolon
+    expect(parseMittiTimecode('-00:00:12;03')).toBe(12000);
+    expect(parseMittiTimecode('00:00:12.5')).toBe(12000);
+    // whatever else Mitti may append, a countdown we can read beats one stuck at zero
+    expect(parseMittiTimecode('00:00:12 (29.97)')).toBe(12000);
   });
 
   it('returns null for anything that is not a timecode', () => {

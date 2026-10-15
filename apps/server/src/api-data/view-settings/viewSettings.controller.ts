@@ -13,8 +13,14 @@ export async function getViewSettings(_req: Request, res: Response<ViewSettings>
 
 export async function postViewSettings(req: Request, res: Response<ViewSettings | ErrorResponse>) {
   try {
+    // Anything posting view settings without this field means "leave it alone", not "use QLab".
+    // The general panel's form does not know about it, so defaulting would silently switch the
+    // countdown back to QLab behind the picker in the QLab and Mitti panels.
+    const current = getDataProvider().getViewSettings();
+    const countdownSource = req.body.countdownSource ?? current.countdownSource;
+
     const newData = {
-      countdownSource: req.body.countdownSource === 'mitti' ? 'mitti' : 'qlab',
+      countdownSource: countdownSource === 'mitti' ? 'mitti' : 'qlab',
       dangerColor: req.body.dangerColor,
       endMessage: req.body.endMessage,
       freezeEnd: req.body.freezeEnd,

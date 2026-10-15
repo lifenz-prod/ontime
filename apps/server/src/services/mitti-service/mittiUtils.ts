@@ -44,10 +44,15 @@ export function isCueUnderway(cue: MittiCueTimes): boolean {
 /**
  * Parses a Mitti timecode string into milliseconds.
  *
- * Mitti sends `HH:MM:SS` or `HH:MM:SS:FF`, and prefixes the remaining time with a minus
- * sign since it counts down. We return the magnitude: the sign carries no information
- * that the field name does not already give us. Frames are dropped — Mitti does not
- * tell us the frame rate, and the countdown is only ever shown to the second.
+ * Mitti sends `HH:MM:SS` with a trailing frames field, and prefixes the remaining time
+ * with a minus sign since it counts down. We return the magnitude: the sign carries no
+ * information the field name does not already give us.
+ *
+ * Everything past the seconds is ignored rather than matched, the way Companion's own
+ * module reads it. The frame separator varies — a colon normally, a semicolon for
+ * drop-frame timecode — and anything we fail to parse here reads on screen as a
+ * countdown stuck at zero, so being lenient is worth more than being precise about a
+ * field we drop anyway.
  *
  * Returns null for anything that is not a timecode, Mitti's `-` placeholder included.
  */
@@ -56,7 +61,7 @@ export function parseMittiTimecode(value: unknown): number | null {
     return null;
   }
 
-  const match = value.trim().match(/^-?(\d{1,3}):([0-5]\d):([0-5]\d)(?::(\d{1,3}))?$/);
+  const match = value.trim().match(/^-?(\d{1,3}):([0-5]\d):([0-5]\d)/);
   if (!match) {
     return null;
   }
