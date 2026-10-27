@@ -1,0 +1,68 @@
+{
+  "name": "ontime-cue-renderer",
+  "version": "4.0.2-beta.1",
+  "productName": "Ontime Cue Renderer",
+  "private": true,
+  "author": "Alan Aiken",
+  "description": "Renders Ontime views as Syphon sources for ProPresenter",
+  "repository": "https://github.com/lifenz-prod/ontime",
+  "license": "AGPL-3.0-only",
+  "main": "src/main.js",
+  "dependencies": {
+    "bindings": "1.5.0",
+    "file-uri-to-path": "1.0.0"
+  },
+  "optionalDependencies": {
+    "node-syphon": "1.5.5"
+  },
+  "devDependencies": {
+    "electron": "44.7.0",
+    "electron-builder": "^24.13.3",
+    "eslint": "catalog:",
+    "eslint-config-prettier": "catalog:",
+    "prettier": "catalog:",
+    "vitest": "catalog:"
+  },
+  "scripts": {
+    "start": "electron .",
+    "lint": "eslint . --quiet",
+    "test": "vitest",
+    "test:pipeline": "vitest run",
+    "pack:mac": "electron-builder --publish=never --mac -c.mac.identity=null",
+    "cleanup": "rm -rf .turbo && rm -rf node_modules && rm -rf dist"
+  },
+  "build": {
+    "productName": "Ontime Cue Renderer",
+    "appId": "nz.lifenz.ontime.cue-renderer",
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/node-syphon/**",
+      "node_modules/bindings/**",
+      "node_modules/file-uri-to-path/**"
+    ],
+    "files": [
+      "src/**/*",
+      "!src/**/*.test.js",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.video",
+      "icon": "src/assets/icon.icns",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "extendInfo": {
+        "LSUIElement": true
+      }
+    },
+    "dmg": {
+      "artifactName": "ontime-cue-renderer-macOS-${arch}.dmg"
+    }
+  }
+}

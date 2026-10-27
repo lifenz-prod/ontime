@@ -1,0 +1,79 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'self'; script-src 'self'; img-src data:"
+    />
+    <title>Ontime Cue Renderer</title>
+    <link rel="stylesheet" href="settings.css" />
+  </head>
+  <body>
+    <form id="settings">
+      <section>
+        <h1>Ontime Cue Renderer</h1>
+        <p class="hint">
+          Renders Ontime views and publishes them as Syphon sources. In ProPresenter, add a Syphon video input and pick
+          the source by name.
+        </p>
+        <label class="field">
+          <span>Ontime server</span>
+          <input name="serverUrl" placeholder="http://192.168.1.10:4001" required />
+          <small>Changing the server restarts the renderer.</small>
+        </label>
+      </section>
+
+      <div id="outputs"></div>
+
+      <footer>
+        <span id="saved" class="hint"></span>
+        <button type="submit">Save</button>
+      </footer>
+    </form>
+
+    <template id="output-template">
+      <section class="output">
+        <header>
+          <h2></h2>
+          <span class="status"></span>
+        </header>
+        <div class="output-body">
+          <div class="fields">
+            <label class="check"><input type="checkbox" data-field="enabled" /> Enabled</label>
+            <label class="field">
+              <span>Syphon source name</span>
+              <input data-field="name" required />
+            </label>
+            <label class="field">
+              <span>View</span>
+              <select data-field="view"></select>
+            </label>
+            <label class="field custom-view">
+              <span>Custom view path</span>
+              <input data-field="customView" placeholder="cuescreen" />
+            </label>
+            <label class="field">
+              <span>View options</span>
+              <input data-field="query" placeholder="key=value&amp;other=value" />
+              <small>Copy everything after the ? from the view's URL in Ontime.</small>
+            </label>
+            <div class="row">
+              <label class="field"><span>Width</span><input type="number" data-field="width" /></label>
+              <label class="field"><span>Height</span><input type="number" data-field="height" /></label>
+              <label class="field"><span>Frame rate</span><input type="number" data-field="frameRate" /></label>
+            </div>
+            <label class="check"><input type="checkbox" data-field="transparent" /> Transparent background</label>
+          </div>
+          <div class="preview">
+            <img alt="" />
+            <div class="meta"></div>
+            <button type="button" class="reload">Reload view</button>
+          </div>
+        </div>
+      </section>
+    </template>
+
+    <script src="settings.js"></script>
+  </body>
+</html>
