@@ -143,5 +143,6 @@ renderer.getState().then((state) => {
   fillForm(state);
   showStatus(state);
   refreshPreviews();
-  setInterval(refreshPreviews, 1000);
+  // often enough that a sample never trails the view by a whole tick of its clock
+  setInterval(refreshPreviews, 250);
 });

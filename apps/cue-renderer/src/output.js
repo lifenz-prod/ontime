@@ -297,7 +297,8 @@ class Output {
       if (texture && this.server && source === wanted) {
         const { codedSize, handle } = texture.textureInfo;
         const region = { x: 0, y: 0, width: codedSize.width, height: codedSize.height };
-        this.server.publishSurfaceHandle(handle.ioSurface, region, codedSize, false);
+        // Chromium's surfaces are top-down and Syphon clients read bottom-up, so publish them flipped
+        this.server.publishSurfaceHandle(handle.ioSurface, region, codedSize, true);
         this.framesThisSecond += 1;
       }
     } catch (error) {
