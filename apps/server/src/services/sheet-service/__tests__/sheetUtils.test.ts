@@ -1,7 +1,7 @@
 import { EndAction, OntimeEvent, SupportedEvent, TimeStrategy, TimerType } from 'ontime-types';
 import { millisToString } from 'ontime-utils';
 
-import { getA1Notation, cellRequestFromEvent } from '../sheetUtils.js';
+import { addRecentSheet, getA1Notation, cellRequestFromEvent } from '../sheetUtils.js';
 
 describe('getA1Notation()', () => {
   test('A1', () => {
@@ -285,5 +285,30 @@ describe('cellRequestFromEvent()', () => {
     expect(result2.updateCells?.start?.rowIndex).toStrictEqual(21);
     expect(result2.updateCells?.start?.columnIndex).toStrictEqual(5);
     expect(result2.updateCells?.fields).toStrictEqual('userEnteredValue');
+  });
+});
+
+describe('addRecentSheet()', () => {
+  const sheet = (sheetId: string, lastUsed = 0) => ({ sheetId, title: sheetId, lastUsed });
+
+  test('puts the sheet first', () => {
+    expect(addRecentSheet([sheet('a'), sheet('b')], sheet('c', 1)).map((s) => s.sheetId)).toStrictEqual([
+      'c',
+      'a',
+      'b',
+    ]);
+  });
+
+  test('does not duplicate a sheet and keeps its latest title', () => {
+    const result = addRecentSheet([sheet('a'), sheet('b')], { sheetId: 'b', title: 'Renamed', lastUsed: 2 });
+    expect(result).toStrictEqual([{ sheetId: 'b', title: 'Renamed', lastUsed: 2 }, sheet('a')]);
+  });
+
+  test('keeps at most 10 sheets', () => {
+    const recents = Array.from({ length: 10 }, (_, index) => sheet(`${index}`));
+    const result = addRecentSheet(recents, sheet('new'));
+    expect(result.length).toBe(10);
+    expect(result.at(0)?.sheetId).toBe('new');
+    expect(result.at(-1)?.sheetId).toBe('8');
   });
 });

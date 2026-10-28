@@ -6,6 +6,9 @@ import express from 'express';
 
 import {
   getWorksheetNamesFromSheet,
+  listRecentSheets,
+  openPublic,
+  readFromPublicSheet,
   readFromSheet,
   requestConnection,
   revokeAuthentication,
@@ -13,9 +16,19 @@ import {
   writeToSheet,
 } from './sheets.controller.js';
 import { uploadClientSecret } from './sheets.middleware.js';
-import { validateRequestConnection, validateSheetId, validateSheetOptions } from './sheets.validation.js';
+import {
+  validatePublicSheet,
+  validateRequestConnection,
+  validateSheetId,
+  validateSheetOptions,
+} from './sheets.validation.js';
 
 export const router = express.Router();
+
+// sheets shared publicly need no authentication, but are read only
+router.get('/recent', listRecentSheets);
+router.post('/public/open', validatePublicSheet, openPublic);
+router.post('/public/:sheetId/read', validateSheetOptions, readFromPublicSheet);
 
 router.get('/connect', verifyAuthentication);
 router.post('/:sheetId/connect', uploadClientSecret, validateRequestConnection, requestConnection);

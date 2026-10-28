@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { IoAdd, IoTrash } from 'react-icons/io5';
 import { Button, IconButton, Input, Select, Tooltip } from '@chakra-ui/react';
-import { ImportMap, isAlphanumericWithSpace } from 'ontime-utils';
+import { ImportMap, isAlphanumericWithSpace, parseGoogleSheetInput } from 'ontime-utils';
 
 import { getWorksheetNames } from '../../../../../common/api/sheets';
 import { maybeAxiosError } from '../../../../../common/api/utils';
@@ -10,21 +10,37 @@ import * as Panel from '../../../panel-utils/PanelUtils';
 import useGoogleSheet from '../useGoogleSheet';
 import { useSheetStore } from '../useSheetStore';
 
-import { convertToImportMap, getPersistedOptions, NamedImportMap, persistImportMap } from './importMapUtils';
+import {
+  convertToImportMap,
+  getPersistedOptions,
+  NamedImportMap,
+  persistImportMap,
+  pickWorksheet,
+} from './importMapUtils';
 
 import style from '../SourcesPanel.module.scss';
 
 interface ImportMapFormProps {
   hasErrors: boolean;
   isSpreadsheet: boolean;
+  /** a sheet opened by its link is read only, and has no authentication to revoke */
+  isPublicSheet?: boolean;
+  onChangeSheet?: () => void;
   onCancel: () => void;
   onSubmitExport: (importMap: ImportMap) => Promise<void>;
   onSubmitImport: (importMap: ImportMap) => Promise<void>;
 }
 
 export default function ImportMapForm(props: ImportMapFormProps) {
-  const { hasErrors, isSpreadsheet, onCancel, onSubmitExport, onSubmitImport } = props;
-  const namedImportMap = getPersistedOptions();
+  const { hasErrors, isSpreadsheet, isPublicSheet, onChangeSheet, onCancel, onSubmitExport, onSubmitImport } = props;
+  const worksheetNames = useSheetStore((state) => state.worksheetNames);
+  const linkedWorksheet = useSheetStore((state) => state.linkedWorksheet);
+  const sheetTitle = useSheetStore((state) => state.sheetTitle);
+  const persistedOptions = getPersistedOptions();
+  const namedImportMap = {
+    ...persistedOptions,
+    Worksheet: pickWorksheet(worksheetNames, linkedWorksheet, persistedOptions.Worksheet),
+  };
   const { revoke } = useGoogleSheet();
   const {
     control,
@@ -44,7 +60,6 @@ export default function ImportMapForm(props: ImportMapFormProps) {
 
   const stepData = useSheetStore((state) => state.stepData);
   const patchStepData = useSheetStore((state) => state.patchStepData);
-  const worksheetNames = useSheetStore((state) => state.worksheetNames);
   const setWorksheets = useSheetStore((state) => state.setWorksheets);
   const sheetId = useSheetStore((state) => state.sheetId);
   const setSheetId = useSheetStore((state) => state.setSheetId);
@@ -109,7 +124,7 @@ export default function ImportMapForm(props: ImportMapFormProps) {
       <Panel.Title>
         Import options
         <Panel.InlineElements>
-          {!isSpreadsheet && (
+          {!isSpreadsheet && !isPublicSheet && (
             <Tooltip label='Revoke the google authentication'>
               <Button variant='ontime-subtle' size='sm' onClick={handleRevoke} isDisabled={isLoading}>
                 Revoke
@@ -119,7 +134,7 @@ export default function ImportMapForm(props: ImportMapFormProps) {
           <Button variant='ontime-subtle' size='sm' onClick={onCancel} isDisabled={isLoading}>
             Cancel
           </Button>
-          {!isSpreadsheet && (
+          {!isSpreadsheet && !isPublicSheet && (
             <Button
               variant='ontime-filled'
               size='sm'
@@ -141,7 +156,18 @@ export default function ImportMapForm(props: ImportMapFormProps) {
           </Button>
         </Panel.InlineElements>
       </Panel.Title>
-      {!isSpreadsheet && (
+      {isPublicSheet && (
+        <Panel.ListGroup>
+          <Panel.Description>Importing from Google Sheet</Panel.Description>
+          <Panel.InlineElements>
+            <Panel.Field title={sheetTitle || sheetId || ''} description={sheetId ?? ''} />
+            <Button size='sm' variant='ontime-subtle' onClick={onChangeSheet} isDisabled={isLoading}>
+              Change sheet
+            </Button>
+          </Panel.InlineElements>
+        </Panel.ListGroup>
+      )}
+      {!isSpreadsheet && !isPublicSheet && (
         <Panel.ListGroup>
           <Panel.Description>Choose which Google Sheet to use</Panel.Description>
           <Panel.InlineElements>
@@ -149,9 +175,9 @@ export default function ImportMapForm(props: ImportMapFormProps) {
               size='sm'
               variant='ontime-filled'
               autoComplete='off'
-              placeholder='Sheet ID'
+              placeholder='Sheet link or ID'
               value={sheetId ?? ''}
-              onChange={(event) => setSheetId(event.target.value)}
+              onChange={(event) => setSheetId(parseGoogleSheetInput(event.target.value)?.sheetId ?? event.target.value)}
               isDisabled={isLoading}
             />
             <Button

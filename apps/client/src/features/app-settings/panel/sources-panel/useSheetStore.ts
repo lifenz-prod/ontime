@@ -13,6 +13,14 @@ type SheetStore = {
   setSheetId: (sheetId: string | null) => void;
   authenticationStatus: AuthenticationStatus;
   setAuthenticationStatus: (status: AuthenticationStatus) => void;
+  /** public sheets are read without signing in to google, but can not be written to */
+  sheetAccess: 'public' | 'oauth';
+  setSheetAccess: (access: 'public' | 'oauth') => void;
+  /** title of the public sheet, once opened */
+  sheetTitle: string | null;
+  /** worksheet the pasted link pointed to */
+  linkedWorksheet: string | null;
+  setPublicSheet: (sheet: { sheetId: string; title: string; worksheets: string[]; worksheet: string | null }) => void;
 
   // we get this from a preview response
   rundown: OntimeRundown | null;
@@ -45,6 +53,9 @@ const initialState = {
   worksheetNames: null,
   sheetId: null,
   authenticationStatus: 'not_authenticated' as AuthenticationStatus,
+  sheetAccess: 'public' as 'public' | 'oauth',
+  sheetTitle: null,
+  linkedWorksheet: null,
   rundown: null,
   customFields: null,
   serviceProfiles: null,
@@ -64,6 +75,11 @@ export const useSheetStore = create<SheetStore>((set, get) => ({
   setSheetId: (sheetId: string | null) => set({ sheetId }),
 
   setAuthenticationStatus: (status: AuthenticationStatus) => set({ authenticationStatus: status }),
+
+  setSheetAccess: (access: 'public' | 'oauth') => set({ sheetAccess: access }),
+
+  setPublicSheet: ({ sheetId, title, worksheets, worksheet }) =>
+    set({ sheetId, sheetTitle: title, worksheetNames: worksheets, linkedWorksheet: worksheet }),
 
   setRundown: (rundown: OntimeRundown | null) => set({ rundown }),
 

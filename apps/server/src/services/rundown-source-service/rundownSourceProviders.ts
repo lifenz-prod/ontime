@@ -8,7 +8,13 @@
 
 import type { CustomFields, MaybeString, OntimeRundown, RundownSourceProvider, ServiceProfiles } from 'ontime-types';
 
-import { download, getImportMap, getLinkedSheetId, hasAuth, listWorksheets } from '../sheet-service/SheetService.js';
+import {
+  canReadLinkedSheet,
+  downloadFromLinkedSheet,
+  getImportMap,
+  getLinkedSheetId,
+  listWorksheets,
+} from '../sheet-service/SheetService.js';
 
 export type FetchedSource = {
   rundown: OntimeRundown;
@@ -31,17 +37,11 @@ export type RundownSourceProviderApi = {
 
 const gsheetProvider: RundownSourceProviderApi = {
   id: 'gsheet',
-  isAvailable: () => hasAuth().authenticated === 'authenticated' && Boolean(getLinkedSheetId()),
+  isAvailable: () => canReadLinkedSheet(),
   getContainerId: () => getLinkedSheetId(),
   list: () => listWorksheets(),
-  fetch: (name: string) => {
-    const sheetId = getLinkedSheetId();
-    if (!sheetId) {
-      throw new Error('No Google Sheet is linked');
-    }
-    // we reuse the import map from the last import so the column mapping matches the UI
-    return download(sheetId, { ...getImportMap(), worksheet: name });
-  },
+  // we reuse the import map from the last import so the column mapping matches the UI
+  fetch: (name: string) => downloadFromLinkedSheet({ ...getImportMap(), worksheet: name }),
 };
 
 const providers: RundownSourceProviderApi[] = [gsheetProvider];

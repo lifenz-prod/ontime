@@ -52,6 +52,24 @@ export type ErrorResponse = MessageResponse;
 
 export type AuthenticationStatus = 'authenticated' | 'not_authenticated' | 'pending';
 
+/** A Google Sheet which was recently imported from */
+export type RecentSheet = {
+  sheetId: string;
+  /** the spreadsheet title, falls back to the sheet ID when it could not be read */
+  title: string;
+  /** epoch millis of the last time the sheet was opened */
+  lastUsed: number;
+};
+
+/** A Google Sheet opened without authentication, by its public link */
+export type PublicSheetInfo = {
+  sheetId: string;
+  title: string;
+  worksheets: string[];
+  /** the worksheet the link pointed to, if any */
+  worksheet: string | null;
+};
+
 export type RundownPaginated = {
   rundown: OntimeRundown;
   total: number;

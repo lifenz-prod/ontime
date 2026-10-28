@@ -94,3 +94,20 @@ export function getPersistedOptions(): NamedImportMap {
     return namedImportMap;
   }
 }
+
+/**
+ * Chooses which worksheet to preselect:
+ * the one a pasted link pointed to, then the one used last, then the first available
+ */
+export function pickWorksheet(
+  worksheetNames: string[] | null,
+  linkedWorksheet: string | null,
+  lastWorksheet: string,
+): string {
+  if (!worksheetNames?.length) {
+    return lastWorksheet;
+  }
+  const find = (name: string | null) =>
+    name ? worksheetNames.find((worksheet) => worksheet.toLowerCase() === name.toLowerCase()) : undefined;
+  return find(linkedWorksheet) ?? find(lastWorksheet) ?? worksheetNames[0];
+}

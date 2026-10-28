@@ -1,5 +1,12 @@
 import axios, { AxiosResponse } from 'axios';
-import { AuthenticationStatus, CustomFields, OntimeRundown, ServiceProfiles } from 'ontime-types';
+import {
+  AuthenticationStatus,
+  CustomFields,
+  OntimeRundown,
+  PublicSheetInfo,
+  RecentSheet,
+  ServiceProfiles,
+} from 'ontime-types';
 import { ImportMap } from 'ontime-utils';
 
 import { apiEntryUrl } from './constants';
@@ -72,5 +79,37 @@ export const getWorksheetNames = async (sheetId: string): Promise<string[]> => {
  */
 export const uploadRundown = async (sheetId: string, options: ImportMap): Promise<void> => {
   const response = await axios.post(`${sheetsPath}/${sheetId}/write`, { options });
+  return response.data;
+};
+
+/**
+ * HTTP request to open a sheet shared as "anyone with the link can view", no authentication needed
+ * @param url - a link to the sheet or its ID
+ */
+export const openPublicSheet = async (url: string): Promise<PublicSheetInfo> => {
+  const response: AxiosResponse<PublicSheetInfo> = await axios.post(`${sheetsPath}/public/open`, { url });
+  return response.data;
+};
+
+/**
+ * HTTP request to preview the contents of a public google sheet as rundown
+ */
+export const previewPublicRundown = async (
+  sheetId: string,
+  options: ImportMap,
+): Promise<{
+  rundown: OntimeRundown;
+  customFields: CustomFields;
+  serviceProfiles: ServiceProfiles;
+}> => {
+  const response = await axios.post(`${sheetsPath}/public/${sheetId}/read`, { options });
+  return response.data;
+};
+
+/**
+ * HTTP request to list the sheets recently imported from, most recent first
+ */
+export const getRecentSheets = async (): Promise<RecentSheet[]> => {
+  const response: AxiosResponse<RecentSheet[]> = await axios.get(`${sheetsPath}/recent`);
   return response.data;
 };

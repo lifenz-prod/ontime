@@ -103,5 +103,6 @@ export {
   defaultImportMap,
   isImportMap,
 } from './src/feature/spreadsheet-import/spreadsheetImport.js';
+export { type GoogleSheetReference, parseGoogleSheetInput } from './src/feature/spreadsheet-import/googleSheetUrl.js';
 
 export { isPlaybackActive } from './src/playback-utils/playbackstate.js';

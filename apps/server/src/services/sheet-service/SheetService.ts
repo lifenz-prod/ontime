@@ -4,7 +4,16 @@
  * @link https://developers.google.com/identity/protocols/oauth2/limited-input-device
  */
 
-import { AuthenticationStatus, CustomFields, LogOrigin, MaybeString, OntimeRundown, ServiceProfiles } from 'ontime-types';
+import {
+  AuthenticationStatus,
+  CustomFields,
+  LogOrigin,
+  MaybeString,
+  OntimeRundown,
+  PublicSheetInfo,
+  RecentSheet,
+  ServiceProfiles,
+} from 'ontime-types';
 import { ImportMap, defaultImportMap, getErrorMessage, isImportMap } from 'ontime-utils';
 
 import { sheets, type sheets_v4 } from '@googleapis/sheets';
@@ -21,12 +30,26 @@ import { getCustomFields } from '../rundown-service/rundownCache.js';
 import { publicDir, publicFiles } from '../../setup/index.js';
 import { ensureDirectory } from '../../utils/fileManagement.js';
 
-import { cellRequestFromEvent, type ClientSecret, getA1Notation, validateClientSecret } from './sheetUtils.js';
+import {
+  addRecentSheet,
+  cellRequestFromEvent,
+  type ClientSecret,
+  getA1Notation,
+  validateClientSecret,
+} from './sheetUtils.js';
+import { fetchPublicWorkbook, fetchPublicWorksheetGids, getWorksheetRows } from './publicSheet.js';
 
 const sheetScope = 'https://www.googleapis.com/auth/spreadsheets';
 const codesUrl = 'https://oauth2.googleapis.com/device/code';
 const tokenUrl = 'https://oauth2.googleapis.com/token';
 const grantType = 'urn:ietf:params:oauth:grant-type:device_code';
+
+/**
+ * How we read the linked sheet
+ * - public: anyone with the link can view, no authentication needed
+ * - oauth: signed in with Google, needed for private sheets and to write back
+ */
+type SheetAccess = 'public' | 'oauth';
 
 type PersistedCredentials = Pick<
   Credentials,
@@ -39,6 +62,9 @@ type PersistedSheetsState = {
   credentials: PersistedCredentials | null;
   /** last import map used from the UI, reused when importing without a client (eg. from OSC) */
   importMap: ImportMap | null;
+  access: SheetAccess | null;
+  /** most recent first */
+  recentSheets: RecentSheet[];
 };
 
 const defaultState: PersistedSheetsState = {
@@ -46,6 +72,8 @@ const defaultState: PersistedSheetsState = {
   sheetId: null,
   credentials: null,
   importMap: null,
+  access: null,
+  recentSheets: [],
 };
 
 const adapter = new JSONFile<PersistedSheetsState>(publicFiles.sheetsState);
@@ -58,6 +86,7 @@ let currentAuthCode: MaybeString = null;
 
 let currentSheetId: MaybeString = null;
 let currentImportMap: ImportMap | null = null;
+let currentAccess: SheetAccess | null = null;
 
 let pollInterval: NodeJS.Timeout | null = null;
 let cleanupTimeout: NodeJS.Timeout | null = null;
@@ -81,6 +110,7 @@ function resetMemoryState() {
   currentAuthCode = null;
   currentSheetId = null;
   currentImportMap = null;
+  currentAccess = null;
 
   clearActiveTimers();
 }
@@ -118,6 +148,7 @@ async function persistCurrentState() {
     sheetId: currentSheetId,
     credentials: currentAuthClient ? getPersistedCredentials(currentAuthClient) : null,
     importMap: currentImportMap,
+    access: currentAccess,
   });
 }
 
@@ -160,6 +191,7 @@ export async function init() {
     currentClientSecret = persistedState.clientSecret;
     currentSheetId = persistedState.sheetId;
     currentImportMap = isImportMap(persistedState.importMap) ? persistedState.importMap : null;
+    currentAccess = persistedState.access;
 
     if (!persistedState.clientSecret || !persistedState.credentials) {
       return;
@@ -191,7 +223,9 @@ export async function init() {
  */
 export async function revoke(): Promise<ReturnType<typeof hasAuth>> {
   resetMemoryState();
-  await writePersistedState(defaultState);
+  // the recent sheets are not part of the connection
+  const { recentSheets } = await readPersistedState();
+  await writePersistedState({ ...defaultState, recentSheets });
   return hasAuth();
 }
 
@@ -324,6 +358,7 @@ async function verifySheet(
       spreadsheetId: sheetId,
       includeGridData: false,
     });
+    await rememberRecentSheet(sheetId, spreadsheets.data.properties?.title);
     return { worksheetOptions: spreadsheets.data.sheets.map((i) => i.properties.title) };
   } catch (error) {
     // attempt to catch errors caused by importing xlsx
@@ -357,6 +392,7 @@ export async function handleInitialConnection(
   currentAuthUrl = verification_url;
   currentAuthCode = user_code;
   currentSheetId = sheetId;
+  currentAccess = 'oauth';
   await persistCurrentStateSafe();
 
   // schedule verifying token and the existence of the sheetID
@@ -374,6 +410,7 @@ export async function getWorksheetOptions(sheetId: string): ReturnType<typeof ve
     throw new Error('Not authenticated');
   }
   currentSheetId = sheetId;
+  currentAccess = 'oauth';
   await persistCurrentStateSafe();
 
   return verifySheet(sheetId);
@@ -384,6 +421,10 @@ export async function getWorksheetOptions(sheetId: string): ReturnType<typeof ve
  * Unlike getWorksheetOptions, this does not change the linked sheet
  */
 export async function listWorksheets(): Promise<string[]> {
+  if (currentAccess === 'public' && currentSheetId) {
+    const { workbook } = await fetchPublicWorkbook(currentSheetId);
+    return workbook.SheetNames;
+  }
   if (!currentAuthClient) {
     throw new Error('Not authenticated with Google Sheets');
   }
@@ -393,6 +434,29 @@ export async function listWorksheets(): Promise<string[]> {
 
   const { worksheetOptions } = await verifySheet();
   return worksheetOptions;
+}
+
+/**
+ * Whether the linked sheet can be read without a client, eg. to recall a worksheet from OSC
+ */
+export function canReadLinkedSheet(): boolean {
+  if (!currentSheetId) {
+    return false;
+  }
+  return currentAccess === 'public' || hasAuth().authenticated === 'authenticated';
+}
+
+/**
+ * Reads a worksheet from the linked sheet, the same way it was last opened
+ */
+export async function downloadFromLinkedSheet(options: ImportMap): ReturnType<typeof download> {
+  if (!currentSheetId) {
+    throw new Error('No Google Sheet is linked');
+  }
+  if (currentAccess === 'public') {
+    return downloadPublic(currentSheetId, options);
+  }
+  return download(currentSheetId, options);
 }
 
 /**
@@ -423,6 +487,7 @@ async function rememberImportMap(options: ImportMap) {
 
 async function verifyWorksheet(sheetId: string, worksheet: string): Promise<{ worksheetId: number; range: string }> {
   currentSheetId = sheetId;
+  currentAccess = 'oauth';
   await persistCurrentStateSafe();
 
   const spreadsheets = await sheets({ version: 'v4', auth: currentAuthClient }).spreadsheets.get({
@@ -542,10 +607,73 @@ export async function download(
     throw new Error(`Sheet read failed: ${googleResponse.statusText}`);
   }
 
-  const dataFromSheet = parseExcel(googleResponse.data.values, getCustomFields(), options);
+  return parseSheetRows(googleResponse.data.values, options);
+}
+
+type SheetImport = Awaited<ReturnType<typeof download>>;
+
+/**
+ * Both ways of reading a sheet end here, so they import the same rundown
+ */
+function parseSheetRows(rows: unknown[][], options: ImportMap): SheetImport {
+  const dataFromSheet = parseExcel(rows, getCustomFields(), options);
   const { customFields, rundown } = parseRundown(dataFromSheet);
   if (rundown.length < 1) {
     throw new Error('Sheet: Could not find data to import in the worksheet');
   }
   return { rundown, customFields, serviceProfiles: dataFromSheet.serviceProfiles };
+}
+
+/**
+ * Opens a publicly shared sheet and links it, no authentication needed
+ * @param gid - the tab the link pointed to, used to preselect the worksheet
+ */
+export async function openPublicSheet(sheetId: string, gid?: string | null): Promise<PublicSheetInfo> {
+  const [{ workbook, title }, gids] = await Promise.all([
+    fetchPublicWorkbook(sheetId),
+    gid ? fetchPublicWorksheetGids(sheetId) : Promise.resolve([]),
+  ]);
+
+  currentSheetId = sheetId;
+  currentAccess = 'public';
+  await persistCurrentStateSafe();
+  await rememberRecentSheet(sheetId, title);
+
+  const worksheet = gids.find((entry) => entry.gid === gid)?.name ?? null;
+  return { sheetId, title, worksheets: workbook.SheetNames, worksheet };
+}
+
+/**
+ * Reads a worksheet from a publicly shared sheet
+ * We download the sheet again so the import has the latest changes
+ */
+export async function downloadPublic(sheetId: string, options: ImportMap): Promise<SheetImport> {
+  const { workbook } = await fetchPublicWorkbook(sheetId);
+  const rows = getWorksheetRows(workbook, options.worksheet);
+
+  currentSheetId = sheetId;
+  currentAccess = 'public';
+  await persistCurrentStateSafe();
+  await rememberImportMap(options);
+
+  return parseSheetRows(rows, options);
+}
+
+/**
+ * Sheets recently opened, most recent first
+ */
+export async function getRecentSheets(): Promise<RecentSheet[]> {
+  const { recentSheets } = await readPersistedState();
+  return Array.isArray(recentSheets) ? recentSheets : [];
+}
+
+async function rememberRecentSheet(sheetId: string, title: MaybeString | undefined) {
+  try {
+    const recentSheets = await getRecentSheets();
+    await writePersistedState({
+      recentSheets: addRecentSheet(recentSheets, { sheetId, title: title || sheetId, lastUsed: Date.now() }),
+    });
+  } catch (error) {
+    logger.warning(LogOrigin.Server, `Could not remember recent Google Sheet: ${getErrorMessage(error)}`);
+  }
 }

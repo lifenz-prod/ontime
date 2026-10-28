@@ -1,6 +1,6 @@
 import { ImportCustom } from 'ontime-utils';
 
-import { convertToImportMap, NamedImportMap } from '../importMapUtils';
+import { convertToImportMap, NamedImportMap, pickWorksheet } from '../importMapUtils';
 
 describe('convertToImportMap', () => {
   it('converts a namedImportMap to a importMap', () => {
@@ -35,5 +35,25 @@ describe('convertToImportMap', () => {
       Custom2: 'custom2',
       Custom3: 'custom3',
     });
+  });
+});
+
+describe('pickWorksheet()', () => {
+  const names = ['Rehearsal', 'CENTRAL AM', 'CENTRAL PM'];
+
+  test('prefers the worksheet the link pointed to', () => {
+    expect(pickWorksheet(names, 'CENTRAL PM', 'central am')).toBe('CENTRAL PM');
+  });
+
+  test('then the worksheet used last, matching its case to the sheet', () => {
+    expect(pickWorksheet(names, null, 'central am')).toBe('CENTRAL AM');
+  });
+
+  test('then the first worksheet', () => {
+    expect(pickWorksheet(names, null, 'event schedule')).toBe('Rehearsal');
+  });
+
+  test('keeps the last worksheet until worksheets are known', () => {
+    expect(pickWorksheet(null, null, 'event schedule')).toBe('event schedule');
   });
 });

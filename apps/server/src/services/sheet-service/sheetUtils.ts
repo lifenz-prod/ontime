@@ -1,4 +1,4 @@
-import { isOntimeBlock, isOntimeEvent, OntimeEvent, OntimeRundownEntry } from 'ontime-types';
+import { isOntimeBlock, isOntimeEvent, OntimeEvent, OntimeRundownEntry, RecentSheet } from 'ontime-types';
 import { millisToString } from 'ontime-utils';
 
 import type { sheets_v4 } from '@googleapis/sheets';
@@ -159,4 +159,13 @@ function getCellData(key: keyof OntimeEvent | 'blank', event: OntimeRundownEntry
   }
 
   return {};
+}
+
+const maxRecentSheets = 10;
+
+/**
+ * Puts a sheet at the top of the recents, without duplicates and within the limit
+ */
+export function addRecentSheet(recentSheets: RecentSheet[], sheet: RecentSheet): RecentSheet[] {
+  return [sheet, ...recentSheets.filter((recent) => recent.sheetId !== sheet.sheetId)].slice(0, maxRecentSheets);
 }

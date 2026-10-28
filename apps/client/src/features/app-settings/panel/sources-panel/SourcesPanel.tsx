@@ -8,13 +8,14 @@ import {
   importRundownPreview as importRundownPreviewExcel,
   upload as uploadExcel,
 } from '../../../../common/api/excel';
-import { getWorksheetNames } from '../../../../common/api/sheets';
+import { getWorksheetNames, previewPublicRundown } from '../../../../common/api/sheets';
 import { maybeAxiosError } from '../../../../common/api/utils';
 import { validateExcelImport } from '../../../../common/utils/uploadUtils';
 import * as Panel from '../../panel-utils/PanelUtils';
 
 import ImportMapForm from './import-map/ImportMapForm';
 import GSheetInfo from './GSheetInfo';
+import GSheetPublic from './GSheetPublic';
 import GSheetSetup from './GSheetSetup';
 import ImportReview from './ImportReview';
 import useGoogleSheet from './useGoogleSheet';
@@ -46,6 +47,9 @@ export default function SourcesPanel({ location, onClose }: SourcesPanelProps) {
   const setServiceProfiles = useSheetStore((state) => state.setServiceProfiles);
   const setSheetId = useSheetStore((state) => state.setSheetId);
   const sheetId = useSheetStore((state) => state.sheetId);
+  const worksheetNames = useSheetStore((state) => state.worksheetNames);
+  const sheetAccess = useSheetStore((state) => state.sheetAccess);
+  const setSheetAccess = useSheetStore((state) => state.setSheetAccess);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -87,9 +91,23 @@ export default function SourcesPanel({ location, onClose }: SourcesPanelProps) {
     setServiceProfiles(null);
     setError('');
     setSheetId(null);
+    setSheetAccess('public');
   };
 
-  const openGSheetFlow = async () => {
+  /** the simple flow: reading a sheet shared by link, no authentication */
+  const openGSheetFlow = () => {
+    setError('');
+    setSheetAccess('public');
+    setSheetId(null);
+    setWorksheets(null);
+    setImportFlow('gsheet');
+  };
+
+  /** signing in with google, for private sheets and to export back to the sheet */
+  const openOAuthFlow = async () => {
+    setError('');
+    setSheetAccess('oauth');
+    setWorksheets(null);
     setIsOpeningGSheet(true);
     try {
       const result = await verifyAuth();
@@ -130,7 +148,11 @@ export default function SourcesPanel({ location, onClose }: SourcesPanelProps) {
         previewData = await importRundownPreviewExcel(importMap);
       } else if (importFlow === 'gsheet') {
         if (!sheetId) return;
-        previewData = (await importRundownPreview(sheetId, importMap)) ?? null;
+        if (sheetAccess === 'public') {
+          previewData = await previewPublicRundown(sheetId, importMap);
+        } else {
+          previewData = (await importRundownPreview(sheetId, importMap)) ?? null;
+        }
       }
 
       if (!previewData) return;
@@ -170,10 +192,14 @@ export default function SourcesPanel({ location, onClose }: SourcesPanelProps) {
   const isExcelFlow = importFlow === 'excel';
   const isGSheetFlow = importFlow === 'gsheet';
   const isAuthenticated = authenticationStatus === 'authenticated';
+  const isPublicSheet = sheetAccess === 'public';
+  const hasPublicSheet = isPublicSheet && Boolean(worksheetNames);
   const showInput = importFlow === 'none' && !isOpeningGSheet;
   const showCompleted = importFlow === 'finished';
-  const showAuth = isGSheetFlow && !isAuthenticated;
-  const showImportMap = (isGSheetFlow && isAuthenticated) || (isExcelFlow && hasFile === 'done');
+  const showPublicSetup = isGSheetFlow && isPublicSheet && !hasPublicSheet;
+  const showAuth = isGSheetFlow && !isPublicSheet && !isAuthenticated;
+  const showImportMap =
+    (isGSheetFlow && (isPublicSheet ? hasPublicSheet : isAuthenticated)) || (isExcelFlow && hasFile === 'done');
   const showReview = rundown !== null && customFields !== null;
 
   return (
@@ -216,9 +242,9 @@ export default function SourcesPanel({ location, onClose }: SourcesPanelProps) {
                     onClick={openGSheetFlow}
                     isDisabled={hasFile !== 'none'}
                   >
-                    Synchronise with Google
+                    Import from Google Sheet
                   </Button>
-                  <Panel.Description>Start authentication process</Panel.Description>
+                  <Panel.Description>Paste a link, no sign in needed</Panel.Description>
                 </div>
               </div>
             </>
@@ -239,11 +265,14 @@ export default function SourcesPanel({ location, onClose }: SourcesPanelProps) {
               </Button>
             </div>
           )}
+          {showPublicSetup && <GSheetPublic onCancel={cancelGSheetFlow} onSignIn={openOAuthFlow} />}
           {showAuth && <GSheetSetup onCancel={cancelGSheetFlow} />}
           {showImportMap && !showReview && (
             <ImportMapForm
               hasErrors={Boolean(error)}
               isSpreadsheet={isExcelFlow}
+              isPublicSheet={isGSheetFlow && isPublicSheet}
+              onChangeSheet={openGSheetFlow}
               onCancel={cancelImportMap}
               onSubmitExport={handleSubmitExport}
               onSubmitImport={handleSubmitImport}
