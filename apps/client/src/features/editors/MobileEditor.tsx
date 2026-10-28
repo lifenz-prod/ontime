@@ -25,7 +25,7 @@ export default function MobileEditor() {
   const { onToggle: onFinderToggle, onClose: onFinderClose } = useDisclosure();
   const { tabs, activeTabId, selectTab } = useServiceSwitcher();
 
-  useWindowTitle('Mobile Editor');
+  useWindowTitle('Editor');
 
   // we need to register the listener to change the editor location
   useElectronListener();

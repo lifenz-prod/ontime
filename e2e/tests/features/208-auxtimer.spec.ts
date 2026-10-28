@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test('Aux timer buttons', async ({ page }) => {
-  await page.goto('http://localhost:4001/editor');
+  await page.goto('http://localhost:4001/advanced-editor');
   await page.getByTestId('time-input-auxTimer').click();
   await page.getByTestId('time-input-auxTimer').fill('123456');
   await page.getByTestId('time-input-auxTimer').press('Enter');

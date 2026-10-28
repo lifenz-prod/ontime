@@ -80,6 +80,12 @@ Sentry.init({
 
 const SentryRoutes = Sentry.withSentryReactRouterV6Routing(Routes);
 
+/** Redirects to another path, carrying over the query so settings links and view options survive */
+function RedirectKeepingSearch({ to }: { to: string }) {
+  const { search } = useLocation();
+  return <Navigate to={{ pathname: to, search }} replace />;
+}
+
 export default function AppRouter() {
   // handle client path changes
   useClientPath();
@@ -196,8 +202,10 @@ export default function AppRouter() {
         />
 
         {/*/!* Protected Routes *!/*/}
-        <Route path='/editor' element={<Editor />} />
-        <Route path='/mobile-editor' element={<MobileEditor />} />
+        <Route path='/editor' element={<MobileEditor />} />
+        <Route path='/advanced-editor' element={<Editor />} />
+        {/* the compact editor used to live here, keep old bookmarks and presets working */}
+        <Route path='/mobile-editor' element={<RedirectKeepingSearch to='/editor' />} />
         <Route path='/ipad-editor' element={<IpadEditor />} />
         <Route path='/cuesheet' element={<PCuesheet />} />
         <Route

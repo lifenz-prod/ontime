@@ -16,7 +16,7 @@ export default function PlaybackControl() {
   return (
     <div className={style.mainContainer}>
       <PlaybackTimer playback={data.playback as Playback}>
-        <AddTime playback={data.playback} />
+        <AddTime playback={data.playback} label='Adjust Current' />
       </PlaybackTimer>
       <PlaybackButtons
         playback={data.playback}

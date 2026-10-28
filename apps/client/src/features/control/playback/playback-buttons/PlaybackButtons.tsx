@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { IoPause, IoPlay, IoPlaySkipBack, IoPlaySkipForward, IoReload, IoStop, IoTime } from 'react-icons/io5';
+import { IoPause, IoPlay, IoPlaySkipBack, IoPlaySkipForward, IoReload, IoStop } from 'react-icons/io5';
 import { Tooltip } from '@chakra-ui/react';
 import { Playback, TimerPhase } from 'ontime-types';
 import { validatePlayback } from 'ontime-utils';
@@ -36,7 +36,6 @@ export default function PlaybackButtons(props: PlaybackButtonsProps) {
   const playbackCan = validatePlayback(playback, timerPhase);
   const disableStart = !playbackCan.start;
   const disablePause = !playbackCan.pause;
-  const disableRoll = !playbackCan.roll || noEvents;
   const disableStop = !playbackCan.stop;
   const disableReload = !playbackCan.reload;
 
@@ -78,9 +77,6 @@ export default function PlaybackButtons(props: PlaybackButtonsProps) {
         </Tooltip>
       </div>
       <div className={style.extra}>
-        <TapButton onClick={setPlayback.roll} disabled={disableRoll} theme={Playback.Roll} active={isRolling}>
-          <IoTime />
-        </TapButton>
         <Tooltip label='Reload event' openDelay={tooltipDelayMid}>
           <TapButton onClick={setPlayback.reload} disabled={disableReload}>
             <IoReload className={style.invertX} />

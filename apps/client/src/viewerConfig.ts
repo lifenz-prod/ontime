@@ -12,7 +12,6 @@ export const navigatorConstants = [
   { url: 'cuescreen', label: 'Cuescreen' },
   { url: 'cuescreennow', label: 'Cuescreen NOW/NEXT' },
   { url: 'qlabcountdown', label: 'Playback Countdown' },
-  { url: 'ipad-editor', label: 'iPad Editor' },
 ];
 
 // default time format to use for users in 12 hour clocks
