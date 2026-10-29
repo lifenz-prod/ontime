@@ -14,7 +14,8 @@ $skip-opacity: 0.2;
     'binder pb-actions estatus estatus'
     'binder ...        ...     ...';
 
-  grid-template-columns: $block-binder-width 3rem 1fr auto;
+  // actions column grows to fit the iPad's larger play button
+  grid-template-columns: $block-binder-width minmax(3rem, auto) 1fr auto;
   grid-template-rows: 0.125rem 2rem 2rem 2rem 0.125rem;
   align-items: center;
   padding-right: $block-clearance;
@@ -129,6 +130,13 @@ $skip-opacity: 0.2;
   align-self: start;
   margin: 0 0.5rem;
   gap: 0.25rem;
+
+  // iPad: play button at twice the size for touch
+  &.bigPlay > button {
+    width: 4rem;
+    height: 4rem;
+    font-size: 2rem;
+  }
 }
 
 .eventTimers {
@@ -137,6 +145,18 @@ $skip-opacity: 0.2;
   align-items: center;
   gap: $block-clearance;
   height: 100%;
+
+  // iPad: fixed duration stopwatch beside the duration, at twice the status icon size
+  .durationIcon {
+    display: flex;
+    align-items: center;
+
+    .durationIconSvg {
+      width: 2rem;
+      height: 2rem;
+      color: var(--status-color-active-override, $active-indicator);
+    }
+  }
 }
 
 .chipSection {

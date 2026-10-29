@@ -109,6 +109,11 @@ function EventBlockInner(props: EventBlockInnerProps) {
           countToEnd={countToEnd}
           hideEndTime={hideEndTime}
         />
+        {playbackOnly && !countToEnd && (
+          <span className={style.durationIcon}>
+            <FixedDurationIcon className={style.durationIconSvg} />
+          </span>
+        )}
       </div>
       <div className={style.titleSection}>
         <EditableBlockTitle title={title} eventId={eventId} placeholder='Event title' className={style.eventTitle} />
@@ -155,13 +160,7 @@ function EventBlockInner(props: EventBlockInnerProps) {
               <EndActionIcon action={endAction} className={style.statusIcon} />
             </span>
           </Tooltip>
-          {!countToEnd && (
-            <Tooltip label='Fixed duration timer' openDelay={tooltipDelayMid}>
-              <span>
-                <IoTimer className={`${style.statusIcon} ${style.active}`} />
-              </span>
-            </Tooltip>
-          )}
+          {!playbackOnly && !countToEnd && <FixedDurationIcon className={style.statusIcon} />}
           <Tooltip label={`${isPublic ? 'Event is public' : 'Event is private'}`} openDelay={tooltipDelayMid}>
             <span>
               <IoPeople className={`${style.statusIcon} ${isPublic ? style.active : style.disabled}`} />
@@ -174,6 +173,17 @@ function EventBlockInner(props: EventBlockInnerProps) {
 }
 
 export default memo(EventBlockInner);
+
+function FixedDurationIcon(props: { className: string }) {
+  const { className } = props;
+  return (
+    <Tooltip label='Fixed duration timer' openDelay={tooltipDelayMid}>
+      <span>
+        <IoTimer className={`${className} ${style.active}`} />
+      </span>
+    </Tooltip>
+  );
+}
 
 function EndActionIcon(props: { action: EndAction; className: string }) {
   const { action, className } = props;

@@ -1,10 +1,10 @@
 .timeContainer {
   display: grid;
   grid-template-areas:
-    'indicators timer  addtime'
-    'status     status addtime';
+    'indicators timer'
+    'status     status';
   grid-template-rows: 1fr auto;
-  grid-template-columns: 1.25rem 1fr 6.5rem;
+  grid-template-columns: 1.25rem 1fr;
   gap: $element-inner-spacing;
 }
 

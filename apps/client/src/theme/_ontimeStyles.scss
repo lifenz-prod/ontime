@@ -61,6 +61,10 @@ $inner-section-text-size: calc(1rem - 2px);
 $text-body-size: calc(1rem - 1px);
 $aux-text-size: calc(1rem - 3px);
 
+// playback control sections (aux timer, adjust current, global offset), sized for touch
+$control-label-size: calc((1rem - 2px) * 1.2);
+$control-tall-button-height: 53px; // 40% taller than the previous 38px
+
 // media queries
 $min-tablet: 500px;
 $small-screen: 800px;

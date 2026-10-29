@@ -70,7 +70,7 @@ export default function IpadEditor() {
           <div id='panels' className={styles.panelContainer}>
             <div className={`${styles.left} ${styles.ipadLeft}`}>
               <IpadTimerControl />
-              <ExternalInput />
+              <ExternalInput className={styles.ipadStageMessage} />
               <div className={rundownStyle.side}>
                 <ErrorBoundary>
                   <IpadRundownEventEditor />

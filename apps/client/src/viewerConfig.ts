@@ -11,6 +11,7 @@ export const navigatorConstants = [
   { url: 'info', label: 'Project Info' },
   { url: 'cuescreen', label: 'Cuescreen' },
   { url: 'cuescreennow', label: 'Cuescreen NOW/NEXT' },
+  { url: 'mobilecuescreen', label: 'Mobile Cue Screen' },
   { url: 'qlabcountdown', label: 'Playback Countdown' },
 ];
 

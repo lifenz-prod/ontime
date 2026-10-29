@@ -12,7 +12,7 @@ import ipadStyle from './IpadPlaybackControl.module.scss';
 import timerStyle from './playback-timer/PlaybackTimer.module.scss';
 import style from './PlaybackControl.module.scss';
 
-function IpadPlaybackTimer({ playback }: { playback: Playback }) {
+function IpadPlaybackTimer() {
   const timer = useTimer();
   const isWaiting = timer.phase === TimerPhase.Pending;
 
@@ -20,7 +20,6 @@ function IpadPlaybackTimer({ playback }: { playback: Playback }) {
     <div className={timerStyle.timeContainer}>
       <div className={timerStyle.indicators} />
       <IpadTimerDisplay time={isWaiting ? timer.secondaryTimer : timer.current} />
-      <AddTime playback={playback} bigger label='Adjust Current' />
     </div>
   );
 }
@@ -30,7 +29,7 @@ export default function IpadPlaybackControl() {
 
   return (
     <div className={style.mainContainer}>
-      <IpadPlaybackTimer playback={data.playback as Playback} />
+      <IpadPlaybackTimer />
       <IpadPlaybackButtons
         playback={data.playback as Playback}
         numEvents={data.numEvents}
@@ -38,6 +37,7 @@ export default function IpadPlaybackControl() {
         timerPhase={data.timerPhase}
       />
       <AuxTimer controlsClassName={ipadStyle.tallAuxControls} mmSs />
+      <AddTime playback={data.playback as Playback} />
       <GlobalOffset />
     </div>
   );

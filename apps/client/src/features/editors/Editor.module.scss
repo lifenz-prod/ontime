@@ -52,6 +52,19 @@ $panel-gap: 0.5rem;
   max-width: $max-playback-width * 1.1;
 }
 
+/* Stage message row at double height for readability on the iPad */
+.ipadStageMessage {
+  input {
+    height: 4rem;
+    font-size: 1.25rem;
+  }
+
+  button {
+    height: 4rem;
+    width: 4rem;
+  }
+}
+
 .messages {
   flex: 1;
 }

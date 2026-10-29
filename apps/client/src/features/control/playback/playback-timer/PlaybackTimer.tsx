@@ -1,4 +1,3 @@
-import { PropsWithChildren } from 'react';
 import { Tooltip } from '@chakra-ui/react';
 import { MaybeNumber, Playback, TimerPhase } from 'ontime-types';
 import { dayInMs, millisToString } from 'ontime-utils';
@@ -27,8 +26,8 @@ function resolveAddedTimeLabel(addedTime: number) {
   return '';
 }
 
-export default function PlaybackTimer(props: PropsWithChildren<PlaybackTimerProps>) {
-  const { playback, children } = props;
+export default function PlaybackTimer(props: PlaybackTimerProps) {
+  const { playback } = props;
   const timer = useTimer();
 
   const isRolling = playback === Playback.Roll;
@@ -59,7 +58,6 @@ export default function PlaybackTimer(props: PropsWithChildren<PlaybackTimerProp
           <RunningStatus startedAt={timer.startedAt} expectedFinish={timer.expectedFinish} playback={playback} />
         )}
       </div>
-      {children}
     </div>
   );
 }

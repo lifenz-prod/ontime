@@ -1,0 +1,23 @@
+// Grey surround so the edges of the black 16:9 screen are visible
+.mobile-cuescreen {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background-color: #1a1a1a;
+}
+
+.mobile-cuescreen__frame {
+  position: relative;
+  overflow: hidden;
+}
+
+.mobile-cuescreen__screen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1920px;
+  height: 1080px;
+  transform-origin: top left;
+}

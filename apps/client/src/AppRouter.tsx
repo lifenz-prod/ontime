@@ -27,6 +27,7 @@ const Operator = React.lazy(() => import('./features/operator/OperatorExport'));
 const TimerView = React.lazy(() => import('./views/timer/Timer'));
 const CuescreenView = React.lazy(() => import('./views/cuescreen/CuescreenView'));
 const CuescreennowView = React.lazy(() => import('./views/cuescreen/CuescreennowView'));
+const MobileCuescreenView = React.lazy(() => import('./views/cuescreen/MobileCuescreenView'));
 const MinimalTimerView = React.lazy(() => import('./features/viewers/minimal-timer/MinimalTimer'));
 const ClockView = React.lazy(() => import('./features/viewers/clock/Clock'));
 const Countdown = React.lazy(() => import('./features/viewers/countdown/Countdown'));
@@ -43,6 +44,7 @@ const QlabCountdownView = React.lazy(() => import('./views/qlabcountdown/QlabCou
 const STimer = withPreset(withData(TimerView));
 const SCuescreen = withPreset(withData(CuescreenView));
 const SCuescreennow = withPreset(withData(CuescreennowView));
+const SMobileCuescreen = withPreset(withData(MobileCuescreenView));
 const SMinimalTimer = withPreset(withData(MinimalTimerView));
 const SClock = withPreset(withData(ClockView));
 const SCountdown = withPreset(withData(Countdown));
@@ -173,6 +175,14 @@ export default function AppRouter() {
           element={
             <ViewLoader>
               <SCuescreen />
+            </ViewLoader>
+          }
+        />
+        <Route
+          path='/mobilecuescreen'
+          element={
+            <ViewLoader>
+              <SMobileCuescreen />
             </ViewLoader>
           }
         />
