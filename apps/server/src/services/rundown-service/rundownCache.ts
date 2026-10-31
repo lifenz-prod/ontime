@@ -328,13 +328,15 @@ export function removeAll(): MutatingReturn {
  * Utility function for patching an existing event with new data
  */
 function makeEvent(eventFromRundown: OntimeRundownEntry, patch: Partial<OntimeRundownEntry>): OntimeRundownEntry {
+  // a hand-edited generated entry deviates from its master and is kept through regeneration
+  const deviation = eventFromRundown.generatedFor ? { deviated: true } : {};
   if (isOntimeEvent(eventFromRundown)) {
-    const newEvent = createPatch(eventFromRundown, patch as OntimeEvent);
+    const newEvent = createPatch(eventFromRundown, { ...patch, ...deviation } as OntimeEvent);
     newEvent.revision++;
     return newEvent;
   }
   // TODO: exhaustive check
-  return { ...eventFromRundown, ...patch } as OntimeRundownEntry;
+  return { ...eventFromRundown, ...patch, ...deviation } as OntimeRundownEntry;
 }
 
 type EditArgs = MutationParams<{ eventId: string; patch: Partial<OntimeRundownEntry> }>;

@@ -74,10 +74,12 @@ export default function MobileEditor() {
         />
       </MobileEditorOverview>
       {!isSettingsOpen && tabs.length > 0 && (
-        <ButtonGroup size='md' variant='ontime-subtle' isAttached mx={4} my={2}>
+        <ButtonGroup size='md' variant='ontime-subtle' spacing={3} mx={4} my={2}>
           {tabs.map((tab) => (
             <Button
               key={tab.id}
+              border='1px solid'
+              borderColor='whiteAlpha.500'
               onClick={() => selectTab(tab.id)}
               variant={activeTabId === tab.id ? 'ontime-filled' : 'ontime-subtle'}
             >

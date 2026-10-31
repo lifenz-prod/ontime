@@ -16,7 +16,8 @@ $skip-opacity: 0.2;
 
   // actions column grows to fit the iPad's larger play button
   grid-template-columns: $block-binder-width minmax(3rem, auto) 1fr auto;
-  grid-template-rows: 0.125rem 2rem 2rem 2rem 0.125rem;
+  // status row grows to fit the 2rem status icons above the progress bar
+  grid-template-rows: 0.125rem 2rem 2rem minmax(2rem, auto) 0.125rem;
   align-items: center;
   padding-right: $block-clearance;
   gap: 2px;
@@ -146,10 +147,11 @@ $skip-opacity: 0.2;
   gap: $block-clearance;
   height: 100%;
 
-  // iPad: fixed duration stopwatch beside the duration, at twice the status icon size
+  // iPad: fixed duration and hidden timer icons beside the duration
   .durationIcon {
     display: flex;
     align-items: center;
+    gap: 0.25rem;
 
     .durationIconSvg {
       width: 2rem;
@@ -234,8 +236,8 @@ $skip-opacity: 0.2;
   color: var(--status-color-override, $gray-500);
 
   .statusIcon {
-    width: 1rem;
-    height: 1rem;
+    width: 2rem;
+    height: 2rem;
   }
 
   .statusIcon.active {

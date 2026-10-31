@@ -24,6 +24,61 @@ export function getLink(currentIndex: number, rundown: OntimeRundown): OntimeEve
 }
 
 /**
+ * Get the first event at or after the given index
+ */
+function getNextEvent(fromIndex: number, rundown: OntimeRundown): OntimeEvent | null {
+  for (let i = fromIndex; i < rundown.length; i++) {
+    const event = rundown[i];
+    if (isOntimeEvent(event) && !event.skip) {
+      return event;
+    }
+  }
+  return null;
+}
+
+/**
+ * Anchors the times of an event about to be inserted at a given index to its neighbours
+ * - a linked event starts at the previous event's end, and links to that event by id
+ * - an unlinked event without a start of its own starts at the previous event's end
+ *   (or at the next event's start, when there is nothing before it)
+ * - when no end was given, the end follows from the start and duration
+ *   so a zero duration cue inserted between two events leaves the next event where it is
+ *   regardless of the time strategy
+ * Does not mutate the given data
+ */
+export function anchorInsertedEvent<T extends Partial<OntimeEvent>>(
+  eventData: T,
+  atIndex: number,
+  rundown: OntimeRundown,
+): T {
+  const patch = { ...eventData };
+  const previous = getLink(atIndex, rundown);
+
+  if (patch.linkStart) {
+    if (!previous) {
+      patch.linkStart = null;
+      return patch;
+    }
+    patch.linkStart = previous.id;
+    patch.timeStart = previous.timeEnd;
+  } else if (patch.timeStart === undefined) {
+    const anchor = previous?.timeEnd ?? getNextEvent(atIndex, rundown)?.timeStart;
+    if (anchor === undefined) {
+      return patch;
+    }
+    patch.timeStart = anchor;
+  } else {
+    return patch;
+  }
+
+  if (patch.timeEnd === undefined) {
+    patch.timeEnd = (patch.timeStart + (patch.duration ?? 0)) % dayInMs;
+  }
+
+  return patch;
+}
+
+/**
  * Populates data from link, if necessary
  * Mutates in place mutableEvent
  * Mutates in place links
@@ -44,10 +99,10 @@ export function handleLink(
     return;
   }
 
-  // sometimes the client cannot set the previous event
-  if (mutableEvent.linkStart === 'true') {
-    mutableEvent.linkStart = linkedEvent.id;
-  }
+  // the link always points at the event it is actually linked to
+  // the client may send 'true' when it cannot resolve the previous event,
+  // and an insert or reorder can leave a stale id behind
+  mutableEvent.linkStart = linkedEvent.id;
 
   links[linkedEvent.id] = mutableEvent.id;
 

@@ -58,13 +58,23 @@ describe('regenerateInstances()', () => {
     const result = regenerateInstances(baseRundown, dualServiceProfiles);
 
     // rehearsal + boundary + 2 master + generated block + 2 generated events
-    expect(result).toHaveLength(7);
+    expect(result).toHaveLength(8);
 
     const generated = result.filter((entry) => entry.generatedFor === 'svc-11');
-    expect(generated).toHaveLength(3);
+    expect(generated).toHaveLength(4);
 
-    const [block, eventA, eventB] = generated;
+    const [block, leadIn, eventA, eventB] = generated;
     expect(block).toMatchObject({ type: SupportedEvent.Block, title: '11am', mirrorOf: 'boundary' });
+    // a blank cue counts down to the first cue (doors open)
+    expect(leadIn).toMatchObject({
+      type: SupportedEvent.Event,
+      title: '',
+      timeStart: 10.5 * MILLIS_PER_HOUR,
+      timeEnd: 10.75 * MILLIS_PER_HOUR,
+      duration: 15 * 60 * 1000,
+      linkStart: null,
+    });
+    expect(leadIn.mirrorOf).toBeUndefined();
     expect(eventA).toMatchObject({
       timeStart: 10.75 * MILLIS_PER_HOUR,
       timeEnd: 11 * MILLIS_PER_HOUR,
@@ -86,7 +96,7 @@ describe('regenerateInstances()', () => {
     const once = regenerateInstances(baseRundown, dualServiceProfiles);
     const twice = regenerateInstances(once, dualServiceProfiles);
     expect(twice).toHaveLength(once.length);
-    expect(twice.filter((entry) => entry.generatedFor)).toHaveLength(3);
+    expect(twice.filter((entry) => entry.generatedFor)).toHaveLength(4);
   });
 
   it('master edits flow into the regenerated section', () => {
@@ -100,6 +110,36 @@ describe('regenerateInstances()', () => {
     const generatedB = result.find((entry) => entry.mirrorOf === 'master-b') as OntimeEvent;
     expect(generatedB.timeEnd).toBe(13 * MILLIS_PER_HOUR);
     expect(generatedB.duration).toBe(2 * MILLIS_PER_HOUR);
+  });
+
+  it('keeps hand-edited generated entries instead of re-cloning them', () => {
+    const once = regenerateInstances(baseRundown, dualServiceProfiles);
+    const generatedA = once.find((entry) => entry.mirrorOf === 'master-a') as OntimeEvent;
+    const deviated = once.map((entry) =>
+      entry.id === generatedA.id ? { ...entry, title: 'Doors open late', deviated: true } : entry,
+    );
+    // a master edit triggers regeneration
+    const edited = deviated.map((entry) => (entry.id === 'master-a' ? { ...entry, title: 'Doors' } : entry));
+    const result = regenerateInstances(edited, dualServiceProfiles);
+
+    const keptA = result.find((entry) => entry.mirrorOf === 'master-a') as OntimeEvent;
+    expect(keptA).toMatchObject({ id: generatedA.id, title: 'Doors open late', deviated: true });
+    expect(result.filter((entry) => entry.mirrorOf === 'master-a')).toHaveLength(1);
+
+    // the following generated cue is re-cloned and still linked to the kept one
+    const generatedB = result.find((entry) => entry.mirrorOf === 'master-b') as OntimeEvent;
+    expect(generatedB.linkStart).toBe(generatedA.id);
+  });
+
+  it('keeps a hand-edited lead-in cue', () => {
+    const once = regenerateInstances(baseRundown, dualServiceProfiles);
+    const leadIn = once.find((entry) => entry.generatedFor && !entry.mirrorOf) as OntimeEvent;
+    const deviated = once.map((entry) =>
+      entry.id === leadIn.id ? { ...entry, title: 'Countdown to doors', deviated: true } : entry,
+    );
+    const result = regenerateInstances(deviated, dualServiceProfiles);
+    const leadIns = result.filter((entry) => entry.generatedFor && !entry.mirrorOf);
+    expect(leadIns).toMatchObject([{ id: leadIn.id, title: 'Countdown to doors' }]);
   });
 
   it('returns only the stripped rundown when there is no boundary', () => {

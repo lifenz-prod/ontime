@@ -33,10 +33,12 @@ export default function IpadEditor() {
       <MobileEditorOverview
         rightContent={
           tabs.length > 0 ? (
-            <ButtonGroup size='lg' isAttached>
+            <ButtonGroup size='lg' spacing={3}>
               {tabs.map((tab) => (
                 <Button
                   key={tab.id}
+                  border='1px solid'
+                  borderColor='whiteAlpha.500'
                   onClick={() => selectTab(tab.id)}
                   variant={activeTabId === tab.id ? 'ontime-filled' : 'ontime-subtle-white'}
                 >

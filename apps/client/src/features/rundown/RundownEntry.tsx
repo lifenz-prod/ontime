@@ -88,8 +88,9 @@ export default function RundownEntry(props: RundownEntryProps) {
       }
       case 'event-before': {
         const newEvent = { type: SupportedEvent.Event };
+        // placed before this entry, so it also works above the first entry in the rundown
         const options = {
-          after: previousEntryId,
+          before: data.id,
         };
         return addEvent(newEvent, options);
       }
@@ -163,6 +164,7 @@ export default function RundownEntry(props: RundownEntryProps) {
         linkStart={data.linkStart}
         countToEnd={data.countToEnd}
         isPublic={data.isPublic}
+        hideTimer={data.hideTimer}
         endAction={data.endAction}
         timerType={data.timerType}
         title={data.title}

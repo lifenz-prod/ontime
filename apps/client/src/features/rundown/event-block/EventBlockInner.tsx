@@ -3,7 +3,7 @@ import {
   IoArrowDown,
   IoArrowUp,
   IoBan,
-  IoPeople,
+  IoEyeOff,
   IoPlay,
   IoPlayForward,
   IoPlaySkipForward,
@@ -36,6 +36,7 @@ interface EventBlockInnerProps {
   countToEnd: boolean;
   eventIndex: number;
   isPublic: boolean;
+  hideTimer: boolean;
   endAction: EndAction;
   timerType: TimerType;
   title: string;
@@ -63,6 +64,7 @@ function EventBlockInner(props: EventBlockInnerProps) {
     linkStart,
     countToEnd,
     isPublic = true,
+    hideTimer,
     endAction,
     timerType,
     title,
@@ -109,9 +111,10 @@ function EventBlockInner(props: EventBlockInnerProps) {
           countToEnd={countToEnd}
           hideEndTime={hideEndTime}
         />
-        {playbackOnly && !countToEnd && (
+        {playbackOnly && (!countToEnd || hideTimer) && (
           <span className={style.durationIcon}>
-            <FixedDurationIcon className={style.durationIconSvg} />
+            {!countToEnd && <FixedDurationIcon className={style.durationIconSvg} />}
+            {hideTimer && <HideTimerIcon className={style.durationIconSvg} />}
           </span>
         )}
       </div>
@@ -161,11 +164,7 @@ function EventBlockInner(props: EventBlockInnerProps) {
             </span>
           </Tooltip>
           {!playbackOnly && !countToEnd && <FixedDurationIcon className={style.statusIcon} />}
-          <Tooltip label={`${isPublic ? 'Event is public' : 'Event is private'}`} openDelay={tooltipDelayMid}>
-            <span>
-              <IoPeople className={`${style.statusIcon} ${isPublic ? style.active : style.disabled}`} />
-            </span>
-          </Tooltip>
+          {!playbackOnly && hideTimer && <HideTimerIcon className={style.statusIcon} />}
         </div>
       </div>
     </>
@@ -180,6 +179,17 @@ function FixedDurationIcon(props: { className: string }) {
     <Tooltip label='Fixed duration timer' openDelay={tooltipDelayMid}>
       <span>
         <IoTimer className={`${className} ${style.active}`} />
+      </span>
+    </Tooltip>
+  );
+}
+
+function HideTimerIcon(props: { className: string }) {
+  const { className } = props;
+  return (
+    <Tooltip label='Timer hidden' openDelay={tooltipDelayMid}>
+      <span>
+        <IoEyeOff className={`${className} ${style.active}`} />
       </span>
     </Tooltip>
   );

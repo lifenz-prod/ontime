@@ -101,7 +101,8 @@ function MakeMultiLineField({ row, column, table }: CellContext<OntimeRundownEnt
     return null;
   }
 
-  const initialValue = event[column.id as keyof OntimeRundownEntry] ?? '';
+  // these columns only hold text fields
+  const initialValue = String(event[column.id as keyof OntimeRundownEntry] ?? '');
 
   return <MultiLineCell initialValue={initialValue} handleUpdate={update} />;
 }
@@ -138,7 +139,8 @@ function MakeSingleLineField({ row, column, table }: CellContext<OntimeRundownEn
     return null;
   }
 
-  const initialValue = event[column.id as keyof OntimeRundownEntry] ?? '';
+  // these columns only hold text fields
+  const initialValue = String(event[column.id as keyof OntimeRundownEntry] ?? '');
 
   return <SingleLineCell initialValue={initialValue} handleUpdate={update} />;
 }

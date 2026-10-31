@@ -19,7 +19,7 @@ import { customFieldLabelToKey, generateId, isAlphanumericWithSpace, validateEnd
 
 import { dbModel } from '../models/dataModel.js';
 import { block as blockDef, delay as delayDef } from '../models/eventsDefinition.js';
-import { createEvent, type ErrorEmitter } from './parser.js';
+import { createEvent, type ErrorEmitter, pickServiceInstanceTags } from './parser.js';
 
 /**
  * Parse rundown array of an entry
@@ -77,9 +77,9 @@ export function parseRundown(
       previousId = id;
       eventIndex += 1;
     } else if (isOntimeDelay(event)) {
-      newEvent = { ...delayDef, duration: event.duration, id };
+      newEvent = { ...delayDef, duration: event.duration, id, ...pickServiceInstanceTags(event) };
     } else if (isOntimeBlock(event)) {
-      newEvent = { ...blockDef, title: event.title, id };
+      newEvent = { ...blockDef, title: event.title, id, ...pickServiceInstanceTags(event) };
     } else {
       emitError?.('Unknown event type, skipping');
       continue;

@@ -9,6 +9,7 @@ import {
 } from 'ontime-types';
 import {
   addToCustomAssignment,
+  anchorInsertedEvent,
   calculateDayOffset,
   getLink,
   handleCustomField,
@@ -69,6 +70,84 @@ describe('handleLink()', () => {
     expect(mutableEvent.timeStart).toBe(0);
     expect(mutableEvent.linkStart).toBe(null);
     expect(links).toStrictEqual({});
+  });
+});
+
+describe('handleLink() keeps the link pointing at the event it follows', () => {
+  it('resolves a link the client could not resolve', () => {
+    const rundown = [
+      { type: SupportedEvent.Event, id: '1', timeEnd: 100 },
+      { type: SupportedEvent.Event, id: '2', timeStart: 0, linkStart: 'true' },
+    ] as OntimeRundown;
+    const mutableEvent = { ...rundown[1] } as OntimeEvent;
+    handleLink(1, rundown, mutableEvent, {});
+    expect(mutableEvent.linkStart).toBe('1');
+  });
+
+  it('replaces a stale id when an event was inserted in between', () => {
+    const rundown = [
+      { type: SupportedEvent.Event, id: '1', timeEnd: 100 },
+      { type: SupportedEvent.Event, id: 'new', timeStart: 100, timeEnd: 100, duration: 0, linkStart: '1' },
+      { type: SupportedEvent.Event, id: '2', timeStart: 100, linkStart: '1' },
+    ] as OntimeRundown;
+    const mutableEvent = { ...rundown[2] } as OntimeEvent;
+    const links = {};
+    handleLink(2, rundown, mutableEvent, links);
+    expect(mutableEvent.linkStart).toBe('new');
+    expect(mutableEvent.timeStart).toBe(100);
+    expect(links).toStrictEqual({ new: '2' });
+  });
+});
+
+describe('anchorInsertedEvent()', () => {
+  const rundown = [
+    { type: SupportedEvent.Event, id: '1', timeStart: 1000, timeEnd: 2000, duration: 1000 },
+    { type: SupportedEvent.Block, id: 'block' },
+    { type: SupportedEvent.Event, id: '2', timeStart: 2000, timeEnd: 3000, duration: 1000, linkStart: '1' },
+  ] as OntimeRundown;
+
+  it('links a new cue to the previous event and starts it at its end', () => {
+    const result = anchorInsertedEvent({ duration: 0, linkStart: 'true' }, 2, rundown);
+    expect(result).toMatchObject({ linkStart: '1', timeStart: 2000, timeEnd: 2000, duration: 0 });
+  });
+
+  it('anchors the end of an end-locked cue to its start', () => {
+    const result = anchorInsertedEvent(
+      { duration: 0, linkStart: 'true', timeStrategy: TimeStrategy.LockEnd },
+      1,
+      rundown,
+    );
+    expect(result).toMatchObject({ linkStart: '1', timeStart: 2000, timeEnd: 2000 });
+  });
+
+  it('starts an unlinked cue at the previous event end', () => {
+    const result = anchorInsertedEvent<Partial<OntimeEvent>>({ duration: 0 }, 2, rundown);
+    expect(result).toMatchObject({ timeStart: 2000, timeEnd: 2000, duration: 0 });
+    expect(result.linkStart).toBeUndefined();
+  });
+
+  it('places a cue inserted before the first event at its start, unlinked', () => {
+    const result = anchorInsertedEvent({ duration: 0, linkStart: 'true' }, 0, rundown);
+    expect(result.linkStart).toBeNull();
+
+    const unlinked = anchorInsertedEvent({ duration: 0 }, 0, rundown);
+    expect(unlinked).toMatchObject({ timeStart: 1000, timeEnd: 1000 });
+  });
+
+  it('keeps the times given to an unlinked event', () => {
+    const result = anchorInsertedEvent({ timeStart: 5000, duration: 100 }, 2, rundown);
+    expect(result).toStrictEqual({ timeStart: 5000, duration: 100 });
+  });
+
+  it('keeps the end given to a linked event', () => {
+    const result = anchorInsertedEvent({ linkStart: 'x', timeEnd: 4000, duration: 100 }, 2, rundown);
+    expect(result).toMatchObject({ linkStart: '1', timeStart: 2000, timeEnd: 4000 });
+  });
+
+  it('does not mutate the given data', () => {
+    const data = { duration: 0, linkStart: 'true' };
+    anchorInsertedEvent(data, 2, rundown);
+    expect(data).toStrictEqual({ duration: 0, linkStart: 'true' });
   });
 });
 

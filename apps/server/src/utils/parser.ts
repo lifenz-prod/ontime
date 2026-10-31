@@ -15,6 +15,7 @@ import {
   EventCustomFields,
   isOntimeBlock,
   LogOrigin,
+  OntimeBaseEvent,
   OntimeEvent,
   OntimeRundown,
   ServiceProfiles,
@@ -442,6 +443,25 @@ function inferStrategy(end: unknown, duration: unknown, fallback: TimeStrategy):
   return fallback;
 }
 
+/**
+ * Carries over the service-instance tags of a generated entry, which are only present on generated sections
+ */
+type ServiceInstanceTags = Pick<OntimeBaseEvent, 'generatedFor' | 'mirrorOf' | 'deviated'>;
+
+export function pickServiceInstanceTags(
+  original: ServiceInstanceTags,
+  patch: ServiceInstanceTags = {},
+): ServiceInstanceTags {
+  const tags: ServiceInstanceTags = {};
+  const generatedFor = patch.generatedFor ?? original.generatedFor;
+  const mirrorOf = patch.mirrorOf ?? original.mirrorOf;
+  const deviated = patch.deviated ?? original.deviated;
+  if (generatedFor) tags.generatedFor = generatedFor;
+  if (mirrorOf) tags.mirrorOf = mirrorOf;
+  if (deviated) tags.deviated = deviated;
+  return tags;
+}
+
 export function createPatch(originalEvent: OntimeEvent, patchEvent: Partial<OntimeEvent>): OntimeEvent {
   if (Object.keys(patchEvent).length === 0) {
     return originalEvent;
@@ -482,6 +502,7 @@ export function createPatch(originalEvent: OntimeEvent, patchEvent: Partial<Onti
     timeDanger: patchEvent.timeDanger ?? originalEvent.timeDanger,
     custom: { ...originalEvent.custom, ...patchEvent.custom },
     triggers: patchEvent.triggers ?? originalEvent.triggers,
+    ...pickServiceInstanceTags(originalEvent, patchEvent),
   };
 }
 

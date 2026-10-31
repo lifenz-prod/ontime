@@ -36,6 +36,7 @@ interface EventBlockProps {
   countToEnd: boolean;
   eventIndex: number;
   isPublic: boolean;
+  hideTimer?: boolean;
   endAction: EndAction;
   timerType: TimerType;
   title: string;
@@ -76,6 +77,7 @@ export default function EventBlock(props: EventBlockProps) {
     linkStart,
     countToEnd,
     isPublic = true,
+    hideTimer = false,
     eventIndex,
     endAction,
     timerType,
@@ -302,6 +304,7 @@ export default function EventBlock(props: EventBlockProps) {
           eventId={eventId}
           eventIndex={eventIndex}
           isPublic={isPublic}
+          hideTimer={hideTimer}
           endAction={endAction}
           timerType={timerType}
           title={title}

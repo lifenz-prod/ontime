@@ -23,6 +23,7 @@ import { getState, updateRundownData } from '../../stores/runtimeState.js';
 import { runtimeService } from '../runtime-service/RuntimeService.js';
 
 import * as cache from './rundownCache.js';
+import { anchorInsertedEvent } from './rundownCacheUtils.js';
 import { getPlayableEvents, getTimedEvents } from './rundownUtils.js';
 
 type CompleteEntry<T> =
@@ -85,8 +86,14 @@ export async function addEvent(eventData: EventPostPayload): Promise<OntimeRundo
     }
   }
 
+  // a new event takes its times from where it lands in the rundown
+  // (inserting a linked, zero duration cue leaves the following events where they were)
+  const anchoredData = isOntimeEvent(eventData)
+    ? anchorInsertedEvent(eventData, atIndex, cache.getPersistedRundown())
+    : eventData;
+
   // generate a fully formed event from the patch
-  const eventToAdd = generateEvent(eventData, afterId);
+  const eventToAdd = generateEvent(anchoredData, afterId);
 
   // modify rundown
   const scopedMutation = cache.mutateCache(cache.add);

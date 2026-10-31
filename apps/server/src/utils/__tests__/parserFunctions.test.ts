@@ -43,6 +43,21 @@ describe('parseRundown()', () => {
     expect(parsedRundown.at(0)).toMatchObject({ id: '1', type: SupportedEvent.Event, title: 'test', skip: false });
     expect(errorEmitter).toHaveBeenCalled();
   });
+
+  it('keeps the tags of generated service sections', () => {
+    const rundown = [
+      { id: 'b', type: SupportedEvent.Block, title: '11am', generatedFor: 'svc-11', mirrorOf: 'boundary' },
+      { id: 'e', type: SupportedEvent.Event, title: 'Doors', generatedFor: 'svc-11', mirrorOf: 'm', deviated: true },
+      { id: 'm', type: SupportedEvent.Event, title: 'Master' },
+    ] as OntimeRundown;
+    const { rundown: parsedRundown } = parseRundown({ rundown, customFields: {} });
+    expect(parsedRundown).toMatchObject([
+      { id: 'b', generatedFor: 'svc-11', mirrorOf: 'boundary' },
+      { id: 'e', generatedFor: 'svc-11', mirrorOf: 'm', deviated: true },
+      { id: 'm' },
+    ]);
+    expect(parsedRundown.at(2)).not.toHaveProperty('generatedFor');
+  });
 });
 
 describe('parseProject()', () => {

@@ -13,6 +13,8 @@ export type OntimeBaseEvent = {
   generatedFor?: string;
   /** Id of the master entry this generated entry was cloned from */
   mirrorOf?: string;
+  /** Generated entry edited by hand: kept as-is instead of being re-cloned from the master */
+  deviated?: boolean;
 };
 
 export type OntimeDelay = OntimeBaseEvent & {
