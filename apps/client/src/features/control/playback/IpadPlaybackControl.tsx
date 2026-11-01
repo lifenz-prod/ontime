@@ -28,7 +28,7 @@ export default function IpadPlaybackControl() {
   const data = usePlaybackControl();
 
   return (
-    <div className={style.mainContainer}>
+    <div className={`${style.mainContainer} ${style.compact}`}>
       <IpadPlaybackTimer />
       <IpadPlaybackButtons
         playback={data.playback as Playback}

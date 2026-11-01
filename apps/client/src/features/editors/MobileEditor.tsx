@@ -92,7 +92,7 @@ export default function MobileEditor() {
         <AppSettings />
       ) : (
         <div id='panels' className={styles.panelContainer}>
-          <div className={styles.left}>
+          <div className={`${styles.left} ${styles.scrollLeft}`}>
             <MobileTimerControl />
             <ExternalInput />
             <div className={rundownStyle.side}>

@@ -173,7 +173,7 @@ $skip-opacity: 0.2;
 
   .nextTag {
     font-size: 1rem;
-    color: $orange-500;
+    color: $orange-700;
     letter-spacing: 0.03px;
     font-weight: 600;
   }
@@ -252,6 +252,21 @@ $skip-opacity: 0.2;
   .statusIcon.delayedAction {
     color: $orange-700;
   }
+}
+
+/* show as aux timer: a small orange tag, sized to sit with the 2rem icons */
+.auxBadge {
+  display: inline-flex;
+  align-items: center;
+  height: 1.5rem;
+  padding-inline: 0.3rem;
+  border: 2px solid $orange-700;
+  border-radius: 3px;
+  color: $orange-700;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.05em;
 }
 
 @keyframes wiggle {

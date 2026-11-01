@@ -52,6 +52,30 @@ $panel-gap: 0.5rem;
   max-width: $max-playback-width * 1.1;
 }
 
+/* iPad and main editor: the control column scrolls as a whole */
+.scrollLeft {
+  overflow-y: auto;
+
+  /* sections keep their size so the column scrolls instead of squashing the event editor */
+  > * {
+    flex-shrink: 0;
+  }
+
+  > :last-child {
+    flex-grow: 1;
+    max-height: none;
+  }
+}
+
+/* iPad and main editor: playback panel 20% shorter, from tighter padding rather than smaller controls */
+.panelContainer .compactPlayback {
+  padding-block: 0.5rem;
+
+  .content {
+    padding-top: 0.25rem;
+  }
+}
+
 /* Stage message row at double height for readability on the iPad */
 .ipadStageMessage {
   input {

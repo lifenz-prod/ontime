@@ -70,7 +70,7 @@ export default function IpadEditor() {
       ) : (
         <>
           <div id='panels' className={styles.panelContainer}>
-            <div className={`${styles.left} ${styles.ipadLeft}`}>
+            <div className={`${styles.left} ${styles.ipadLeft} ${styles.scrollLeft}`}>
               <IpadTimerControl />
               <ExternalInput className={styles.ipadStageMessage} />
               <div className={rundownStyle.side}>

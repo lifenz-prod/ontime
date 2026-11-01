@@ -165,8 +165,8 @@ export default function RundownEntry(props: RundownEntryProps) {
         countToEnd={data.countToEnd}
         isPublic={data.isPublic}
         hideTimer={data.hideTimer}
+        showAsAuxTimer={data.showAsAuxTimer}
         endAction={data.endAction}
-        timerType={data.timerType}
         title={data.title}
         note={data.note}
         delay={data.delay ?? 0}
