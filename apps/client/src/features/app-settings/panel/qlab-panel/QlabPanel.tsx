@@ -3,10 +3,12 @@ import { Button, Input, Switch } from '@chakra-ui/react';
 import type { QlabSettings } from 'ontime-types';
 
 import { maybeAxiosError } from '../../../../common/api/utils';
+import Info from '../../../../common/components/info/Info';
 import useQlabSettings, { useQlabSettingsMutation } from '../../../../common/hooks-query/useQlabSettings';
 import { useRuntimeStore } from '../../../../common/stores/runtime';
 import { preventEscape } from '../../../../common/utils/keyEvent';
 import * as Panel from '../../panel-utils/PanelUtils';
+import CountdownSourcePicker from '../countdown-source/CountdownSourcePicker';
 
 export default function QlabPanel() {
   const { data } = useQlabSettings();
@@ -68,6 +70,14 @@ export default function QlabPanel() {
 
       <Panel.Divider />
 
+      <Info>
+        Ontime only reads from QLab, so it can share one with Bitfocus Companion.
+        <br />
+        QLab keeps a reply port per client, so if something else is already using the default 53001, give Ontime a port
+        of its own below and it will ask QLab to reply there. Companion&apos;s QLab module uses TCP by default, which
+        does not take the port at all.
+      </Info>
+
       <Panel.Section
         as='form'
         id='qlab-settings-form'
@@ -75,6 +85,8 @@ export default function QlabPanel() {
         onKeyDown={(event) => preventEscape(event, onReset)}
       >
         <Panel.Loader isLoading={false} />
+
+        <CountdownSourcePicker />
 
         <Panel.Title>Connection</Panel.Title>
         <Panel.ListGroup>
@@ -147,7 +159,7 @@ export default function QlabPanel() {
           <Panel.ListItem>
             <Panel.Field
               title='Listen port'
-              description='Port to receive QLab responses. Default: 53001'
+              description='Port Ontime asks QLab to reply on. Default: 53001'
               error={errors.listenPort?.message}
             />
             <Input

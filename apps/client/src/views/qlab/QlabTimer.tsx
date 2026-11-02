@@ -3,6 +3,7 @@ import { millisToString, removeLeadingZero } from 'ontime-utils';
 
 import { useWindowTitle } from '../../common/hooks/useWindowTitle';
 import { useRuntimeStore } from '../../common/stores/runtime';
+import { countdownSourceLabels } from '../../common/utils/countdownSource';
 
 import './QlabTimer.scss';
 
@@ -33,28 +34,29 @@ function getProgressPhaseClass(phase: TimerPhase): string {
 }
 
 export default function QlabTimer() {
-  const qlab = useRuntimeStore((state) => state.qlab);
+  const countdown = useRuntimeStore((state) => state.countdown);
+  const sourceLabel = countdownSourceLabels[countdown.source];
 
-  useWindowTitle('QLab Timer');
+  useWindowTitle(`${sourceLabel} Timer`);
 
-  if (!qlab.enabled) {
+  if (!countdown.enabled) {
     return (
       <div className='qlab-timer'>
-        <div className='idle'>QLab integration disabled</div>
+        <div className='idle'>{sourceLabel} integration disabled</div>
       </div>
     );
   }
 
-  if (!qlab.connected) {
+  if (!countdown.connected) {
     return (
       <div className='qlab-timer'>
         <div className='status status--disconnected'>Disconnected</div>
-        <div className='idle'>Waiting for QLab connection...</div>
+        <div className='idle'>Waiting for {sourceLabel} connection...</div>
       </div>
     );
   }
 
-  if (!qlab.cueName && !qlab.cueNumber) {
+  if (!countdown.cueName && !countdown.cueNumber) {
     return (
       <div className='qlab-timer'>
         <div className='status status--connected'>Connected</div>
@@ -63,21 +65,21 @@ export default function QlabTimer() {
     );
   }
 
-  const display = removeLeadingZero(millisToString(qlab.remaining));
-  const progress = qlab.duration > 0 ? ((qlab.duration - qlab.remaining) / qlab.duration) * 100 : 0;
-  const phaseClass = getPhaseClass(qlab.phase);
-  const progressPhaseClass = getProgressPhaseClass(qlab.phase);
+  const display = removeLeadingZero(millisToString(countdown.remaining));
+  const progress = countdown.duration > 0 ? ((countdown.duration - countdown.remaining) / countdown.duration) * 100 : 0;
+  const phaseClass = getPhaseClass(countdown.phase);
+  const progressPhaseClass = getProgressPhaseClass(countdown.phase);
 
   return (
     <div className='qlab-timer'>
-      <div className='status status--connected'>QLab Connected</div>
+      <div className='status status--connected'>{sourceLabel} Connected</div>
 
       <div className='cue-info'>
-        {qlab.cueNumber && <div className='cue-number'>Cue {qlab.cueNumber}</div>}
-        {qlab.cueName && <div className='cue-name'>{qlab.cueName}</div>}
+        {countdown.cueNumber && <div className='cue-number'>Cue {countdown.cueNumber}</div>}
+        {countdown.cueName && <div className='cue-name'>{countdown.cueName}</div>}
       </div>
 
-      <div className={`countdown ${phaseClass} ${qlab.isPaused ? 'countdown--paused' : ''}`}>
+      <div className={`countdown ${phaseClass} ${countdown.isPaused ? 'countdown--paused' : ''}`}>
         {display}
       </div>
 
@@ -88,7 +90,7 @@ export default function QlabTimer() {
         />
       </div>
 
-      {qlab.isPaused && <div className='pause-indicator'>Paused</div>}
+      {countdown.isPaused && <div className='pause-indicator'>Paused</div>}
     </div>
   );
 }

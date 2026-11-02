@@ -92,6 +92,7 @@ function NavigationMenu(props: NavigationMenuProps) {
               </div>
             </div>
             <hr className={style.separator} />
+            {/* the compact editor is the everyday one, the full editor is for when more detail is needed */}
             <Link
               to='/editor'
               tabIndex={0}
@@ -101,12 +102,12 @@ function NavigationMenu(props: NavigationMenuProps) {
               Editor
             </Link>
             <Link
-              to='/mobile-editor'
+              to='/advanced-editor'
               tabIndex={0}
-              className={`${style.link} ${location.pathname === '/mobile-editor' && style.current}`}
+              className={`${style.link} ${location.pathname === '/advanced-editor' && style.current}`}
             >
               <IoLockClosedOutline />
-              Mobile Editor
+              Advanced Editor
             </Link>
             <Link
               to='/ipad-editor'
@@ -116,14 +117,6 @@ function NavigationMenu(props: NavigationMenuProps) {
               <IoLockClosedOutline />
               iPad Editor
             </Link>
-            <ClientLink to='cuesheet' current={location.pathname === '/cuesheet'}>
-              <IoLockClosedOutline />
-              Cuesheet
-            </ClientLink>
-            <ClientLink to='op' current={location.pathname === '/op'}>
-              <IoLockClosedOutline />
-              Operator
-            </ClientLink>
             <hr className={style.separator} />
             {navigatorConstants.map((route) => (
               <ClientLink key={route.url} to={route.url} current={location.pathname === `/${route.url}`}>

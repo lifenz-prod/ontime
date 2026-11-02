@@ -1,0 +1,74 @@
+.updateStatus {
+  margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.betaTag {
+  margin-left: 0.75rem;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid $orange-700;
+  border-radius: 3px;
+  color: $orange-700;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.versionLine {
+  color: $gray-500;
+  margin-bottom: 1rem;
+}
+
+.releaseNotes {
+  padding: 1rem;
+  background-color: $gray-1350;
+  border: 1px solid $white-10;
+  border-radius: 3px;
+  line-height: 1.5;
+
+  h4 {
+    font-weight: 600;
+    margin-block: 0.75rem 0.25rem;
+
+    &:first-child {
+      margin-top: 0;
+    }
+  }
+
+  ul {
+    padding-left: 1.25rem;
+    list-style: disc;
+  }
+
+  p + p,
+  ul + p,
+  p + ul {
+    margin-top: 0.5rem;
+  }
+
+  code {
+    font-size: 0.9em;
+    padding: 0 0.2em;
+    background-color: $white-10;
+    border-radius: 2px;
+  }
+}
+
+.installProgress {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.updateHint {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-left: 3px solid $orange-700;
+  background-color: $gray-1350;
+}

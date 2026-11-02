@@ -1,18 +1,7 @@
 import { memo, useEffect, useState } from 'react';
-import {
-  IoArrowDown,
-  IoArrowUp,
-  IoBan,
-  IoPeople,
-  IoPlay,
-  IoPlayForward,
-  IoPlaySkipForward,
-  IoStop,
-  IoTime,
-  IoTimer,
-} from 'react-icons/io5';
+import { IoEyeOff, IoPlay, IoPlayForward, IoPlaySkipForward, IoStop, IoTimer } from 'react-icons/io5';
 import { Tooltip } from '@chakra-ui/react';
-import { EndAction, MaybeString, Playback, TimerType, TimeStrategy } from 'ontime-types';
+import { EndAction, MaybeString, Playback, TimeStrategy } from 'ontime-types';
 
 import { cx } from '../../../common/utils/styleUtils';
 import { tooltipDelayMid } from '../../../ontimeConfig';
@@ -36,8 +25,9 @@ interface EventBlockInnerProps {
   countToEnd: boolean;
   eventIndex: number;
   isPublic: boolean;
+  hideTimer: boolean;
+  showAsAuxTimer: boolean;
   endAction: EndAction;
-  timerType: TimerType;
   title: string;
   note: string;
   delay: number;
@@ -63,8 +53,9 @@ function EventBlockInner(props: EventBlockInnerProps) {
     linkStart,
     countToEnd,
     isPublic = true,
+    hideTimer,
+    showAsAuxTimer,
     endAction,
-    timerType,
     title,
     note,
     delay,
@@ -109,6 +100,13 @@ function EventBlockInner(props: EventBlockInnerProps) {
           countToEnd={countToEnd}
           hideEndTime={hideEndTime}
         />
+        {playbackOnly && (!countToEnd || hideTimer || showAsAuxTimer) && (
+          <span className={style.durationIcon}>
+            {!countToEnd && <FixedDurationIcon className={style.durationIconSvg} />}
+            {hideTimer && <HideTimerIcon className={style.durationIconSvg} />}
+            {showAsAuxTimer && <AuxTimerBadge />}
+          </span>
+        )}
       </div>
       <div className={style.titleSection}>
         <EditableBlockTitle title={title} eventId={eventId} placeholder='Event title' className={style.eventTitle} />
@@ -145,28 +143,16 @@ function EventBlockInner(props: EventBlockInnerProps) {
           {loaded && <EventBlockProgressBar />}
         </div>
         <div className={style.eventStatus} tabIndex={-1}>
-          <Tooltip label={`Time type: ${timerType}`} openDelay={tooltipDelayMid}>
-            <span>
-              <TimerIcon type={timerType} className={style.statusIcon} />
-            </span>
-          </Tooltip>
-          <Tooltip label={`End action: ${endAction}`} openDelay={tooltipDelayMid}>
-            <span>
-              <EndActionIcon action={endAction} className={style.statusIcon} />
-            </span>
-          </Tooltip>
-          {!countToEnd && (
-            <Tooltip label='Fixed duration timer' openDelay={tooltipDelayMid}>
+          {shownEndActions.has(endAction) && (
+            <Tooltip label={`End action: ${endAction}`} openDelay={tooltipDelayMid}>
               <span>
-                <IoTimer className={`${style.statusIcon} ${style.active}`} />
+                <EndActionIcon action={endAction} className={style.statusIcon} />
               </span>
             </Tooltip>
           )}
-          <Tooltip label={`${isPublic ? 'Event is public' : 'Event is private'}`} openDelay={tooltipDelayMid}>
-            <span>
-              <IoPeople className={`${style.statusIcon} ${isPublic ? style.active : style.disabled}`} />
-            </span>
-          </Tooltip>
+          {!playbackOnly && !countToEnd && <FixedDurationIcon className={style.statusIcon} />}
+          {!playbackOnly && hideTimer && <HideTimerIcon className={style.statusIcon} />}
+          {!playbackOnly && showAsAuxTimer && <AuxTimerBadge />}
         </div>
       </div>
     </>
@@ -174,6 +160,39 @@ function EventBlockInner(props: EventBlockInnerProps) {
 }
 
 export default memo(EventBlockInner);
+
+function FixedDurationIcon(props: { className: string }) {
+  const { className } = props;
+  return (
+    <Tooltip label='Fixed duration timer' openDelay={tooltipDelayMid}>
+      <span>
+        <IoTimer className={`${className} ${style.active}`} />
+      </span>
+    </Tooltip>
+  );
+}
+
+function AuxTimerBadge() {
+  return (
+    <Tooltip label='Shown as aux timer' openDelay={tooltipDelayMid}>
+      <span className={style.auxBadge}>AUX</span>
+    </Tooltip>
+  );
+}
+
+function HideTimerIcon(props: { className: string }) {
+  const { className } = props;
+  return (
+    <Tooltip label='Timer hidden' openDelay={tooltipDelayMid}>
+      <span>
+        <IoEyeOff className={`${className} ${style.active}`} />
+      </span>
+    </Tooltip>
+  );
+}
+
+/** a cue that just ends, or loads the next, needs no marker */
+const shownEndActions = new Set<EndAction>([EndAction.Stop, EndAction.PlayNext, EndAction.PlayNextDelayed]);
 
 function EndActionIcon(props: { action: EndAction; className: string }) {
   const { action, className } = props;
@@ -192,18 +211,4 @@ function EndActionIcon(props: { action: EndAction; className: string }) {
     return <IoStop className={maybeActiveClasses} />;
   }
   return <IoPlay className={className} />;
-}
-
-function TimerIcon(props: { type: TimerType; className: string }) {
-  const { type, className } = props;
-  if (type === TimerType.CountUp) {
-    return <IoArrowUp className={className} />;
-  }
-  if (type === TimerType.Clock) {
-    return <IoTime className={className} />;
-  }
-  if (type === TimerType.None) {
-    return <IoBan className={className} />;
-  }
-  return <IoArrowDown className={className} />;
 }

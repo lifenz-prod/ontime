@@ -34,6 +34,7 @@ const targets = [
   'package.json',
   'apps/cli/package.json',
   'apps/electron/package.json',
+  'apps/cue-renderer/package.json',
   'apps/client/package.json',
   'apps/server/package.json',
 ];

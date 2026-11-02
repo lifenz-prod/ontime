@@ -45,7 +45,7 @@ Default dev server runs at `http://localhost:4001`. Views are reached as path ro
 ### Server (`apps/server/src`)
 - The server is the single source of truth. The **rundown cache** (`services/rundown-service/rundownCache.ts`) holds the normalised rundown and is recomputed on edits; `RundownService.ts` is the orchestration entry point for rundown mutations.
 - The **runtime/playback engine** (`services/runtime-service`, `EventTimer.ts`, `Clock.ts`, `timerUtils.ts`, `rollUtils.ts`) tracks the live state: what's playing, elapsed/remaining time, roll mode, added time, delays. `effectiveSchedule.ts` computes projected times.
-- State is broadcast to clients over WebSocket; integrations (OSC, HTTP, Websocket API, qlab-service) live under `api-integration` / `services`. `sheet-service` handles Google Sheets import/export.
+- State is broadcast to clients over WebSocket; integrations (OSC, HTTP, Websocket API, qlab-service, mitti-service) live under `api-integration` / `services`. QLab is polled, Mitti pushes its own OSC feedback; `countdown-service` holds both and publishes whichever one `viewSettings.countdownSource` selects, which is the only countdown the views read. Both only read, and are built to share a device with Bitfocus Companion, which also controls it: QLab takes a reply port of its own via `/udpReplyPort` (it keeps one per client), and Mitti, which feeds a single destination, is relayed onward verbatim by `MittiService`. `sheet-service` handles Google Sheets import/export.
 - Data persists to a project file DB; E2E runs against a separate test-db.
 - Entry: built from `app.js` → output `index.cjs` (an Electron quirk; `index.ts` only takes over init when Electron is absent). See `DEVELOPMENT.md` "APP Building".
 
@@ -89,10 +89,13 @@ Betas never move `latest`/`:latest`, so existing stable users are unaffected; te
 
 **Cutting a release:**
 1. `pnpm set-version 3.19.0-beta.0` — stamps the version into root + `apps/cli` + `apps/electron` (+ client/server) package.jsons. The root version also feeds the in-app version via the `addversion` hook → `ONTIME_VERSION.js` (generated, gitignored). `apps/cli` drives the npm version; `apps/electron` drives the desktop build.
-2. `git commit -am "release: v3.19.0-beta.0" && git tag v3.19.0-beta.0`
-3. `git push && git push --tags`
+2. **Write the release notes** in `release-notes/v3.19.0-beta.0.md` — every release, betas included. They become the GitHub Release body and are what the in-app updater (About → Updates) shows before anyone installs. Write them for the volunteers and operators who will read them: what changed for them, grouped under short headings, not a commit log. See `release-notes/README.md`.
+3. `git add release-notes && git commit -am "release: v3.19.0-beta.0" && git tag v3.19.0-beta.0`
+4. `git push && git push --tags`
 
-`build.yml`'s `verify_version` job fails the build if the tag doesn't match the package versions — so if you forget step 1, nothing ships with a wrong number.
+`build.yml`'s `verify_version` job fails the build if the tag doesn't match the package versions, or if `release-notes/<tag>.md` is missing or empty — so if you forget step 1 or 2, nothing ships.
+
+**In-app updates:** About → Updates checks GitHub Releases for the newest stable release (or newest beta, with "Opt in to beta releases" on), shows its notes, and in the desktop app installs it in one click (`apps/electron/src/updater.js`). It downloads the release's own assets — `ontime-macOS-<arch>.zip`, `ontime-win64.exe`, `ontime-linux.AppImage` — so those names must not change. Only CI builds (signed) can update; the macOS swap refuses a bundle that fails `codesign --verify`.
 
 **Branching workflow:** active development happens on **`beta-releases`** (cut `-beta.N` tags from there for test builds). `master` is the stable line — merge `beta-releases` into it (or PR) only once a beta is proven, then cut a clean tag from `master` to promote to stable. A tag push triggers the build from whichever branch it points at; build.yml builds desktop binaries on any tag.
 

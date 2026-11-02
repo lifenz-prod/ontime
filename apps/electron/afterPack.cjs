@@ -8,8 +8,8 @@ const { execSync } = require('child_process');
  * ~/Documents, which codesign rejects as "Finder information detritus".
  * Running outside iCloud means this hook is mostly a no-op safety measure.
  *
- * Still runs xattr -cr on the .app bundle in case the build environment
- * has other metadata-adding agents.
+ * Still clears extended attributes on the .app bundle in case the build
+ * environment has other metadata-adding agents.
  *
  * No-op for Windows / Linux targets.
  */
@@ -22,7 +22,8 @@ exports.default = async function afterPack(context) {
   console.log(`afterPack: stripping extended attributes from ${appPath}`);
 
   execSync(`find "${appPath}" -name "._*" -delete`);
-  execSync(`xattr -cr "${appPath}"`);
+  // xattr lost its -r flag in recent macOS, so recurse with find instead
+  execSync(`find "${appPath}" -exec xattr -c {} +`);
 
   console.log('afterPack: done');
 };

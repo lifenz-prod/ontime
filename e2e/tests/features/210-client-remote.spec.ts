@@ -4,7 +4,7 @@ test('redirect', async ({ context }) => {
   const controllerPage = await context.newPage();
   const remotePage = await context.newPage();
 
-  await controllerPage.goto('http://localhost:4001/editor?settings=network__clients');
+  await controllerPage.goto('http://localhost:4001/advanced-editor?settings=network__clients');
   await remotePage.goto('http://localhost:4001/timer');
 
   await controllerPage.getByTestId('not-self-redirect').click();
@@ -19,7 +19,7 @@ test('identify', async ({ context }) => {
   const controllerPage = await context.newPage();
   const remotePage = await context.newPage();
 
-  await controllerPage.goto('http://localhost:4001/editor?settings=network__clients');
+  await controllerPage.goto('http://localhost:4001/advanced-editor?settings=network__clients');
   await remotePage.goto('http://localhost:4001/timer');
 
   await controllerPage.getByTestId('not-self-identify').click();
@@ -31,7 +31,7 @@ test('rename', async ({ context }) => {
   const controllerPage = await context.newPage();
   const remotePage = await context.newPage();
 
-  await controllerPage.goto('http://localhost:4001/editor?settings=network__clients');
+  await controllerPage.goto('http://localhost:4001/advanced-editor?settings=network__clients');
   await remotePage.goto('http://localhost:4001/timer');
 
   await controllerPage.getByTestId('not-self-rename').click();

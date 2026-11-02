@@ -5,6 +5,7 @@ import { Request, Response, NextFunction } from 'express';
  * @description Validates object for POST /ontime/views
  */
 export const validateViewSettings = [
+  check('countdownSource').optional().isIn(['qlab', 'mitti']).withMessage('countdownSource must be qlab or mitti'),
   check('dangerColor').exists().isString().trim().withMessage('dangerColor value must be string'),
   check('endMessage').exists().isString().trim().withMessage('endMessage value must be string'),
   check('freezeEnd').exists().isBoolean().withMessage('freezeEnd value must be boolean'),

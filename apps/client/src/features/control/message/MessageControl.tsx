@@ -10,7 +10,7 @@ export default function MessageControl() {
   return <ExternalInput />;
 }
 
-export function ExternalInput() {
+export function ExternalInput({ className }: { className?: string }) {
   const { text, visible } = useExternalMessageInput();
 
   const toggleExternal = () => {
@@ -24,6 +24,7 @@ export function ExternalInput() {
   return (
     <InputRow
       label='Stage Message'
+      className={className}
       placeholder='Message to show on cue screen'
       text={text}
       visible={visible}

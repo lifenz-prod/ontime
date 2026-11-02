@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test('delay blocks add time to events', async ({ page }) => {
-  await page.goto('http://localhost:4001/editor');
+  await page.goto('http://localhost:4001/advanced-editor');
 
   // delete all events and add a new one
   await page.getByRole('button', { name: 'Edit' }).click();
@@ -49,7 +49,7 @@ test('delay blocks add time to events', async ({ page }) => {
 });
 
 test('delays are show correctly', async ({ page }) => {
-  await page.goto('http://localhost:4001/editor');
+  await page.goto('http://localhost:4001/advanced-editor');
 
   // add a test event
   await page.getByRole('button', { name: 'Edit' }).click();

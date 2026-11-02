@@ -2,6 +2,7 @@ import ExternalLink from '../../../../common/components/link/external-link/Exter
 import { documentationUrl, githubUrl } from '../../../../externals';
 import * as Panel from '../../panel-utils/PanelUtils';
 
+import AppUpdates from './AppUpdates';
 import AppVersion from './AppVersion';
 
 export default function AboutPanel() {
@@ -11,6 +12,8 @@ export default function AboutPanel() {
       <Panel.Section>
         <Panel.SubHeader>Current version</Panel.SubHeader>
         <AppVersion />
+        <Panel.SubHeader>Updates</Panel.SubHeader>
+        <AppUpdates />
         <Panel.SubHeader>Links</Panel.SubHeader>
         <ExternalLink href={documentationUrl}>Read the docs</ExternalLink>
         <ExternalLink href={githubUrl}>Follow the project on GitHub</ExternalLink>

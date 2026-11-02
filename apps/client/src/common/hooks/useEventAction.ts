@@ -27,6 +27,7 @@ import {
   SwapEntry,
 } from '../api/rundown';
 import { logAxiosError } from '../api/utils';
+import { useDeviationConfirm } from '../stores/deviationConfirm';
 import { useEditorSettings } from '../stores/editorSettings';
 
 export type EventOptions = Partial<{
@@ -66,6 +67,23 @@ export const useEventAction = () => {
     [queryClient],
   );
 
+  const requestDeviationConfirm = useDeviationConfirm((state) => state.request);
+
+  /**
+   * Cues in a generated service section (eg 11am) follow the master service until edited by hand
+   * Asks before the first hand edit, after which they keep their own changes
+   */
+  const confirmDeviation = useCallback(
+    async (eventIds: (string | undefined)[]) => {
+      const needsConfirm = eventIds.some((id) => {
+        const entry = id ? getEventById(id) : undefined;
+        return entry?.generatedFor && !entry.deviated;
+      });
+      return needsConfirm ? requestDeviationConfirm() : true;
+    },
+    [getEventById, requestDeviationConfirm],
+  );
+
   /**
    * Calls mutation to add new event
    * @private
@@ -96,16 +114,22 @@ export const useEventAction = () => {
           linkPrevious: options?.linkPrevious ?? linkPrevious,
         };
 
-        if (applicationOptions.linkPrevious && applicationOptions?.lastEventId) {
-          newEvent.linkStart = applicationOptions.lastEventId;
-        } else if (applicationOptions?.lastEventId) {
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- we know this is a value
-          const rundownData = queryClient.getQueryData<RundownCached>(RUNDOWN)!;
-          const { rundown } = rundownData;
-          const previousEvent = rundown[applicationOptions.lastEventId];
-          if (isOntimeEvent(previousEvent)) {
-            newEvent.timeStart = previousEvent.timeEnd;
-          }
+        // a cue added in place in the rundown (above or below another) takes no time:
+        // it starts where the previous cue ends and, by default, links to it,
+        // so the cue after it keeps its times.
+        // the server resolves the link and the times from the cue's position
+        const isBlankCue =
+          newEvent.timeStart === undefined && newEvent.timeEnd === undefined && newEvent.duration === undefined;
+        const hasPosition = Boolean(
+          applicationOptions.after || applicationOptions.before || applicationOptions.lastEventId,
+        );
+
+        if (isBlankCue && hasPosition) {
+          newEvent.duration = 0;
+        }
+
+        if (applicationOptions.linkPrevious && hasPosition && newEvent.linkStart === undefined) {
+          newEvent.linkStart = 'true';
         }
 
         // Override event with options from editor settings
@@ -113,6 +137,7 @@ export const useEventAction = () => {
           newEvent.isPublic = true;
         }
 
+        // with nothing to place it against (eg: the first cue in an empty rundown) we use the default duration
         if (newEvent.duration === undefined && newEvent.timeEnd === undefined) {
           newEvent.duration = parseUserTime(defaultDuration);
         }
@@ -170,7 +195,6 @@ export const useEventAction = () => {
       defaultTimeStrategy,
       defaultWarnTime,
       linkPrevious,
-      queryClient,
     ],
   );
 
@@ -217,13 +241,16 @@ export const useEventAction = () => {
    */
   const updateEvent = useCallback(
     async (event: Partial<OntimeRundownEntry>) => {
+      if (!(await confirmDeviation([event.id]))) {
+        return;
+      }
       try {
         await _updateEventMutation.mutateAsync(event);
       } catch (error) {
         logAxiosError('Error updating event', error);
       }
     },
-    [_updateEventMutation],
+    [_updateEventMutation, confirmDeviation],
   );
 
   const updateCustomField = useCallback(
@@ -244,6 +271,10 @@ export const useEventAction = () => {
     async (eventId: string, field: TimeField, value: string, lockOnUpdate?: boolean) => {
       // an empty value with no lock has no domain validity
       if (!lockOnUpdate && value === '') {
+        return;
+      }
+
+      if (!(await confirmDeviation([eventId]))) {
         return;
       }
 
@@ -359,7 +390,7 @@ export const useEventAction = () => {
         return getPrevious()?.timeEnd ?? 0;
       }
     },
-    [_updateEventMutation, queryClient],
+    [_updateEventMutation, queryClient, confirmDeviation],
   );
 
   /**
@@ -407,13 +438,16 @@ export const useEventAction = () => {
 
   const batchUpdateEvents = useCallback(
     async (data: Partial<OntimeEvent>, eventIds: string[]) => {
+      if (!(await confirmDeviation(eventIds))) {
+        return;
+      }
       try {
         await _batchUpdateEventsMutation.mutateAsync({ ids: eventIds, data });
       } catch (error) {
         logAxiosError('Error updating events', error);
       }
     },
-    [_batchUpdateEventsMutation],
+    [_batchUpdateEventsMutation, confirmDeviation],
   );
 
   /**

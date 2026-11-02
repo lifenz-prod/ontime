@@ -22,6 +22,7 @@ const publicAssets = new Set([
   '/ontime-logo.png',
   '/robots.txt',
   '/site.webmanifest',
+  '/sw.js', // service worker registration does not follow the login redirect
 ]);
 
 export const loginRouter = express.Router();

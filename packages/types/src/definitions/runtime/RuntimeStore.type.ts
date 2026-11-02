@@ -1,3 +1,5 @@
+import type { CountdownState } from '../core/Countdown.type.js';
+import type { MittiState } from '../core/Mitti.type.js';
 import type { OntimeEvent } from '../core/OntimeEvent.type.js';
 import type { QlabState } from '../core/Qlab.type.js';
 import type { SimpleTimerState } from './AuxTimer.type.js';
@@ -29,6 +31,10 @@ export type RuntimeStore = {
 
   // external integrations
   qlab: QlabState;
+  mitti: MittiState;
+
+  // the countdown views read this: whichever integration is the selected source
+  countdown: CountdownState;
 
   // recallable rundown sources
   rundownSources: RundownSourcesState;

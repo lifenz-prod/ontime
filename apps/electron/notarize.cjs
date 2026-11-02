@@ -5,7 +5,38 @@
 // Alternative:  App Store Connect API key — see commented block below.
 
 const { notarize } = require('@electron/notarize');
+const { execFile } = require('child_process');
 const path = require('path');
+
+// Stapling fetches the ticket from Apple's CDN, and that connection drops often enough on CI runners
+// (error 68, "The network connection was lost") to fail whole releases. @electron/notarize claims to
+// retry the staple, but its promise-retry callback never calls retry(), so the first failure is final.
+// The notarization itself has already succeeded by then, so only the staple needs repeating.
+const STAPLE_ATTEMPTS = 6;
+const STAPLE_BACKOFF_MS = 20_000;
+
+function staple(appPath) {
+  return new Promise((resolve, reject) => {
+    execFile('xcrun', ['stapler', 'staple', '-v', appPath], (error, stdout, stderr) => {
+      if (error) reject(new Error(`${error.message}\n${stdout}${stderr}`));
+      else resolve();
+    });
+  });
+}
+
+async function stapleWithRetry(appPath) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await staple(appPath);
+      return;
+    } catch (error) {
+      if (attempt >= STAPLE_ATTEMPTS) throw error;
+      const wait = STAPLE_BACKOFF_MS * attempt;
+      console.warn(`[notarize] Staple attempt ${attempt}/${STAPLE_ATTEMPTS} failed, retrying in ${wait / 1000}s`);
+      await new Promise((resolve) => setTimeout(resolve, wait));
+    }
+  }
+}
 
 exports.default = async function notarizing(context) {
   const { electronPlatformName, appOutDir } = context;
@@ -40,21 +71,28 @@ exports.default = async function notarizing(context) {
 
   console.log(`[notarize] Submitting ${appName} for notarization...`);
 
-  await notarize({
-    // Apple ID auth:
-    tool: 'notarytool',
-    appPath,
-    appleId,
-    appleIdPassword,
-    teamId,
+  try {
+    await notarize({
+      // Apple ID auth:
+      tool: 'notarytool',
+      appPath,
+      appleId,
+      appleIdPassword,
+      teamId,
 
-    // App Store Connect API key auth (uncomment and remove above):
-    // tool: 'notarytool',
-    // appPath,
-    // appleApiKey,
-    // appleApiIssuer,
-    // appleApiKeyPath,
-  });
+      // App Store Connect API key auth (uncomment and remove above):
+      // tool: 'notarytool',
+      // appPath,
+      // appleApiKey,
+      // appleApiIssuer,
+      // appleApiKeyPath,
+    });
+  } catch (error) {
+    // only a failed staple is worth another go; a rejected notarization is not
+    if (!/Failed to staple/.test(String(error?.message))) throw error;
+    console.warn('[notarize] Notarized, but stapling failed — retrying the staple');
+    await stapleWithRetry(appPath);
+  }
 
   console.log(`[notarize] Done — ${appName} successfully notarized.`);
 };

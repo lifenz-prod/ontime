@@ -2,3 +2,8 @@
   width: 100%;
   margin: 0 auto;
 }
+
+/* Tighter gaps between the aux timer, adjust current and global offset sections */
+.compact > :nth-child(n + 3) {
+  margin-top: 0.5rem;
+}

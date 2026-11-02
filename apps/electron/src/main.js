@@ -4,6 +4,7 @@ const fs = require('fs');
 
 const { getApplicationMenu } = require('./menu/applicationMenu.js');
 const { getTrayMenu } = require('./menu/trayMenu.js');
+const { getUpdateSupport, installRelease } = require('./updater.js');
 
 const electronConfig = require('./electron.config.js');
 const {
@@ -379,4 +380,28 @@ ipcMain.on('set-auto-launch', (_event, enabled) => {
   // record that the user has made an explicit choice so the default-on
   // logic never overrides it on a later launch
   markAutoLaunchPreference();
+});
+
+/**
+ * Whether this install can update itself
+ */
+ipcMain.handle('updater:support', () => {
+  return getUpdateSupport();
+});
+
+/**
+ * Installs a release the user confirmed, reporting download progress to the window
+ * Resolves once the app is about to quit, or with a message the user can read
+ */
+ipcMain.handle('updater:install', async (event, tag) => {
+  try {
+    await installRelease(
+      tag,
+      (fraction) => event.sender.send('updater:progress', fraction),
+      () => appShutdown(),
+    );
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : String(error) };
+  }
 });

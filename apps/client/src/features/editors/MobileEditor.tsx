@@ -25,7 +25,7 @@ export default function MobileEditor() {
   const { onToggle: onFinderToggle, onClose: onFinderClose } = useDisclosure();
   const { tabs, activeTabId, selectTab } = useServiceSwitcher();
 
-  useWindowTitle('Mobile Editor');
+  useWindowTitle('Editor');
 
   // we need to register the listener to change the editor location
   useElectronListener();
@@ -74,10 +74,12 @@ export default function MobileEditor() {
         />
       </MobileEditorOverview>
       {!isSettingsOpen && tabs.length > 0 && (
-        <ButtonGroup size='md' variant='ontime-subtle' isAttached mx={4} my={2}>
+        <ButtonGroup size='md' variant='ontime-subtle' spacing={3} mx={4} my={2}>
           {tabs.map((tab) => (
             <Button
               key={tab.id}
+              border='1px solid'
+              borderColor='whiteAlpha.500'
               onClick={() => selectTab(tab.id)}
               variant={activeTabId === tab.id ? 'ontime-filled' : 'ontime-subtle'}
             >
@@ -90,7 +92,7 @@ export default function MobileEditor() {
         <AppSettings />
       ) : (
         <div id='panels' className={styles.panelContainer}>
-          <div className={styles.left}>
+          <div className={`${styles.left} ${styles.scrollLeft}`}>
             <MobileTimerControl />
             <ExternalInput />
             <div className={rundownStyle.side}>

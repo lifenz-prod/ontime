@@ -26,6 +26,8 @@ import {
   removeCustomField,
   customFieldChangelog,
 } from '../rundownCache.js';
+import { anchorInsertedEvent } from '../rundownCacheUtils.js';
+import { createEvent } from '../../../utils/parser.js';
 
 beforeAll(() => {
   vi.mock('../../../classes/data-provider/DataProvider.js', () => {
@@ -444,6 +446,59 @@ describe('add() mutation', () => {
   });
 });
 
+describe('inserting a zero duration cue between linked events', () => {
+  const makeRundown = (nextStrategy: TimeStrategy): OntimeRundown => [
+    {
+      type: SupportedEvent.Event,
+      id: '1',
+      timeStart: 9 * MILLIS_PER_HOUR,
+      timeEnd: 10 * MILLIS_PER_HOUR,
+      duration: MILLIS_PER_HOUR,
+      timeStrategy: TimeStrategy.LockEnd,
+      linkStart: null,
+    } as OntimeEvent,
+    {
+      type: SupportedEvent.Event,
+      id: '2',
+      timeStart: 10 * MILLIS_PER_HOUR,
+      timeEnd: 11 * MILLIS_PER_HOUR,
+      duration: MILLIS_PER_HOUR,
+      timeStrategy: nextStrategy,
+      linkStart: '1',
+    } as OntimeEvent,
+  ];
+
+  test.each([TimeStrategy.LockDuration, TimeStrategy.LockEnd])(
+    'new cue (%s) sits at the previous end and the next cue does not move',
+    (newStrategy) => {
+      for (const nextStrategy of [TimeStrategy.LockDuration, TimeStrategy.LockEnd]) {
+        const testRundown = makeRundown(nextStrategy);
+        const anchored = anchorInsertedEvent(
+          { type: SupportedEvent.Event, duration: 0, linkStart: 'true', timeStrategy: newStrategy },
+          1,
+          testRundown,
+        );
+        const newEvent = createEvent({ ...anchored, id: 'new' }, 'new') as OntimeEvent;
+        const { newRundown } = add({ atIndex: 1, event: newEvent, rundown: testRundown });
+        const { rundown } = generate(newRundown);
+
+        expect(rundown.new).toMatchObject({
+          linkStart: '1',
+          timeStart: 10 * MILLIS_PER_HOUR,
+          timeEnd: 10 * MILLIS_PER_HOUR,
+          duration: 0,
+        });
+        expect(rundown['2']).toMatchObject({
+          linkStart: 'new',
+          timeStart: 10 * MILLIS_PER_HOUR,
+          timeEnd: 11 * MILLIS_PER_HOUR,
+          duration: MILLIS_PER_HOUR,
+        });
+      }
+    },
+  );
+});
+
 describe('remove() mutation', () => {
   test('deletes an event from the rundown', () => {
     const mockEvent = { id: 'mock', cue: 'mock', type: SupportedEvent.Event } as OntimeEvent;
@@ -482,6 +537,24 @@ describe('edit() mutation', () => {
       cue: 'patched',
       type: SupportedEvent.Event,
     });
+  });
+
+  test('marks a generated entry as deviated and keeps its service tags', () => {
+    const generated = {
+      id: 'gen',
+      cue: 'mock',
+      type: SupportedEvent.Event,
+      generatedFor: 'svc-11',
+      mirrorOf: 'master',
+    } as OntimeEvent;
+    const master = { id: 'master', cue: 'mock', type: SupportedEvent.Event } as OntimeEvent;
+    const testRundown: OntimeRundown = [master, generated];
+
+    const { newEvent } = edit({ eventId: 'gen', patch: { title: 'late' }, rundown: testRundown });
+    expect(newEvent).toMatchObject({ title: 'late', generatedFor: 'svc-11', mirrorOf: 'master', deviated: true });
+
+    const { newEvent: editedMaster } = edit({ eventId: 'master', patch: { title: 'x' }, rundown: testRundown });
+    expect(editedMaster).not.toHaveProperty('deviated');
   });
 });
 

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test('URL preset feature, it should redirect to given URL', async ({ page }) => {
-  await page.goto('http://localhost:4001/editor');
+  await page.goto('http://localhost:4001/advanced-editor');
 
   // open settings
   await page.getByRole('button', { name: 'Toggle settings' }).click();

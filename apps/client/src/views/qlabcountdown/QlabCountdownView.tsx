@@ -16,10 +16,10 @@ function formatMs(ms: number | null): string {
 }
 
 export default function QlabCountdownView() {
-  useWindowTitle('QLab Countdown');
+  useWindowTitle('Playback Countdown');
 
-  const qlab = useRuntimeStore((state) => state.qlab);
-  const display = formatMs(qlab.remaining);
+  const countdown = useRuntimeStore((state) => state.countdown);
+  const display = formatMs(countdown.remaining);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<HTMLDivElement>(null);

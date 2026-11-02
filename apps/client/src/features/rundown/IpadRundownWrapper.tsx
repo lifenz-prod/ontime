@@ -7,7 +7,7 @@ import RundownModeContext from './RundownModeContext';
 
 import styles from './Rundown.module.scss';
 
-const ipadMode = { hideRowActions: false, hideEndTime: true, playbackOnly: true };
+const ipadMode = { hideRowActions: false, hideEndTime: true, playbackOnly: true, eventOnlyQuickAdd: true };
 
 export default function IpadRundownWrapper() {
   const { data, status } = useRundown();

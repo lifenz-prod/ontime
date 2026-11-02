@@ -5,12 +5,12 @@
 
 .label {
   margin-bottom: 0.25rem;
-  font-size: $inner-section-text-size;
+  font-size: $control-label-size;
   color: $label-gray;
 }
 
 .tallButtons {
-  height: 38px;
+  height: $control-tall-button-height;
   min-width: 0;
   padding-inline: 1rem;
 }
@@ -23,6 +23,6 @@
 }
 
 .resetButton {
-  height: 38px;
+  height: $control-tall-button-height;
   min-width: 0;
 }

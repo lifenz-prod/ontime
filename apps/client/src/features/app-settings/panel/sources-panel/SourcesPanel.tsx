@@ -1,6 +1,7 @@
-import { ChangeEvent, useEffect, useRef, useState } from 'react';
-import { IoCloudOutline, IoDownloadOutline } from 'react-icons/io5';
+import { ChangeEvent, useRef, useState } from 'react';
+import { IoDownloadOutline } from 'react-icons/io5';
 import { Button, Input } from '@chakra-ui/react';
+import { LoadedSheet, PublicSheetInfo } from 'ontime-types';
 import { getErrorMessage, ImportMap } from 'ontime-utils';
 
 import {
@@ -8,13 +9,14 @@ import {
   importRundownPreview as importRundownPreviewExcel,
   upload as uploadExcel,
 } from '../../../../common/api/excel';
-import { getWorksheetNames } from '../../../../common/api/sheets';
+import { getWorksheetNames, openPublicSheet, previewPublicRundown } from '../../../../common/api/sheets';
 import { maybeAxiosError } from '../../../../common/api/utils';
 import { validateExcelImport } from '../../../../common/utils/uploadUtils';
 import * as Panel from '../../panel-utils/PanelUtils';
 
 import ImportMapForm from './import-map/ImportMapForm';
-import GSheetInfo from './GSheetInfo';
+import GSheetPublic from './GSheetPublic';
+import GSheetQuickImport from './GSheetQuickImport';
 import GSheetSetup from './GSheetSetup';
 import ImportReview from './ImportReview';
 import useGoogleSheet from './useGoogleSheet';
@@ -27,7 +29,7 @@ interface SourcesPanelProps {
   onClose?: () => void;
 }
 
-export default function SourcesPanel({ location, onClose }: SourcesPanelProps) {
+export default function SourcesPanel({ onClose }: SourcesPanelProps) {
   const [importFlow, setImportFlow] = useState<'none' | 'excel' | 'gsheet' | 'finished'>('none');
   const [error, setError] = useState('');
   const [hasFile, setHasFile] = useState<'none' | 'loading' | 'done'>('none');
@@ -46,6 +48,10 @@ export default function SourcesPanel({ location, onClose }: SourcesPanelProps) {
   const setServiceProfiles = useSheetStore((state) => state.setServiceProfiles);
   const setSheetId = useSheetStore((state) => state.setSheetId);
   const sheetId = useSheetStore((state) => state.sheetId);
+  const worksheetNames = useSheetStore((state) => state.worksheetNames);
+  const sheetAccess = useSheetStore((state) => state.sheetAccess);
+  const setSheetAccess = useSheetStore((state) => state.setSheetAccess);
+  const setPublicSheet = useSheetStore((state) => state.setPublicSheet);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -87,9 +93,23 @@ export default function SourcesPanel({ location, onClose }: SourcesPanelProps) {
     setServiceProfiles(null);
     setError('');
     setSheetId(null);
+    setSheetAccess('public');
   };
 
-  const openGSheetFlow = async () => {
+  /** the simple flow: reading a sheet shared by link, no authentication */
+  const openGSheetFlow = () => {
+    setError('');
+    setSheetAccess('public');
+    setSheetId(null);
+    setWorksheets(null);
+    setImportFlow('gsheet');
+  };
+
+  /** signing in with google, for private sheets and to export back to the sheet */
+  const openOAuthFlow = async () => {
+    setError('');
+    setSheetAccess('oauth');
+    setWorksheets(null);
     setIsOpeningGSheet(true);
     try {
       const result = await verifyAuth();
@@ -112,12 +132,31 @@ export default function SourcesPanel({ location, onClose }: SourcesPanelProps) {
     }
   };
 
-  useEffect(() => {
-    if (location === 'gsheet_import' && importFlow === 'none') {
-      openGSheetFlow();
+  /** a sheet with no column mapping yet goes through the import options */
+  const openMappingForSheet = (sheet: PublicSheetInfo) => {
+    setError('');
+    setSheetAccess('public');
+    setPublicSheet(sheet);
+    setImportFlow('gsheet');
+  };
+
+  /** opens the import options for the loaded sheet, on the tab it is on */
+  const editLoadedMapping = async (loaded: LoadedSheet) => {
+    if (loaded.access !== 'public') {
+      await openOAuthFlow();
+      return;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location]);
+    setError('');
+    setIsOpeningGSheet(true);
+    try {
+      const sheet = await openPublicSheet(loaded.sheetId);
+      openMappingForSheet({ ...sheet, worksheet: loaded.worksheet });
+    } catch (error) {
+      setError(maybeAxiosError(error));
+    } finally {
+      setIsOpeningGSheet(false);
+    }
+  };
 
   const cancelGSheetFlow = () => {
     resetFlow();
@@ -130,7 +169,11 @@ export default function SourcesPanel({ location, onClose }: SourcesPanelProps) {
         previewData = await importRundownPreviewExcel(importMap);
       } else if (importFlow === 'gsheet') {
         if (!sheetId) return;
-        previewData = (await importRundownPreview(sheetId, importMap)) ?? null;
+        if (sheetAccess === 'public') {
+          previewData = await previewPublicRundown(sheetId, importMap);
+        } else {
+          previewData = (await importRundownPreview(sheetId, importMap)) ?? null;
+        }
       }
 
       if (!previewData) return;
@@ -170,23 +213,35 @@ export default function SourcesPanel({ location, onClose }: SourcesPanelProps) {
   const isExcelFlow = importFlow === 'excel';
   const isGSheetFlow = importFlow === 'gsheet';
   const isAuthenticated = authenticationStatus === 'authenticated';
+  const isPublicSheet = sheetAccess === 'public';
+  const hasPublicSheet = isPublicSheet && Boolean(worksheetNames);
   const showInput = importFlow === 'none' && !isOpeningGSheet;
   const showCompleted = importFlow === 'finished';
-  const showAuth = isGSheetFlow && !isAuthenticated;
-  const showImportMap = (isGSheetFlow && isAuthenticated) || (isExcelFlow && hasFile === 'done');
+  const showPublicSetup = isGSheetFlow && isPublicSheet && !hasPublicSheet;
+  const showAuth = isGSheetFlow && !isPublicSheet && !isAuthenticated;
+  const showImportMap =
+    (isGSheetFlow && (isPublicSheet ? hasPublicSheet : isAuthenticated)) || (isExcelFlow && hasFile === 'done');
   const showReview = rundown !== null && customFields !== null;
 
   return (
     <>
-      <Panel.Header>Data sources</Panel.Header>
-      <Panel.Section>
-        <Panel.Card>
-          <Panel.SubHeader>Synchronise your rundown with an external source</Panel.SubHeader>
-          {error && <Panel.Error>{error}</Panel.Error>}
-          <Panel.Loader isLoading={isOpeningGSheet} />
-          {showInput && (
-            <>
-              <GSheetInfo />
+      <Panel.Header>Import</Panel.Header>
+      {showInput && (
+        <>
+          <Panel.Section>
+            <Panel.Card>
+              <Panel.SubHeader>Import from Google Sheet</Panel.SubHeader>
+              {error && <Panel.Error>{error}</Panel.Error>}
+              <GSheetQuickImport
+                onNeedsMapping={openMappingForSheet}
+                onEditMapping={editLoadedMapping}
+                onSignIn={openOAuthFlow}
+              />
+            </Panel.Card>
+          </Panel.Section>
+          <Panel.Section>
+            <Panel.Card>
+              <Panel.SubHeader>Import from spreadsheet</Panel.SubHeader>
               <Input
                 ref={fileInputRef}
                 style={{ display: 'none' }}
@@ -195,71 +250,68 @@ export default function SourcesPanel({ location, onClose }: SourcesPanelProps) {
                 accept='.xlsx'
                 data-testid='file-input'
               />
-              <div className={style.uploadSection}>
-                <div>
-                  <Button
-                    variant='ontime-filled'
-                    size='sm'
-                    leftIcon={<IoDownloadOutline />}
-                    onClick={handleUpload}
-                    isLoading={hasFile === 'loading'}
-                  >
-                    Import from spreadsheet
-                  </Button>
-                  <Panel.Description>Accepts .xlsx files</Panel.Description>
-                </div>
-                <div>
-                  <Button
-                    variant='ontime-filled'
-                    size='sm'
-                    leftIcon={<IoCloudOutline />}
-                    onClick={openGSheetFlow}
-                    isDisabled={hasFile !== 'none'}
-                  >
-                    Synchronise with Google
-                  </Button>
-                  <Panel.Description>Start authentication process</Panel.Description>
-                </div>
+              <Panel.InlineElements>
+                <Button
+                  variant='ontime-filled'
+                  size='sm'
+                  leftIcon={<IoDownloadOutline />}
+                  onClick={handleUpload}
+                  isLoading={hasFile === 'loading'}
+                >
+                  Import from spreadsheet
+                </Button>
+                <Panel.Description>Accepts .xlsx files</Panel.Description>
+              </Panel.InlineElements>
+            </Panel.Card>
+          </Panel.Section>
+        </>
+      )}
+      {!showInput && (
+        <Panel.Section>
+          <Panel.Card>
+            {error && <Panel.Error>{error}</Panel.Error>}
+            <Panel.Loader isLoading={isOpeningGSheet} />
+            {showCompleted && (
+              <div className={style.finishSection}>
+                {error ? (
+                  <span key='finish__error' className={style.error}>
+                    Import failed
+                  </span>
+                ) : (
+                  <span key='finish__success' className={style.success}>
+                    Import successful
+                  </span>
+                )}
+                <Button variant='ontime-filled' size='sm' onClick={onClose ?? resetFlow}>
+                  Return
+                </Button>
               </div>
-            </>
-          )}
-          {showCompleted && (
-            <div className={style.finishSection}>
-              {error ? (
-                <span key='finish__error' className={style.error}>
-                  Import failed
-                </span>
-              ) : (
-                <span key='finish__success' className={style.success}>
-                  Import successful
-                </span>
-              )}
-              <Button variant='ontime-filled' size='sm' onClick={onClose ?? resetFlow}>
-                Return
-              </Button>
-            </div>
-          )}
-          {showAuth && <GSheetSetup onCancel={cancelGSheetFlow} />}
-          {showImportMap && !showReview && (
-            <ImportMapForm
-              hasErrors={Boolean(error)}
-              isSpreadsheet={isExcelFlow}
-              onCancel={cancelImportMap}
-              onSubmitExport={handleSubmitExport}
-              onSubmitImport={handleSubmitImport}
-            />
-          )}
-          {showReview && (
-            <ImportReview
-              rundown={rundown}
-              customFields={customFields}
-              serviceProfiles={serviceProfiles}
-              onFinished={handleFinished}
-              onCancel={cancelImportMap}
-            />
-          )}
-        </Panel.Card>
-      </Panel.Section>
+            )}
+            {showPublicSetup && <GSheetPublic onCancel={cancelGSheetFlow} onSignIn={openOAuthFlow} />}
+            {showAuth && <GSheetSetup onCancel={cancelGSheetFlow} />}
+            {showImportMap && !showReview && (
+              <ImportMapForm
+                hasErrors={Boolean(error)}
+                isSpreadsheet={isExcelFlow}
+                isPublicSheet={isGSheetFlow && isPublicSheet}
+                onChangeSheet={openGSheetFlow}
+                onCancel={cancelImportMap}
+                onSubmitExport={handleSubmitExport}
+                onSubmitImport={handleSubmitImport}
+              />
+            )}
+            {showReview && (
+              <ImportReview
+                rundown={rundown}
+                customFields={customFields}
+                serviceProfiles={serviceProfiles}
+                onFinished={handleFinished}
+                onCancel={cancelImportMap}
+              />
+            )}
+          </Panel.Card>
+        </Panel.Section>
+      )}
     </>
   );
 }

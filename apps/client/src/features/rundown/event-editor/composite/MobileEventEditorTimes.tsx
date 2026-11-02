@@ -83,37 +83,6 @@ function MobileEventEditorTimes(props: MobileEventEditorTimesProps) {
 
   return (
     <>
-      <Button
-        colorScheme='red'
-        variant='ontime-outlined'
-        color='#FA5656'
-        leftIcon={<IoTrash />}
-        size='sm'
-        width='100%'
-        mb={4}
-        onClick={onOpen}
-      >
-        Delete Event
-      </Button>
-      <AlertDialog variant='ontime' isOpen={isOpen} leastDestructiveRef={cancelRef} onClose={onClose}>
-        <AlertDialogOverlay>
-          <AlertDialogContent>
-            <AlertDialogHeader fontSize='lg' fontWeight='bold'>
-              Delete event
-            </AlertDialogHeader>
-            <AlertDialogBody>Are you sure you want to delete this event?</AlertDialogBody>
-            <AlertDialogFooter>
-              <Button ref={cancelRef} onClick={onClose} variant='ontime-ghosted-white'>
-                Cancel
-              </Button>
-              <Button colorScheme='red' onClick={handleDeleteConfirm} ml={4}>
-                Delete event
-              </Button>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialogOverlay>
-      </AlertDialog>
-
       <div className={style.column}>
         <Editor.Title>Event schedule</Editor.Title>
         <div>
@@ -195,6 +164,36 @@ function MobileEventEditorTimes(props: MobileEventEditorTimesProps) {
           </div>
         </div>
       </div>
+
+      <Button
+        colorScheme='red'
+        variant='ontime-outlined'
+        color='#FA5656'
+        leftIcon={<IoTrash />}
+        size='sm'
+        width='100%'
+        onClick={onOpen}
+      >
+        Delete Event
+      </Button>
+      <AlertDialog variant='ontime' isOpen={isOpen} leastDestructiveRef={cancelRef} onClose={onClose}>
+        <AlertDialogOverlay>
+          <AlertDialogContent>
+            <AlertDialogHeader fontSize='lg' fontWeight='bold'>
+              Delete event
+            </AlertDialogHeader>
+            <AlertDialogBody>Are you sure you want to delete this event?</AlertDialogBody>
+            <AlertDialogFooter>
+              <Button ref={cancelRef} onClick={onClose} variant='ontime-ghosted-white'>
+                Cancel
+              </Button>
+              <Button colorScheme='red' onClick={handleDeleteConfirm} ml={4}>
+                Delete event
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
     </>
   );
 }

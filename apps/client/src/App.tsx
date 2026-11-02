@@ -3,6 +3,7 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 
+import DeviationConfirmDialog from './common/components/deviation-confirm/DeviationConfirmDialog';
 import ErrorBoundary from './common/components/error-boundary/ErrorBoundary';
 import IdentifyOverlay from './common/components/identify-overlay/IdentifyOverlay';
 import { AppContextProvider } from './common/context/AppContext';
@@ -26,6 +27,7 @@ function App() {
                 <TranslationProvider>
                   <IdentifyOverlay />
                   <AppRouter />
+                  <DeviationConfirmDialog />
                 </TranslationProvider>
               </ErrorBoundary>
               <ReactQueryDevtools initialIsOpen={false} />

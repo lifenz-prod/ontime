@@ -28,7 +28,7 @@ function formatMs(ms: number | null): string {
 export default function CuescreenView({ time, auxTimer, eventNow, eventNext }: CuescreenViewProps) {
   useWindowTitle('Cuescreen');
 
-  const qlab = useRuntimeStore((state) => state.qlab);
+  const countdown = useRuntimeStore((state) => state.countdown);
   const externalMessage = useRuntimeStore((state) => state.message.external);
   const showExternal = useRuntimeStore((state) => state.message.timer.secondarySource === 'external');
   const overrideMessage = showExternal && externalMessage ? externalMessage : null;
@@ -121,9 +121,9 @@ export default function CuescreenView({ time, auxTimer, eventNow, eventNext }: C
           )}
         </div>
       </div>
-      {qlab.enabled && (
+      {countdown.enabled && (
         <div className='cuescreen__qlab-timer'>
-          {formatMs(qlab.remaining)}
+          {formatMs(countdown.remaining)}
         </div>
       )}
     </div>

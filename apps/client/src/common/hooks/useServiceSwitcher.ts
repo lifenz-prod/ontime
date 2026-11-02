@@ -5,6 +5,8 @@ import useServiceProfiles from '../hooks-query/useServiceProfiles';
 
 /** synthesized tab showing the rehearsal entries before the boundary block */
 export const PRE_TAB_ID = 'pre-service';
+/** synthesized tab showing every service section, from the boundary block onwards */
+export const SERVICE_TAB_ID = 'service';
 
 type ServiceSwitcherStore = {
   activeTabId: string | null;
@@ -22,7 +24,7 @@ export type ServiceTab = {
 };
 
 /**
- * Exposes the service tabs (PRE + one per service instance) and a
+ * Exposes the service tabs (PRE + SERVICE) and a
  * filtered view of the rundown order for the selected tab.
  * Selecting a tab only changes what is visible, it does not change any times.
  */
@@ -34,7 +36,6 @@ export default function useServiceSwitcher() {
 
   const { boundaryBlockId, services } = serviceProfiles;
   const order = data?.order ?? [];
-  const rundown = data?.rundown ?? {};
   const boundaryIndex = boundaryBlockId ? order.indexOf(boundaryBlockId) : -1;
 
   const isConfigured = boundaryIndex >= 0 && services.length > 0;
@@ -44,9 +45,7 @@ export default function useServiceSwitcher() {
     if (boundaryIndex > 0) {
       tabs.push({ id: PRE_TAB_ID, name: 'PRE' });
     }
-    for (const service of services) {
-      tabs.push({ id: service.id, name: service.name });
-    }
+    tabs.push({ id: SERVICE_TAB_ID, name: 'SERVICE' });
   }
 
   /** selecting the active tab again clears the filter */
@@ -59,18 +58,7 @@ export default function useServiceSwitcher() {
     if (activeTabId === PRE_TAB_ID) {
       return order.slice(0, boundaryIndex);
     }
-    const masterServiceId = services[0]?.id;
-    if (activeTabId === masterServiceId) {
-      // the master section spans from the boundary block to the first generated entry
-      const sectionOrder: string[] = [];
-      for (let i = boundaryIndex; i < order.length; i++) {
-        const entry = rundown[order[i]];
-        if (entry?.generatedFor) break;
-        sectionOrder.push(order[i]);
-      }
-      return sectionOrder;
-    }
-    return order.filter((id) => rundown[id]?.generatedFor === activeTabId);
+    return order.slice(boundaryIndex);
   };
 
   return {

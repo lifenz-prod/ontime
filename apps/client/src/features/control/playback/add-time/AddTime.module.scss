@@ -1,34 +1,32 @@
+/* Laid out to match the Global Offset section below it */
 .addTime {
-  grid-area: addtime;
-  display: flex;
-  flex-direction: column;
-  gap: $element-inner-spacing;
+  width: 100%;
+  margin-top: 2rem;
 }
 
 .label {
-  font-size: calc(1rem - 3px);
+  margin-bottom: 0.25rem;
+  font-size: $control-label-size;
   color: $label-gray;
-  text-align: center;
-  line-height: 1.2;
 }
 
 .addButtons {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: $element-inner-spacing;
+  grid-template-columns: 1fr 2fr 1fr;
+  column-gap: $element-inner-spacing;
+  width: 100%;
 }
 
 .tallButtons {
-  height: 28px;
+  height: $control-tall-button-height;
+  min-width: 0;
+  padding-inline: 1rem;
 }
 
-/* iPad editor: 15% bigger add-time control */
-.biggerButton {
-  height: 32px;
-  font-size: 1.15rem;
-}
-
-.biggerInput {
-  height: 2.3rem !important;
-  font-size: 1.15rem !important;
+.timeInput {
+  width: 100% !important;
+  max-width: none !important;
+  height: $control-tall-button-height !important;
+  font-size: calc(1rem + 2px) !important;
+  text-align: center;
 }

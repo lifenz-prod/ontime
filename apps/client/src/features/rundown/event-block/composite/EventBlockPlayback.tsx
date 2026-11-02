@@ -4,6 +4,7 @@ import { IoPause, IoPlay, IoReload, IoRemoveCircle, IoRemoveCircleOutline } from
 import TooltipActionBtn from '../../../../common/components/buttons/TooltipActionBtn';
 import { useEventAction } from '../../../../common/hooks/useEventAction';
 import { setEventPlayback } from '../../../../common/hooks/useSocket';
+import { cx } from '../../../../common/utils/styleUtils';
 import { tooltipDelayMid } from '../../../../ontimeConfig';
 
 import style from '../EventBlock.module.scss';
@@ -85,7 +86,7 @@ const EventBlockPlayback = (props: EventBlockPlaybackProps) => {
   }
 
   return (
-    <div className={style.playbackActions}>
+    <div className={cx([style.playbackActions, playbackOnly && style.bigPlay])}>
       {!playbackOnly && (
         <TooltipActionBtn
           variant='ontime-subtle-white'

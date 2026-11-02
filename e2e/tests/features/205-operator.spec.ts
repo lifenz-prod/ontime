@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test('smoke test operator', async ({ page }) => {
   // make some boilerplate
-  await page.goto('http://localhost:4001/editor');
+  await page.goto('http://localhost:4001/advanced-editor');
   await page.getByRole('button', { name: 'Edit' }).click();
   await page.getByRole('button', { name: 'Clear rundown' }).click();
   await page.getByRole('button', { name: 'Delete all' }).click();

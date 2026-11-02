@@ -12,7 +12,7 @@ import {
 } from 'react-icons/io5';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { EndAction, MaybeString, OntimeEvent, Playback, TimerType, TimeStrategy } from 'ontime-types';
+import { EndAction, MaybeString, OntimeEvent, Playback, TimeStrategy } from 'ontime-types';
 
 import { useContextMenu } from '../../../common/hooks/useContextMenu';
 import { cx, getAccessibleColour } from '../../../common/utils/styleUtils';
@@ -36,8 +36,9 @@ interface EventBlockProps {
   countToEnd: boolean;
   eventIndex: number;
   isPublic: boolean;
+  hideTimer?: boolean;
+  showAsAuxTimer?: boolean;
   endAction: EndAction;
-  timerType: TimerType;
   title: string;
   note: string;
   delay: number;
@@ -76,9 +77,10 @@ export default function EventBlock(props: EventBlockProps) {
     linkStart,
     countToEnd,
     isPublic = true,
+    hideTimer = false,
+    showAsAuxTimer = false,
     eventIndex,
     endAction,
-    timerType,
     title,
     note,
     delay,
@@ -302,8 +304,9 @@ export default function EventBlock(props: EventBlockProps) {
           eventId={eventId}
           eventIndex={eventIndex}
           isPublic={isPublic}
+          hideTimer={hideTimer}
+          showAsAuxTimer={showAsAuxTimer}
           endAction={endAction}
-          timerType={timerType}
           title={title}
           note={note}
           delay={delay}

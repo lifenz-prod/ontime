@@ -24,7 +24,7 @@ export default function Editor() {
   const { isOpen: isMenuOpen, onOpen, onClose } = useDisclosure();
   const { isOpen: isFinderOpen, onToggle: onFinderToggle, onClose: onFinderClose } = useDisclosure();
 
-  useWindowTitle('Editor');
+  useWindowTitle('Advanced Editor');
 
   // we need to register the listener to change the editor location
   useElectronListener();

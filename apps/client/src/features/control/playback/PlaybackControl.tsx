@@ -10,14 +10,12 @@ import PlaybackTimer from './playback-timer/PlaybackTimer';
 
 import style from './PlaybackControl.module.scss';
 
-export default function PlaybackControl() {
+export default function PlaybackControl({ compact }: { compact?: boolean }) {
   const data = usePlaybackControl();
 
   return (
-    <div className={style.mainContainer}>
-      <PlaybackTimer playback={data.playback as Playback}>
-        <AddTime playback={data.playback} />
-      </PlaybackTimer>
+    <div className={compact ? `${style.mainContainer} ${style.compact}` : style.mainContainer}>
+      <PlaybackTimer playback={data.playback as Playback} />
       <PlaybackButtons
         playback={data.playback}
         numEvents={data.numEvents}
@@ -25,6 +23,7 @@ export default function PlaybackControl() {
         timerPhase={data.timerPhase}
       />
       <AuxTimer />
+      <AddTime playback={data.playback} />
       <GlobalOffset />
     </div>
   );

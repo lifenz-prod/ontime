@@ -1,5 +1,5 @@
 import expressStaticGzip from 'express-static-gzip';
-import { extname } from 'node:path';
+import { basename, extname } from 'node:path';
 
 import { srcDir } from '../setup/index.js';
 
@@ -21,6 +21,16 @@ export const compressedStatic = expressStaticGzip(srcDir.clientDir, {
       if (extname(file) === '.html') {
         res.setHeader('Cache-Control', 'public, max-age=0');
       }
+      // the service worker has a stable name, it must be revalidated so clients pick up a new version
+      // the file may be the pre-compressed variant (ie: sw.js.br)
+      if (isServiceWorker(file)) {
+        res.setHeader('Cache-Control', 'no-cache');
+      }
     },
   },
 });
+
+function isServiceWorker(file: string): boolean {
+  const name = basename(file);
+  return name === 'sw.js' || name.startsWith('sw.js.');
+}

@@ -1,0 +1,178 @@
+.page {
+  height: 100vh;
+  overflow-y: auto;
+  background: $ui-black;
+  color: $ui-white;
+  font-family: $ontime-font-family;
+}
+
+.toc {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.75rem 1rem;
+  background: $gray-1350;
+  border-bottom: 1px solid $border-color-ondark;
+
+  a,
+  .jump {
+    color: $blue-500;
+    font-weight: 600;
+  }
+
+  .jump {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .download {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+}
+
+.guide {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 2rem 1rem 3rem;
+  line-height: 1.5;
+  scroll-margin-top: 4rem;
+
+  & + & {
+    border-top: 1px solid $border-color-ondark;
+  }
+
+  h1 {
+    font-size: 2rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+  }
+
+  h2 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    margin: 2rem 0 0.5rem;
+  }
+
+  h3 {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin: 1.25rem 0 0.5rem;
+  }
+
+  p {
+    margin: 0.5rem 0;
+  }
+
+  ul,
+  ol {
+    margin: 0.5rem 0;
+    padding-left: 1.5rem;
+  }
+
+  ul {
+    list-style: disc;
+  }
+
+  ol {
+    list-style: decimal;
+  }
+
+  li {
+    margin: 0.25rem 0;
+  }
+
+  li > ul {
+    list-style: circle;
+  }
+
+  code {
+    padding: 0 0.25rem;
+    border-radius: $component-border-radius-sm;
+    background: $gray-1250;
+  }
+
+  img {
+    width: 100%;
+    margin: 1rem 0;
+    border-radius: $component-border-radius-md;
+  }
+
+  table {
+    width: 100%;
+    margin: 1rem 0;
+    border-collapse: collapse;
+  }
+
+  th,
+  td {
+    padding: 0.4rem 0.6rem;
+    border: 1px solid $border-color-ondark;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  th {
+    background: $gray-1250;
+  }
+}
+
+// the PDF is printed from this page
+@media print {
+  // the app pins itself to the viewport, which would print a single page
+  :global(html),
+  :global(body),
+  :global(.App) {
+    height: auto;
+    overflow: visible;
+    background: white;
+  }
+
+  .page {
+    height: auto;
+    overflow: visible;
+    background: white;
+    color: black;
+  }
+
+  .toc {
+    display: none;
+  }
+
+  .guide {
+    max-width: none;
+    padding: 0;
+
+    & + & {
+      border-top: none;
+      break-before: page;
+    }
+
+    h2,
+    h3 {
+      break-after: avoid;
+    }
+
+    tr,
+    img {
+      break-inside: avoid;
+    }
+
+    code,
+    th {
+      background: #eee;
+    }
+
+    th,
+    td {
+      border-color: #bbb;
+    }
+  }
+}

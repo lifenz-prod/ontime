@@ -1,18 +1,13 @@
+// views no longer offered in the menu (minimal, clock, timeline, public, lower, studio, countdown, info)
+// still have routes, pending removal
 export const navigatorConstants = [
+  { url: 'quick-start', label: 'Quick Start' },
   { url: 'timer', label: 'Timer' },
-  { url: 'minimal', label: 'Minimal Timer' },
-  { url: 'clock', label: 'Wall Clock' },
   { url: 'backstage', label: 'Backstage' },
-  { url: 'timeline', label: 'Timeline (beta)' },
-  { url: 'public', label: 'Public' },
-  { url: 'lower', label: 'Lower Thirds' },
-  { url: 'studio', label: 'Studio Clock' },
-  { url: 'countdown', label: 'Countdown' },
-  { url: 'info', label: 'Project Info' },
   { url: 'cuescreen', label: 'Cuescreen' },
   { url: 'cuescreennow', label: 'Cuescreen NOW/NEXT' },
-  { url: 'qlabcountdown', label: 'Qlab Countdown' },
-  { url: 'ipad-editor', label: 'iPad Editor' },
+  { url: 'mobilecuescreen', label: 'Mobile Cue Screen' },
+  { url: 'qlabcountdown', label: 'Playback Countdown' },
 ];
 
 // default time format to use for users in 12 hour clocks

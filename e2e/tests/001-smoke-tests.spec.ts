@@ -5,7 +5,7 @@ test.describe('pages routes are available', () => {
   test.use({ viewport: { width: 1920, height: 1080 } });
   test.describe('main views', () => {
     test('editor', async ({ page }) => {
-      await page.goto('http://localhost:4001/editor');
+      await page.goto('http://localhost:4001/advanced-editor');
 
       await expect(page).toHaveTitle(/ontime/);
       await expect(page.getByTestId('editor-container')).toBeVisible();

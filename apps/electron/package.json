@@ -1,6 +1,6 @@
 {
   "name": "ontime-electron",
-  "version": "4.0.1",
+  "version": "4.0.2-beta.6",
   "author": "Alan Aiken",
   "description": "Time keeping for live events",
   "repository": "https://github.com/lifenz-prod/ontime",
@@ -41,6 +41,7 @@
     "afterPack": "./afterPack.cjs",
     "afterSign": "./notarize.cjs",
     "mac": {
+      "artifactName": "ontime-macOS-${arch}.${ext}",
       "notarize": false,
       "hardenedRuntime": true,
       "gatekeeperAssess": false,

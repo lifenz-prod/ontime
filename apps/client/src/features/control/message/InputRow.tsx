@@ -11,10 +11,11 @@ interface InputRowProps {
   text: string;
   visible: boolean;
   changeHandler: (newValue: string) => void;
+  className?: string;
 }
 
 export default function InputRow(props: PropsWithChildren<InputRowProps>) {
-  const { label, placeholder, text, visible, changeHandler, children } = props;
+  const { label, placeholder, text, visible, changeHandler, className, children } = props;
 
   const [value, setValue] = useState(text);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -42,7 +43,7 @@ export default function InputRow(props: PropsWithChildren<InputRowProps>) {
   };
 
   return (
-    <div className={style.inputRow}>
+    <div className={cx([style.inputRow, className])}>
       <label className={cx([style.label, visible ?? style.active])} htmlFor={label}>
         {label}
       </label>

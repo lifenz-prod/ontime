@@ -1,6 +1,7 @@
 import { ChangeEvent, useEffect, useState } from 'react';
 import { IoCheckmark, IoShieldCheckmarkOutline } from 'react-icons/io5';
 import { Button, Input, Spinner } from '@chakra-ui/react';
+import { parseGoogleSheetInput } from 'ontime-utils';
 
 import { getWorksheetNames } from '../../../../common/api/sheets';
 import { maybeAxiosError } from '../../../../common/api/utils';
@@ -166,8 +167,8 @@ export default function GSheetSetup(props: GSheetSetupProps) {
           size='sm'
           variant='ontime-filled'
           autoComplete='off'
-          placeholder='Sheet ID'
-          onChange={(event) => setSheetId(event.target.value)}
+          placeholder='Sheet link or ID'
+          onChange={(event) => setSheetId(parseGoogleSheetInput(event.target.value)?.sheetId ?? event.target.value)}
           isDisabled={isLoading || canAuthenticate}
         />
       </Panel.ListGroup>

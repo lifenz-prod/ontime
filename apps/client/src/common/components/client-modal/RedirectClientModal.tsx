@@ -71,6 +71,7 @@ export function RedirectClientModal(props: RedirectClientModalProps) {
                 onChange={(event) => setSelected(event.target.value)}
               >
                 <option value='/'>Select view or preset</option>
+                <option value='/ipad-editor'>iPad Editor</option>
                 {navigatorConstants.map((view) => {
                   return (
                     <option key={view.url} value={`/${view.url}`}>

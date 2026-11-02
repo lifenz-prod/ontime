@@ -8,10 +8,10 @@ import style from '../../editors/Editor.module.scss';
 
 const MobileTimerControlExport = () => {
   return (
-    <div className={style.playback} data-testid='panel-timer-control'>
+    <div className={`${style.playback} ${style.compactPlayback}`} data-testid='panel-timer-control'>
       <div className={style.content}>
         <ErrorBoundary>
-          <PlaybackControl />
+          <PlaybackControl compact />
         </ErrorBoundary>
       </div>
     </div>

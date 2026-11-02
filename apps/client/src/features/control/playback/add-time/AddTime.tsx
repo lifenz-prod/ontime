@@ -6,7 +6,6 @@ import { MILLIS_PER_HOUR, MILLIS_PER_SECOND, parseUserTime } from 'ontime-utils'
 
 import TimeInput from '../../../../common/components/input/time-input/TimeInput';
 import { setPlayback } from '../../../../common/hooks/useSocket';
-import { cx } from '../../../../common/utils/styleUtils';
 import { tooltipDelayMid } from '../../../../ontimeConfig';
 import TapButton from '../tap-button/TapButton';
 
@@ -14,12 +13,10 @@ import style from './AddTime.module.scss';
 
 interface AddTimeProps {
   playback: Playback;
-  bigger?: boolean;
-  label?: string;
 }
 
 export default function AddTime(props: AddTimeProps) {
-  const { playback, bigger, label } = props;
+  const { playback } = props;
   const [time, setTime] = useLocalStorage({ key: 'add-time-v2', defaultValue: 60_000 }); // 1 minute
 
   const handleTimeChange = (_field: string, value: string) => {
@@ -61,31 +58,23 @@ export default function AddTime(props: AddTimeProps) {
 
   return (
     <div className={style.addTime}>
-      {label && <span className={style.label}>{label}</span>}
-      <TimeInput
-        name='addtime'
-        submitHandler={handleTimeChange}
-        time={time}
-        placeholder='Add time'
-        className={bigger ? style.biggerInput : undefined}
-        formatValue={formatMmSs}
-      />
+      <div className={style.label}>Adjust Current</div>
       <div className={style.addButtons}>
         <Tooltip label='Remove time' openDelay={tooltipDelayMid} shouldWrapChildren>
-          <TapButton
-            onClick={() => handleAddTime('remove')}
-            disabled={doDisableButtons}
-            className={cx([style.tallButtons, bigger && style.biggerButton])}
-          >
+          <TapButton onClick={() => handleAddTime('remove')} disabled={doDisableButtons} className={style.tallButtons}>
             <IoRemove />
           </TapButton>
         </Tooltip>
+        <TimeInput
+          name='addtime'
+          submitHandler={handleTimeChange}
+          time={time}
+          placeholder='Add time'
+          className={style.timeInput}
+          formatValue={formatMmSs}
+        />
         <Tooltip label='Add time' openDelay={tooltipDelayMid} shouldWrapChildren>
-          <TapButton
-            onClick={() => handleAddTime('add')}
-            disabled={doDisableButtons}
-            className={cx([style.tallButtons, bigger && style.biggerButton])}
-          >
+          <TapButton onClick={() => handleAddTime('add')} disabled={doDisableButtons} className={style.tallButtons}>
             <IoAdd />
           </TapButton>
         </Tooltip>

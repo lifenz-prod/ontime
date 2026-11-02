@@ -210,6 +210,16 @@ export const connectSocket = () => {
           updateDevTools({ qlab: payload });
           break;
         }
+        case 'ontime-mitti': {
+          addToBatchUpdates('mitti', payload);
+          updateDevTools({ mitti: payload });
+          break;
+        }
+        case 'ontime-countdown': {
+          addToBatchUpdates('countdown', payload);
+          updateDevTools({ countdown: payload });
+          break;
+        }
         case 'ontime-rundownSources': {
           addToBatchUpdates('rundownSources', payload);
           updateDevTools({ rundownSources: payload });

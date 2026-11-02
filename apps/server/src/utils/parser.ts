@@ -15,6 +15,7 @@ import {
   EventCustomFields,
   isOntimeBlock,
   LogOrigin,
+  OntimeBaseEvent,
   OntimeEvent,
   OntimeRundown,
   ServiceProfiles,
@@ -24,6 +25,7 @@ import {
 } from 'ontime-types';
 
 import { parseAutomationSettings } from '../api-data/automation/automation.parser.js';
+import { parseMittiSettings } from '../api-data/mitti/mitti.parser.js';
 import { parseQlabSettings } from '../api-data/qlab/qlab.parser.js';
 import { logger } from '../classes/Logger.js';
 import { event as eventDef } from '../models/eventsDefinition.js';
@@ -416,6 +418,7 @@ export function parseDatabaseModel(jsonData: Partial<DatabaseModel>): { data: Da
     customFields,
     automation: parseAutomationSettings(jsonData),
     qlab: parseQlabSettings(jsonData),
+    mitti: parseMittiSettings(jsonData),
     serviceProfiles: parseServiceProfiles(jsonData),
   };
 
@@ -438,6 +441,25 @@ function inferStrategy(end: unknown, duration: unknown, fallback: TimeStrategy):
     return TimeStrategy.LockDuration;
   }
   return fallback;
+}
+
+/**
+ * Carries over the service-instance tags of a generated entry, which are only present on generated sections
+ */
+type ServiceInstanceTags = Pick<OntimeBaseEvent, 'generatedFor' | 'mirrorOf' | 'deviated'>;
+
+export function pickServiceInstanceTags(
+  original: ServiceInstanceTags,
+  patch: ServiceInstanceTags = {},
+): ServiceInstanceTags {
+  const tags: ServiceInstanceTags = {};
+  const generatedFor = patch.generatedFor ?? original.generatedFor;
+  const mirrorOf = patch.mirrorOf ?? original.mirrorOf;
+  const deviated = patch.deviated ?? original.deviated;
+  if (generatedFor) tags.generatedFor = generatedFor;
+  if (mirrorOf) tags.mirrorOf = mirrorOf;
+  if (deviated) tags.deviated = deviated;
+  return tags;
 }
 
 export function createPatch(originalEvent: OntimeEvent, patchEvent: Partial<OntimeEvent>): OntimeEvent {
@@ -480,6 +502,7 @@ export function createPatch(originalEvent: OntimeEvent, patchEvent: Partial<Onti
     timeDanger: patchEvent.timeDanger ?? originalEvent.timeDanger,
     custom: { ...originalEvent.custom, ...patchEvent.custom },
     triggers: patchEvent.triggers ?? originalEvent.triggers,
+    ...pickServiceInstanceTags(originalEvent, patchEvent),
   };
 }
 

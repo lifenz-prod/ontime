@@ -14,7 +14,9 @@
 }
 
 .content {
-  margin: 1rem;
+  /* top margin clears the absolutely positioned close button, which otherwise
+     crowds the save button in each panel's header */
+  margin: 3.5rem 1rem 1rem;
   overflow-y: auto;
   flex-grow: 1;
   padding-bottom: 300px;
