@@ -50,4 +50,7 @@ installs on Windows and Linux carry on without it. Its install step downloads `S
 package's GitHub releases. Frames go from Electron's off-screen renderer to Syphon as shared GPU textures, with no
 copy through memory.
 
-The DMG is not signed or notarised, so the first launch on a new Mac needs right-click → Open.
+Every release tag attaches signed and notarised DMGs (`ontime-cue-renderer-macOS-arm64.dmg` and `-x64.dmg`) to
+the GitHub Release; the `build_cue_renderer` job in `.github/workflows/build.yml` runs `release:mac`, which signs with
+the main app's certificate and entitlements and notarises through `apps/electron/notarize.cjs`. A local `pack:mac`
+build is unsigned, so its first launch on a new Mac needs right-click → Open.

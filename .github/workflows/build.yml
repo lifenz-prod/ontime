@@ -28,6 +28,16 @@ jobs:
             fi
             echo "$pkg OK ($V)"
           done
+      # The in-app updater shows these notes before anyone installs, so every release needs them
+      - name: Check release notes
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          NOTES="release-notes/${GITHUB_REF_NAME}.md"
+          if [ ! -s "$NOTES" ]; then
+            echo "::error::$NOTES is missing or empty. Write the release notes and re-tag."
+            exit 1
+          fi
+          echo "$NOTES OK"
 
   build_macos:
     needs: verify_version
@@ -69,11 +79,66 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           prerelease: ${{ contains(github.ref_name, '-') }}
+          body_path: release-notes/${{ github.ref_name }}.md
           files: |
             ./apps/electron/dist/ontime-macOS-x64.dmg
             ./apps/electron/dist/ontime-macOS-arm64.dmg
             ./apps/electron/dist/ontime-macOS-x64.zip
             ./apps/electron/dist/ontime-macOS-arm64.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Ontime Cue Renderer, the ProPresenter machine's Syphon menu bar app (apps/cue-renderer).
+  # Signed and notarised with the same certificate and notarize.cjs as the main app.
+  build_cue_renderer:
+    needs: verify_version
+    # Pinned for the same keychain reason as build_macos
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4.4.0
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      # The renderer is plain JS with no build step, but notarize.cjs needs apps/electron's @electron/notarize
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --filter ontime-cue-renderer --filter ontime-electron
+
+      - name: Electron - Build and sign app
+        env:
+          APPLE_ID: ${{ secrets.APPLEID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLEIDPASS }}
+          APPLE_TEAM_ID: ${{ secrets.TEAMID }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        run: pnpm --filter ontime-cue-renderer release:mac
+        timeout-minutes: 60
+
+      # notarize.cjs skips quietly when credentials are missing, so check before attaching anything
+      - name: Verify signature and notarisation
+        working-directory: apps/cue-renderer/dist
+        run: |
+          for app in mac/*.app mac-arm64/*.app; do
+            codesign --verify --deep --strict --verbose=2 "$app"
+            xcrun stapler validate "$app"
+          done
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          body_path: release-notes/${{ github.ref_name }}.md
+          fail_on_unmatched_files: true
+          files: |
+            ./apps/cue-renderer/dist/ontime-cue-renderer-macOS-x64.dmg
+            ./apps/cue-renderer/dist/ontime-cue-renderer-macOS-arm64.dmg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -107,6 +172,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           prerelease: ${{ contains(github.ref_name, '-') }}
+          body_path: release-notes/${{ github.ref_name }}.md
           files: './apps/electron/dist/ontime-win64.exe'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -141,6 +207,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           prerelease: ${{ contains(github.ref_name, '-') }}
+          body_path: release-notes/${{ github.ref_name }}.md
           files: './apps/electron/dist/ontime-linux.AppImage'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
