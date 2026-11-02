@@ -40,6 +40,7 @@ const StudioClock = React.lazy(() => import('./features/viewers/studio/StudioClo
 const ProjectInfo = React.lazy(() => import('./views/project-info/ProjectInfo'));
 const QlabTimerView = React.lazy(() => import('./views/qlab/QlabTimer'));
 const QlabCountdownView = React.lazy(() => import('./views/qlabcountdown/QlabCountdownView'));
+const QuickStartGuide = React.lazy(() => import('./features/quick-start/QuickStartGuide'));
 
 const STimer = withPreset(withData(TimerView));
 const SCuescreen = withPreset(withData(CuescreenView));
@@ -212,6 +213,7 @@ export default function AppRouter() {
         />
 
         {/*/!* Protected Routes *!/*/}
+        <Route path='/quick-start' element={<QuickStartGuide />} />
         <Route path='/editor' element={<MobileEditor />} />
         <Route path='/advanced-editor' element={<Editor />} />
         {/* the compact editor used to live here, keep old bookmarks and presets working */}

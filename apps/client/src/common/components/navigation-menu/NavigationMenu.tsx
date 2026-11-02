@@ -117,14 +117,6 @@ function NavigationMenu(props: NavigationMenuProps) {
               <IoLockClosedOutline />
               iPad Editor
             </Link>
-            <ClientLink to='cuesheet' current={location.pathname === '/cuesheet'}>
-              <IoLockClosedOutline />
-              Cuesheet
-            </ClientLink>
-            <ClientLink to='op' current={location.pathname === '/op'}>
-              <IoLockClosedOutline />
-              Operator
-            </ClientLink>
             <hr className={style.separator} />
             {navigatorConstants.map((route) => (
               <ClientLink key={route.url} to={route.url} current={location.pathname === `/${route.url}`}>
