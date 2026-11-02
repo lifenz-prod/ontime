@@ -41,6 +41,7 @@
     "afterPack": "./afterPack.cjs",
     "afterSign": "./notarize.cjs",
     "mac": {
+      "artifactName": "ontime-macOS-${arch}.${ext}",
       "notarize": false,
       "hardenedRuntime": true,
       "gatekeeperAssess": false,

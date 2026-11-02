@@ -77,6 +77,7 @@ export { getPropertyFromPath } from './src/common/objectUtils.js';
 // generic utilities
 export { getErrorMessage } from './src/generic/generic.js';
 export { obfuscate, unobfuscate } from './src/generic/generic.js';
+export { compareVersions, isPrerelease, parseVersion } from './src/version-utils/compareVersions.js';
 export { isNumeric } from './src/types/types.js';
 
 // model validation
