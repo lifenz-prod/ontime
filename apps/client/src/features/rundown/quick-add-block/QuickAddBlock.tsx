@@ -5,6 +5,7 @@ import { SupportedEvent } from 'ontime-types';
 
 import { useEventAction } from '../../../common/hooks/useEventAction';
 import { useEmitLog } from '../../../common/stores/logger';
+import { useRundownMode } from '../RundownModeContext';
 
 import style from './QuickAddBlock.module.scss';
 
@@ -18,6 +19,7 @@ function QuickAddBlock(props: QuickAddBlockProps) {
   const { previousEventId } = props;
   const { addEvent } = useEventAction();
   const { emitError } = useEmitLog();
+  const { eventOnlyQuickAdd } = useRundownMode();
 
   const doLinkPrevious = useRef<HTMLInputElement | null>(null);
   const doPublic = useRef<HTMLInputElement | null>(null);
@@ -76,26 +78,30 @@ function QuickAddBlock(props: QuickAddBlockProps) {
       >
         Event
       </Button>
-      <Button
-        onClick={() => handleCreateEvent(SupportedEvent.Delay)}
-        size='xs'
-        variant='ontime-subtle-white'
-        className={style.quickBtn}
-        leftIcon={<IoAdd />}
-        color='#b1b1b1' // $gray-400
-      >
-        Delay
-      </Button>
-      <Button
-        onClick={() => handleCreateEvent(SupportedEvent.Block)}
-        size='xs'
-        variant='ontime-subtle-white'
-        className={style.quickBtn}
-        leftIcon={<IoAdd />}
-        color='#b1b1b1' // $gray-400
-      >
-        Block
-      </Button>
+      {!eventOnlyQuickAdd && (
+        <>
+          <Button
+            onClick={() => handleCreateEvent(SupportedEvent.Delay)}
+            size='xs'
+            variant='ontime-subtle-white'
+            className={style.quickBtn}
+            leftIcon={<IoAdd />}
+            color='#b1b1b1' // $gray-400
+          >
+            Delay
+          </Button>
+          <Button
+            onClick={() => handleCreateEvent(SupportedEvent.Block)}
+            size='xs'
+            variant='ontime-subtle-white'
+            className={style.quickBtn}
+            leftIcon={<IoAdd />}
+            color='#b1b1b1' // $gray-400
+          >
+            Block
+          </Button>
+        </>
+      )}
     </div>
   );
 }

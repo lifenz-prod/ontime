@@ -3,9 +3,8 @@
   display: grid;
   grid-template-areas:
           "go playback"
-          "go transport"
-          "extra extra";
-  grid-template-rows: repeat(3, 2rem);
+          "go extra";
+  grid-template-rows: repeat(2, 2rem);
   gap: $element-spacing;
 }
 
@@ -25,17 +24,13 @@
   @include spaced-flex;
 }
 
-.transportContainer {
-  grid-area: transport;
-  @include spaced-flex;
-}
-
 .extra {
   grid-area: extra;
   @include spaced-flex;
 }
 
-.invertX {
-  transform: rotateY(180deg);
+.prev {
+  font-weight: 600;
+  letter-spacing: 0.05em;
 }
 

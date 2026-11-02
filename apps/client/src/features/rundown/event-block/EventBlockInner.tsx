@@ -1,12 +1,5 @@
 import { memo, useEffect, useState } from 'react';
-import {
-  IoEyeOff,
-  IoPlay,
-  IoPlayForward,
-  IoPlaySkipForward,
-  IoStop,
-  IoTimer,
-} from 'react-icons/io5';
+import { IoEyeOff, IoPlay, IoPlayForward, IoPlaySkipForward, IoStop, IoTimer } from 'react-icons/io5';
 import { Tooltip } from '@chakra-ui/react';
 import { EndAction, MaybeString, Playback, TimeStrategy } from 'ontime-types';
 
@@ -150,11 +143,13 @@ function EventBlockInner(props: EventBlockInnerProps) {
           {loaded && <EventBlockProgressBar />}
         </div>
         <div className={style.eventStatus} tabIndex={-1}>
-          <Tooltip label={`End action: ${endAction}`} openDelay={tooltipDelayMid}>
-            <span>
-              <EndActionIcon action={endAction} className={style.statusIcon} />
-            </span>
-          </Tooltip>
+          {shownEndActions.has(endAction) && (
+            <Tooltip label={`End action: ${endAction}`} openDelay={tooltipDelayMid}>
+              <span>
+                <EndActionIcon action={endAction} className={style.statusIcon} />
+              </span>
+            </Tooltip>
+          )}
           {!playbackOnly && !countToEnd && <FixedDurationIcon className={style.statusIcon} />}
           {!playbackOnly && hideTimer && <HideTimerIcon className={style.statusIcon} />}
           {!playbackOnly && showAsAuxTimer && <AuxTimerBadge />}
@@ -195,6 +190,9 @@ function HideTimerIcon(props: { className: string }) {
     </Tooltip>
   );
 }
+
+/** a cue that just ends, or loads the next, needs no marker */
+const shownEndActions = new Set<EndAction>([EndAction.Stop, EndAction.PlayNext, EndAction.PlayNextDelayed]);
 
 function EndActionIcon(props: { action: EndAction; className: string }) {
   const { action, className } = props;

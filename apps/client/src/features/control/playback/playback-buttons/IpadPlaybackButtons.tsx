@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { IoPlay, IoStop } from 'react-icons/io5';
+import { IoStop } from 'react-icons/io5';
 import { Playback, TimerPhase } from 'ontime-types';
 import { validatePlayback } from 'ontime-utils';
 
@@ -18,16 +18,16 @@ interface IpadPlaybackButtonsProps {
 export default function IpadPlaybackButtons(props: IpadPlaybackButtonsProps) {
   const { playback, numEvents, selectedEventIndex, timerPhase } = props;
 
-  const isPlaying = playback === Playback.Play;
   const isArmed = playback === Playback.Armed;
   const isRolling = playback === Playback.Roll;
+  const isFirst = selectedEventIndex === 0;
   const isLast = selectedEventIndex === numEvents - 1;
   const noEvents = numEvents === 0;
 
   const disableGo = isRolling || noEvents;
+  const disablePrev = isRolling || noEvents || isFirst || selectedEventIndex === null;
 
   const playbackCan = validatePlayback(playback, timerPhase);
-  const disableStart = !playbackCan.start;
   const disableStop = !playbackCan.stop;
 
   const [goModeAction, goModeText] = useMemo(() => {
@@ -47,8 +47,8 @@ export default function IpadPlaybackButtons(props: IpadPlaybackButtonsProps) {
         {goModeText}
       </TapButton>
       <div className={style.controls}>
-        <TapButton onClick={setPlayback.start} disabled={disableStart} theme={Playback.Play} active={isPlaying}>
-          <IoPlay />
+        <TapButton onClick={setPlayback.startPrevious} disabled={disablePrev} className={style.prev}>
+          PREV
         </TapButton>
         <TapButton onClick={setPlayback.stop} disabled={disableStop} theme={Playback.Stop}>
           <IoStop />
