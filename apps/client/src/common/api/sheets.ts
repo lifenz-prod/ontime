@@ -2,6 +2,7 @@ import axios, { AxiosResponse } from 'axios';
 import {
   AuthenticationStatus,
   CustomFields,
+  LoadedSheet,
   OntimeRundown,
   PublicSheetInfo,
   RecentSheet,
@@ -112,4 +113,14 @@ export const previewPublicRundown = async (
 export const getRecentSheets = async (): Promise<RecentSheet[]> => {
   const response: AxiosResponse<RecentSheet[]> = await axios.get(`${sheetsPath}/recent`);
   return response.data;
+};
+
+/**
+ * HTTP request for the sheet tab the rundown was last imported from, and the column mapping used
+ */
+export const getLoadedSheet = async (): Promise<{ sheet: LoadedSheet; importMap: ImportMap } | null> => {
+  const response: AxiosResponse<{ sheet: LoadedSheet; importMap: ImportMap } | null> = await axios.get(
+    `${sheetsPath}/loaded`,
+  );
+  return response.data || null;
 };

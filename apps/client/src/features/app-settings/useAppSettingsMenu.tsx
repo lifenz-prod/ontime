@@ -38,11 +38,10 @@ const staticOptions = [
   },
   {
     id: 'sources',
-    label: 'Data Sources',
+    label: 'Import',
     secondary: [
+      { id: 'sources__gsheet_import', label: 'Import from Google Sheet' },
       { id: 'sources__xlsx', label: 'Import spreadsheet' },
-      { id: 'sources__gsheet', label: 'Sync with Google Sheet' },
-      { id: 'sources__gsheet_import', label: 'Import from sheet' },
     ],
     split: true,
   },

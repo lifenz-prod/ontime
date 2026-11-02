@@ -69,6 +69,7 @@ export type {
 // SERVER RESPONSES
 export type {
   AuthenticationStatus,
+  LoadedSheet,
   PublicSheetInfo,
   RecentSheet,
   NetworkInterface,

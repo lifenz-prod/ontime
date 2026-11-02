@@ -7,6 +7,7 @@
 import {
   AuthenticationStatus,
   CustomFields,
+  LoadedSheet,
   LogOrigin,
   MaybeString,
   OntimeRundown,
@@ -65,6 +66,8 @@ type PersistedSheetsState = {
   access: SheetAccess | null;
   /** most recent first */
   recentSheets: RecentSheet[];
+  /** the sheet tab the rundown was last imported from */
+  loadedSheet: Omit<LoadedSheet, 'title'> | null;
 };
 
 const defaultState: PersistedSheetsState = {
@@ -74,6 +77,7 @@ const defaultState: PersistedSheetsState = {
   importMap: null,
   access: null,
   recentSheets: [],
+  loadedSheet: null,
 };
 
 const adapter = new JSONFile<PersistedSheetsState>(publicFiles.sheetsState);
@@ -223,9 +227,9 @@ export async function init() {
  */
 export async function revoke(): Promise<ReturnType<typeof hasAuth>> {
   resetMemoryState();
-  // the recent sheets are not part of the connection
-  const { recentSheets } = await readPersistedState();
-  await writePersistedState({ ...defaultState, recentSheets });
+  // the recent sheets and the loaded sheet are not part of the connection
+  const { recentSheets, loadedSheet } = await readPersistedState();
+  await writePersistedState({ ...defaultState, recentSheets, loadedSheet });
   return hasAuth();
 }
 
@@ -607,7 +611,9 @@ export async function download(
     throw new Error(`Sheet read failed: ${googleResponse.statusText}`);
   }
 
-  return parseSheetRows(googleResponse.data.values, options);
+  const data = parseSheetRows(googleResponse.data.values, options);
+  await rememberLoadedSheet(sheetId, options.worksheet, 'oauth');
+  return data;
 }
 
 type SheetImport = Awaited<ReturnType<typeof download>>;
@@ -656,7 +662,9 @@ export async function downloadPublic(sheetId: string, options: ImportMap): Promi
   await persistCurrentStateSafe();
   await rememberImportMap(options);
 
-  return parseSheetRows(rows, options);
+  const data = parseSheetRows(rows, options);
+  await rememberLoadedSheet(sheetId, options.worksheet, 'public');
+  return data;
 }
 
 /**
@@ -675,5 +683,38 @@ async function rememberRecentSheet(sheetId: string, title: MaybeString | undefin
     });
   } catch (error) {
     logger.warning(LogOrigin.Server, `Could not remember recent Google Sheet: ${getErrorMessage(error)}`);
+  }
+}
+
+/**
+ * The sheet tab the rundown was last imported from, with the column mapping used,
+ * so the UI can switch tabs without going through the mapping again
+ */
+export async function getLoadedSheet(): Promise<{ sheet: LoadedSheet; importMap: ImportMap } | null> {
+  const { loadedSheet, recentSheets } = await readPersistedState();
+  if (!currentImportMap) {
+    return null;
+  }
+  // imports from before the loaded sheet was tracked still left the linked sheet and its mapping
+  const sheet =
+    loadedSheet ??
+    (currentSheetId && currentAccess
+      ? { sheetId: currentSheetId, worksheet: currentImportMap.worksheet, access: currentAccess, importedAt: 0 }
+      : null);
+  if (!sheet?.sheetId) {
+    return null;
+  }
+  const title = recentSheets?.find((recent) => recent.sheetId === sheet.sheetId)?.title ?? sheet.sheetId;
+  return {
+    sheet: { ...sheet, title },
+    importMap: currentImportMap,
+  };
+}
+
+async function rememberLoadedSheet(sheetId: string, worksheet: string, access: SheetAccess) {
+  try {
+    await writePersistedState({ loadedSheet: { sheetId, worksheet, access, importedAt: Date.now() } });
+  } catch (error) {
+    logger.warning(LogOrigin.Server, `Could not remember loaded Google Sheet: ${getErrorMessage(error)}`);
   }
 }

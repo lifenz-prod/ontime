@@ -27,6 +27,7 @@ import {
   openPublicSheet,
   downloadPublic,
   getRecentSheets,
+  getLoadedSheet,
 } from '../../services/sheet-service/SheetService.js';
 import { getErrorMessage, parseGoogleSheetInput } from 'ontime-utils';
 
@@ -161,6 +162,19 @@ export async function listRecentSheets(_req: Request, res: Response<RecentSheet[
   try {
     const recentSheets = await getRecentSheets();
     res.status(200).send(recentSheets);
+  } catch (error) {
+    const message = getErrorMessage(error);
+    res.status(500).send({ message });
+  }
+}
+
+export async function readLoadedSheet(
+  _req: Request,
+  res: Response<Awaited<ReturnType<typeof getLoadedSheet>> | ErrorResponse>,
+) {
+  try {
+    const loaded = await getLoadedSheet();
+    res.status(200).send(loaded);
   } catch (error) {
     const message = getErrorMessage(error);
     res.status(500).send({ message });

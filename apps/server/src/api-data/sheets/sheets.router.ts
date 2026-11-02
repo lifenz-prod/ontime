@@ -7,6 +7,7 @@ import express from 'express';
 import {
   getWorksheetNamesFromSheet,
   listRecentSheets,
+  readLoadedSheet,
   openPublic,
   readFromPublicSheet,
   readFromSheet,
@@ -27,6 +28,7 @@ export const router = express.Router();
 
 // sheets shared publicly need no authentication, but are read only
 router.get('/recent', listRecentSheets);
+router.get('/loaded', readLoadedSheet);
 router.post('/public/open', validatePublicSheet, openPublic);
 router.post('/public/:sheetId/read', validateSheetOptions, readFromPublicSheet);
 

@@ -17,7 +17,7 @@ interface PanelListProps extends PanelBaseProps {
   selectedPanel: string;
 }
 
-export default function PanelList({ selectedPanel, location }: PanelListProps) {
+export default function PanelList({ selectedPanel }: PanelListProps) {
   const { options } = useAppSettingsMenu();
 
   return (
@@ -27,11 +27,11 @@ export default function PanelList({ selectedPanel, location }: PanelListProps) {
         if (panel.highlight) {
           return (
             <Tooltip key={panel.id} label={panel.highlight} openDelay={tooltipDelayFast} shouldWrapChildren>
-              <PanelListItem panel={panel} location={location} isSelected={isSelected} />
+              <PanelListItem panel={panel} isSelected={isSelected} />
             </Tooltip>
           );
         }
-        return <PanelListItem key={panel.id} panel={panel} location={location} isSelected={isSelected} />;
+        return <PanelListItem key={panel.id} panel={panel} isSelected={isSelected} />;
       })}
     </ul>
   );
@@ -40,11 +40,10 @@ export default function PanelList({ selectedPanel, location }: PanelListProps) {
 interface PanelListItemProps {
   panel: SettingsOption;
   isSelected: boolean;
-  location?: string;
 }
 
 function PanelListItem(props: PanelListItemProps) {
-  const { panel, isSelected, location } = props;
+  const { panel, isSelected } = props;
   const { setLocation } = useAppSettingsNavigation();
 
   const classes = cx([
@@ -68,23 +67,6 @@ function PanelListItem(props: PanelListItemProps) {
       >
         {panel.label}
       </li>
-      {panel.secondary?.map((secondary) => {
-        const id = secondary.id.split('__')[1];
-        const secondaryClasses = cx([style.secondary, isSelected && location === id ? style.active : null]);
-        return (
-          <li
-            key={secondary.id}
-            onClick={() => setLocation(secondary.id as SettingsOptionId)}
-            onKeyDown={(event) => {
-              isKeyEnter(event) && setLocation(secondary.id as SettingsOptionId);
-            }}
-            className={secondaryClasses}
-            role='button'
-          >
-            {secondary.label}
-          </li>
-        );
-      })}
     </Fragment>
   );
 }

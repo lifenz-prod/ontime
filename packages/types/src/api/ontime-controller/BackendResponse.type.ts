@@ -61,6 +61,16 @@ export type RecentSheet = {
   lastUsed: number;
 };
 
+/** The Google Sheet tab the current rundown was last imported from */
+export type LoadedSheet = {
+  sheetId: string;
+  title: string;
+  worksheet: string;
+  access: 'public' | 'oauth';
+  /** epoch millis of the import */
+  importedAt: number;
+};
+
 /** A Google Sheet opened without authentication, by its public link */
 export type PublicSheetInfo = {
   sheetId: string;
