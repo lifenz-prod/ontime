@@ -15,8 +15,7 @@ const mittiPlaceholderSettings: MittiSettings = {
   warningThreshold: 30000,
   dangerThreshold: 10000,
   timeout: 5000,
-  relayHost: null,
-  relayPort: null,
+  relays: [],
 };
 
 export default function useMittiSettings() {

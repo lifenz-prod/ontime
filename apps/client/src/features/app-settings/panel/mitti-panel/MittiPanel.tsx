@@ -1,5 +1,6 @@
-import { Controller, useForm } from 'react-hook-form';
-import { Button, Input, Switch } from '@chakra-ui/react';
+import { Controller, useFieldArray, useForm } from 'react-hook-form';
+import { IoAdd, IoTrash } from 'react-icons/io5';
+import { Button, IconButton, Input, Switch } from '@chakra-ui/react';
 import type { MittiSettings } from 'ontime-types';
 
 import { maybeAxiosError } from '../../../../common/api/utils';
@@ -30,6 +31,8 @@ export default function MittiPanel() {
       keepDirtyValues: true,
     },
   });
+
+  const { fields: relayFields, append: appendRelay, remove: removeRelay } = useFieldArray({ control, name: 'relays' });
 
   const onSubmit = async (formData: MittiSettings) => {
     try {
@@ -78,8 +81,8 @@ export default function MittiPanel() {
         <br />
         <br />
         Mitti sends its feedback to one destination only, so pointing it here takes it away from anything else that was
-        receiving it. To keep Bitfocus Companion fed, set the relay below to Companion&apos;s Mitti module and give that
-        module a feedback port of its own: Ontime passes every packet straight on, untouched.
+        receiving it. To keep Bitfocus Companion (or anything else) fed, add a relay below for each one, pointing at its
+        Mitti module with a feedback port of its own: Ontime passes every packet straight on, untouched.
       </Info>
 
       <Panel.Section
@@ -208,49 +211,78 @@ export default function MittiPanel() {
           </Panel.ListItem>
         </Panel.ListGroup>
 
-        <Panel.Title>Relay</Panel.Title>
+        <Panel.Title>Relays</Panel.Title>
+        <Panel.Description>
+          Every packet Mitti sends is passed on to each destination here. A relay to this machine must use a port other
+          than the listen port above.
+        </Panel.Description>
         <Panel.ListGroup>
-          <Panel.ListItem>
-            <Panel.Field
-              title='Relay feedback to'
-              description='IP address of the other application that needs Mitti feedback. Leave empty for none'
-              error={errors.relayHost?.message}
-            />
-            <Input
-              id='relayHost'
-              placeholder='Leave empty for none'
-              width='10rem'
-              size='sm'
-              textAlign='right'
-              variant='ontime-filled'
-              autoComplete='off'
-              {...register('relayHost')}
-            />
-          </Panel.ListItem>
-          <Panel.ListItem>
-            <Panel.Field
-              title='Relay port'
-              description='Port it listens on. Must differ from the listen port above when relaying to this machine'
-              error={errors.relayPort?.message}
-            />
-            <Input
-              id='relayPort'
-              placeholder='None'
-              width='5rem'
-              maxLength={5}
-              size='sm'
-              textAlign='right'
-              variant='ontime-filled'
-              type='number'
-              autoComplete='off'
-              {...register('relayPort', {
-                setValueAs: (value) => (value === '' || value === null ? null : Number(value)),
-                max: { value: 65535, message: 'Port must be within range 1 - 65535' },
-                min: { value: 1, message: 'Port must be within range 1 - 65535' },
-              })}
-            />
-          </Panel.ListItem>
+          {relayFields.length === 0 && (
+            <Panel.ListItem>
+              <Panel.Field title='No relays' description='Mitti feedback is not passed on to anything else' />
+            </Panel.ListItem>
+          )}
+          {relayFields.map((field, index) => {
+            const relayErrors = errors.relays?.[index];
+            return (
+              <Panel.ListItem key={field.id}>
+                <Panel.Field
+                  title={`Relay ${index + 1}`}
+                  description='IP address and port of an application that needs Mitti feedback'
+                  error={relayErrors?.host?.message ?? relayErrors?.port?.message}
+                />
+                <Panel.InlineElements>
+                  <Input
+                    placeholder='IP address'
+                    width='10rem'
+                    size='sm'
+                    textAlign='right'
+                    variant='ontime-filled'
+                    autoComplete='off'
+                    {...register(`relays.${index}.host`, {
+                      required: { value: true, message: 'Host is required' },
+                      setValueAs: (value) => (typeof value === 'string' ? value.trim() : value),
+                    })}
+                  />
+                  <Input
+                    placeholder='Port'
+                    width='5rem'
+                    maxLength={5}
+                    size='sm'
+                    textAlign='right'
+                    variant='ontime-filled'
+                    type='number'
+                    autoComplete='off'
+                    {...register(`relays.${index}.port`, {
+                      valueAsNumber: true,
+                      validate: (value) => Number.isInteger(value) || 'Port is required',
+                      max: { value: 65535, message: 'Port must be within range 1 - 65535' },
+                      min: { value: 1, message: 'Port must be within range 1 - 65535' },
+                    })}
+                  />
+                  <IconButton
+                    aria-label={`Remove relay ${index + 1}`}
+                    icon={<IoTrash />}
+                    size='sm'
+                    variant='ontime-ghosted'
+                    colorScheme='red'
+                    onClick={() => removeRelay(index)}
+                  />
+                </Panel.InlineElements>
+              </Panel.ListItem>
+            );
+          })}
         </Panel.ListGroup>
+        <Button
+          leftIcon={<IoAdd />}
+          variant='ontime-subtle'
+          size='sm'
+          onClick={() => appendRelay({ host: '', port: NaN })}
+          marginTop={2}
+          alignSelf='flex-start'
+        >
+          Add relay
+        </Button>
 
         <Panel.Title>Phase Thresholds</Panel.Title>
         <Panel.ListGroup>

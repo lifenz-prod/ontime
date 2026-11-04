@@ -14,12 +14,16 @@ export const validateMittiSettings = [
   body('warningThreshold').isInt({ min: 0 }),
   body('dangerThreshold').isInt({ min: 0 }),
   body('timeout').isInt({ min: 1000 }),
-  body('relayHost').optional({ nullable: true, checkFalsy: true }).isString(),
-  body('relayPort').optional({ nullable: true, checkFalsy: true }).isInt({ min: 1, max: 65535 }),
+  body('relays').optional().isArray(),
+  body('relays.*.host').isString().trim().notEmpty(),
+  body('relays.*.port').isInt({ min: 1, max: 65535 }).toInt(),
   // relaying to our own listen port would feed Mitti's packets straight back into us
-  body('relayPort').custom((relayPort, { req }) => {
-    if (!relayPort || !req.body.relayHost) return true;
-    if (Number(relayPort) === Number(req.body.listenPort) && isThisMachine(req.body.relayHost)) {
+  body('relays').custom((relays, { req }) => {
+    if (!Array.isArray(relays)) return true;
+    const loops = relays.some(
+      (relay) => Number(relay?.port) === Number(req.body.listenPort) && isThisMachine(relay?.host),
+    );
+    if (loops) {
       throw new Error('Relay port must differ from the listen port when relaying to this machine');
     }
     return true;

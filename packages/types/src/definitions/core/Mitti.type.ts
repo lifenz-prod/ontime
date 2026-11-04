@@ -10,8 +10,12 @@ export type MittiSettings = {
   warningThreshold: number; // milliseconds, default 30000
   dangerThreshold: number; // milliseconds, default 10000
   timeout: number; // milliseconds without feedback before we call it disconnected, default 5000
-  // Mitti feeds one destination only, so Ontime passes what it receives on to a second listener
-  // (in practice Companion, which needs the feedback to drive its buttons). null disables it.
-  relayHost: string | null;
-  relayPort: number | null;
+  // Mitti feeds one destination only, so Ontime passes what it receives on to every listener here
+  // (in practice Companion instances, which need the feedback to drive their buttons). Empty disables it.
+  relays: MittiRelay[];
+};
+
+export type MittiRelay = {
+  host: string;
+  port: number;
 };

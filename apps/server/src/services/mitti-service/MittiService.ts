@@ -26,8 +26,7 @@ const defaultMittiSettings: MittiSettings = {
   warningThreshold: 30000,
   dangerThreshold: 10000,
   timeout: 5000,
-  relayHost: null,
-  relayPort: null,
+  relays: [],
 };
 
 export { defaultMittiSettings };
@@ -50,7 +49,8 @@ class MittiService {
   private lastFeedbackTime = 0;
   private startedAt = 0;
   private hasReportedSilence = false;
-  private hasReportedRelayFailure = false;
+  /** relays we have already complained about, keyed host:port, so a dead one is reported once */
+  private failedRelays = new Set<string>();
   private cue: MittiCueTimes = emptyCueTimes();
   private currentState: MittiState = { ...mittiStatePlaceholder };
 
@@ -113,7 +113,7 @@ class MittiService {
 
     this.startedAt = Date.now();
     this.hasReportedSilence = false;
-    this.hasReportedRelayFailure = false;
+    this.failedRelays.clear();
 
     this.healthTimer = setInterval(() => this.checkHealth(), healthInterval);
   }
@@ -148,32 +148,32 @@ class MittiService {
   }
 
   /**
-   * Forwards a feedback packet, untouched, to a second listener.
+   * Forwards a feedback packet, untouched, to every relay listener.
    *
-   * Mitti sends its feedback to one destination only, so two applications can only both have it
+   * Mitti sends its feedback to one destination only, so several applications can only all have it
    * if the first one passes it along. Ontime takes that first slot and hands the bytes straight
-   * on, so what the other end receives is what Mitti sent.
+   * on, so what each other end receives is what Mitti sent.
    */
   private relay(buf: Buffer) {
-    const { relayHost, relayPort } = this.settings;
-    if (!relayHost || !relayPort || !this.sendSocket) {
+    const socket = this.sendSocket;
+    if (!socket) {
       return;
     }
 
-    this.sendSocket.send(buf, 0, buf.byteLength, relayPort, relayHost, (error) => {
-      if (!error) {
-        this.hasReportedRelayFailure = false;
-        return;
-      }
-      // say it once: this fires per packet, which is several times a second
-      if (!this.hasReportedRelayFailure) {
-        this.hasReportedRelayFailure = true;
-        logger.error(
-          LogOrigin.Tx,
-          `Mitti: could not pass the feedback on to ${relayHost}:${relayPort} - ${error.message}`,
-        );
-      }
-    });
+    for (const { host, port } of this.settings.relays) {
+      const key = `${host}:${port}`;
+      socket.send(buf, 0, buf.byteLength, port, host, (error) => {
+        if (!error) {
+          this.failedRelays.delete(key);
+          return;
+        }
+        // say it once per relay: this fires per packet, which is several times a second
+        if (!this.failedRelays.has(key)) {
+          this.failedRelays.add(key);
+          logger.error(LogOrigin.Tx, `Mitti: could not pass the feedback on to ${key} - ${error.message}`);
+        }
+      });
+    }
   }
 
   private sendCommand(command: string) {

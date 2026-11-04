@@ -60,8 +60,7 @@ export const dbModel: DatabaseModel = {
     warningThreshold: 30000,
     dangerThreshold: 10000,
     timeout: 5000,
-    relayHost: null,
-    relayPort: null,
+    relays: [],
   },
   serviceProfiles: { boundaryBlockId: null, services: [] },
 };

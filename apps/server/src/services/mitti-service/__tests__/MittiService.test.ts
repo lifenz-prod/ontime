@@ -49,8 +49,7 @@ describe('MittiService', () => {
       warningThreshold: 300000,
       dangerThreshold: 60000,
       timeout: 5000,
-      relayHost: null,
-      relayPort: null,
+      relays: [],
     });
     await settle();
 
@@ -100,8 +99,7 @@ describe('MittiService', () => {
       warningThreshold: 300000,
       dangerThreshold: 60000,
       timeout: 5000,
-      relayHost: null,
-      relayPort: null,
+      relays: [],
     });
     await settle();
 
@@ -130,15 +128,20 @@ describe('MittiService', () => {
     mittiService.shutdown();
   }, 15000);
 
-  it('hands every packet on to the relay, so Companion keeps its feedback', async () => {
+  it('hands every packet on to every relay, so each Companion keeps its feedback', async () => {
     const relayListenPort = 55919;
-    const relayTargetPort = 55920;
+    const relayTargetPorts = [55920, 55922];
 
-    // stands in for Companion's Mitti module, which still needs the feedback to drive its buttons
-    const relayed: Buffer[] = [];
-    const companion = dgram.createSocket('udp4');
-    companion.on('message', (buf) => relayed.push(buf));
-    await new Promise<void>((resolve) => companion.bind(relayTargetPort, () => resolve()));
+    // stand in for Companion's Mitti module on two machines, each needing the feedback to drive its buttons
+    const listeners = await Promise.all(
+      relayTargetPorts.map(async (port) => {
+        const received: Buffer[] = [];
+        const socket = dgram.createSocket('udp4');
+        socket.on('message', (buf) => received.push(buf));
+        await new Promise<void>((resolve) => socket.bind(port, () => resolve()));
+        return { socket, received };
+      }),
+    );
 
     const { mittiService } = await import('../MittiService.js');
     mittiService.init({
@@ -149,8 +152,7 @@ describe('MittiService', () => {
       warningThreshold: 300000,
       dangerThreshold: 60000,
       timeout: 5000,
-      relayHost: '127.0.0.1',
-      relayPort: relayTargetPort,
+      relays: relayTargetPorts.map((port) => ({ host: '127.0.0.1', port })),
     });
     await settle();
 
@@ -163,17 +165,19 @@ describe('MittiService', () => {
     // Ontime reads it as usual
     expect(mittiService.getState()).toMatchObject({ cueName: 'Sermon Bumper', remaining: 252000 });
 
-    // and Companion gets the bytes Mitti sent, not our reading of them
-    expect(relayed).toHaveLength(4);
-    const relayedAddresses = relayed.map((buf) => (fromBuffer(buf) as { address: string }).address);
-    expect(relayedAddresses).toEqual([
-      '/mitti/currentCueName',
-      '/mitti/currentCueTRT',
-      '/mitti/cueTimeLeft',
-      '/mitti/togglePlay',
-    ]);
+    // and every listener gets the bytes Mitti sent, not our reading of them
+    for (const { received } of listeners) {
+      expect(received).toHaveLength(4);
+      const relayedAddresses = received.map((buf) => (fromBuffer(buf) as { address: string }).address);
+      expect(relayedAddresses).toEqual([
+        '/mitti/currentCueName',
+        '/mitti/currentCueTRT',
+        '/mitti/cueTimeLeft',
+        '/mitti/togglePlay',
+      ]);
+    }
 
     mittiService.shutdown();
-    companion.close();
+    listeners.forEach(({ socket }) => socket.close());
   }, 15000);
 });

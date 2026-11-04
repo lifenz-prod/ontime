@@ -7,6 +7,8 @@ import { failEmptyObjects } from '../../utils/routerUtils.js';
 import { getDataProvider } from '../../classes/data-provider/DataProvider.js';
 import { mittiService } from '../../services/mitti-service/MittiService.js';
 
+import { parseMittiRelays } from './mitti.parser.js';
+
 export async function getMittiSettings(_req: Request, res: Response<MittiSettings>) {
   const settings = getDataProvider().getMitti();
   res.status(200).send(settings);
@@ -25,8 +27,7 @@ export async function postMittiSettings(req: Request, res: Response<MittiSetting
       warningThreshold: req.body.warningThreshold,
       dangerThreshold: req.body.dangerThreshold,
       timeout: req.body.timeout,
-      relayHost: req.body.relayHost || null,
-      relayPort: req.body.relayPort || null,
+      relays: parseMittiRelays(req.body),
     };
 
     await getDataProvider().setMitti(newData);
