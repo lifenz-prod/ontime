@@ -7,7 +7,7 @@ export const navigatorConstants = [
   { url: 'cuescreen', label: 'Cuescreen' },
   { url: 'cuescreennow', label: 'Cuescreen NOW/NEXT' },
   { url: 'mobilecuescreen', label: 'Mobile Cue Screen' },
-  { url: 'qlabcountdown', label: 'Playback Countdown' },
+  { url: 'qlabcountdown', label: 'Video Countdown' },
 ];
 
 // default time format to use for users in 12 hour clocks

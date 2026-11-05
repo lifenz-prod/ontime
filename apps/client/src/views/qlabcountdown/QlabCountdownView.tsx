@@ -16,7 +16,7 @@ function formatMs(ms: number | null): string {
 }
 
 export default function QlabCountdownView() {
-  useWindowTitle('Playback Countdown');
+  useWindowTitle('Video Countdown');
 
   const countdown = useRuntimeStore((state) => state.countdown);
   const display = formatMs(countdown.remaining);

@@ -7,7 +7,7 @@
 const knownViews = [
   { path: 'cuescreen', label: 'Cuescreen' },
   { path: 'cuescreennow', label: 'Cuescreen NOW/NEXT' },
-  { path: 'qlabcountdown', label: 'Playback Countdown' },
+  { path: 'qlabcountdown', label: 'Video Countdown' },
   { path: 'qlab', label: 'QLab' },
   { path: 'timer', label: 'Timer' },
   { path: 'minimal', label: 'Minimal Timer' },
