@@ -18,7 +18,11 @@ test('project file upload', async ({ page }) => {
   // workaround to upload file on hidden input
   // https://playwright.dev/docs/api/class-filechooser
   const fileChooserPromise = page.waitForEvent('filechooser');
-  await page.getByRole('button', { name: 'Import', exact: true }).click();
+  // the settings menu has an Import entry too, so look only in the project list's header
+  await page
+    .getByRole('heading', { name: /Manage projects/ })
+    .getByRole('button', { name: 'Import', exact: true })
+    .click();
   const fileChooser = await fileChooserPromise;
   await fileChooser.setFiles(fileToUpload);
 
@@ -63,5 +67,6 @@ test('project file download', async ({ page }) => {
   // when a file is parsed, the server will write the version number to the project file
   original.settings.version = 'not-important';
   fromServer.settings.version = 'not-important';
-  expect(original).toMatchObject(fromServer);
+  // everything we uploaded comes back; the server may add defaults for settings the fixture predates
+  expect(fromServer).toMatchObject(original);
 });

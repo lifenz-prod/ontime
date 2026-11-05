@@ -24,15 +24,19 @@ test('delay blocks add time to events', async ({ page }) => {
   await page.getByTestId('delay-input').click();
   await page.getByTestId('delay-input').fill('2m');
   await page.getByTestId('delay-input').press('Enter');
-  await page.getByText('New start 00:12').click();
+  // the rundown shows the delayed start, and keeps the planned one beside it
+  const rundownStart = page.getByTestId('rundown').getByTestId('time-input-timeStart');
+  await expect(rundownStart).toHaveValue('00:12:00');
+  await expect(page.getByText('Original start 00:10')).toBeVisible();
 
   // make negative delay
   await page.getByText('Subtract time').click();
-  await page.getByText('New start 00:08').click();
+  await expect(rundownStart).toHaveValue('00:08:00');
 
   // apply delay
   await page.getByRole('button', { name: 'Make permanent' }).click();
-  await expect(page.getByTestId('rundown').getByTestId('time-input-timeStart')).toHaveValue('00:08:00');
+  await expect(rundownStart).toHaveValue('00:08:00');
+  await expect(page.getByText(/Original start/)).toHaveCount(0);
 
   // add new delay
   await page.getByTestId('rundown').getByPlaceholder('Start').click();
@@ -40,12 +44,13 @@ test('delay blocks add time to events', async ({ page }) => {
   await page.getByTestId('delay-input').click();
   await page.getByTestId('delay-input').fill('10m');
   await page.getByTestId('delay-input').press('Enter');
-  await page.getByText('New start 00:18').click();
+  await expect(rundownStart).toHaveValue('00:18:00');
+  await expect(page.getByText('Original start 00:08')).toBeVisible();
 
   // cancel delay
   await page.getByRole('button', { name: 'Cancel' }).click();
-  await expect(page.getByTestId('rundown').getByTestId('time-input-timeStart')).toHaveValue('00:08:00');
-  await expect(page.getByText('New start 00:18')).toHaveCount(0);
+  await expect(rundownStart).toHaveValue('00:08:00');
+  await expect(page.getByText(/Original start/)).toHaveCount(0);
 });
 
 test('delays are show correctly', async ({ page }) => {
@@ -76,7 +81,8 @@ test('delays are show correctly', async ({ page }) => {
   await page.getByTestId('delay-input').press('Enter');
 
   // delay is shown in the editor
-  await page.getByText('New start 00:11').click();
+  await expect(page.getByTestId('rundown').getByTestId('time-input-timeStart')).toHaveValue('00:11:00');
+  await expect(page.getByText('Original start 00:10')).toBeVisible();
 
   // delay is shown in the cuesheet
   await page.goto('http://localhost:4001/cuesheet');

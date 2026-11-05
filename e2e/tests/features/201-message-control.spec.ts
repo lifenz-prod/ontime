@@ -6,10 +6,10 @@ test('message control sends messages to screens', async ({ context }) => {
 
   await editorPage.goto('http://localhost:4001/messagecontrol');
 
-  // stage timer message
-  await editorPage.getByPlaceholder('Message shown fullscreen in stage timer').click();
-  await editorPage.getByPlaceholder('Message shown fullscreen in stage timer').fill('testing stage');
-  await editorPage.getByRole('button', { name: /toggle timer message/i }).click({ timeout: 5000 });
+  // stage message, shown on the timer under the countdown
+  await editorPage.getByPlaceholder('Message to show on cue screen').click();
+  await editorPage.getByPlaceholder('Message to show on cue screen').fill('testing stage');
+  await editorPage.getByRole('button', { name: /toggle stage message visibility/i }).click({ timeout: 5000 });
 
   await featurePage.goto('http://localhost:4001/timer');
   await featurePage.waitForLoadState('load', { timeout: 5000 });

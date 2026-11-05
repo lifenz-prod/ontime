@@ -25,9 +25,11 @@ export class EventTimer {
    */
   constructor(timerConfig: { refresh: number; updateInterval: number }) {
     EventTimer._refreshInterval = timerConfig.refresh;
-    // Skip the background refresh loop under test: the module-level singleton would otherwise
+    // Skip the background refresh loop under unit tests: the module-level singleton would otherwise
     // leak a setInterval that fires runtimeState.update() after a test's mocks are torn down.
-    if (!process.env.IS_TEST) {
+    // This is vitest's own flag, not IS_TEST: the e2e server runs with IS_TEST and needs the loop,
+    // since it is what broadcasts the runtime state to the views.
+    if (!process.env.VITEST) {
       this._interval = setInterval(() => {
         this.update();
       }, EventTimer._refreshInterval);

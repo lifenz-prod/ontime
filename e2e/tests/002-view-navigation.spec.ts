@@ -19,6 +19,10 @@ test.describe('test view navigation feature', () => {
     const errorBoundary = page.locator('data-test-id=error-container');
     await expect(errorBoundary).toHaveCount(0);
 
+    // the cue screen hides the menu (it goes out as a clean video feed), so step back to leave it
+    await page.goBack();
+    await expect(page).toHaveURL('http://localhost:4001/backstage');
+
     await page.getByRole('button', { name: 'toggle menu' }).click();
     page.locator('data-test-id=navigation__menu');
     await page.getByRole('link', { name: 'Timer', exact: true }).click();

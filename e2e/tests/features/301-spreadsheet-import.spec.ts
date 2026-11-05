@@ -9,7 +9,8 @@ test('sheet file upload', async ({ page }) => {
   await page.getByRole('button', { name: 'Delete all' }).click();
 
   await page.getByRole('button', { name: 'Toggle settings' }).click();
-  await page.getByRole('button', { name: 'Import spreadsheet' }).click();
+  // the settings menu lists only its headings; spreadsheet import lives in the Import panel
+  await page.getByRole('list').getByRole('button', { name: 'Import', exact: true }).click();
 
   // workaround to upload file on hidden input
   // https://playwright.dev/docs/api/class-filechooser
@@ -18,13 +19,17 @@ test('sheet file upload', async ({ page }) => {
   const fileChooser = await fileChooserPromise;
   await fileChooser.setFiles(fileToUpload);
 
-  await page.locator('[id="event\\ schedule"]').selectOption('Sheet2');
-  await page.locator('[id="event\\ schedule"]').selectOption('test');
+  const worksheet = page.getByRole('row', { name: /^Worksheet/ }).getByRole('combobox');
+  await worksheet.selectOption('Sheet2');
+  await worksheet.selectOption('test');
 
-  await page.getByRole('button', { name: 'Import preview' }).click();
-  await page.getByRole('button', { name: 'Apply' }).click();
+  // importing applies straight away, there is no separate review step
+  await page
+    .getByRole('heading', { name: /Import options/ })
+    .getByRole('button', { name: 'Import', exact: true })
+    .click();
+  // Return closes the settings as well
   await page.getByRole('button', { name: 'Return' }).click();
-  await page.getByLabel('close').click();
 
   // asset test events
   const firstTitle = page.getByTestId('entry-1').getByTestId('block__title');
