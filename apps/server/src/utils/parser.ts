@@ -25,6 +25,7 @@ import {
 } from 'ontime-types';
 
 import { parseAutomationSettings } from '../api-data/automation/automation.parser.js';
+import { parseAbletonSettings } from '../api-data/ableton/ableton.parser.js';
 import { parseMittiSettings } from '../api-data/mitti/mitti.parser.js';
 import { parseQlabSettings } from '../api-data/qlab/qlab.parser.js';
 import { logger } from '../classes/Logger.js';
@@ -419,6 +420,7 @@ export function parseDatabaseModel(jsonData: Partial<DatabaseModel>): { data: Da
     automation: parseAutomationSettings(jsonData),
     qlab: parseQlabSettings(jsonData),
     mitti: parseMittiSettings(jsonData),
+    ableton: parseAbletonSettings(jsonData),
     serviceProfiles: parseServiceProfiles(jsonData),
   };
 

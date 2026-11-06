@@ -28,6 +28,18 @@ export const mittiStatePlaceholder: RuntimeStore['mitti'] = {
   phase: TimerPhase.None,
 };
 
+export const abletonStatePlaceholder: RuntimeStore['ableton'] = {
+  enabled: false,
+  connected: false,
+  cueName: '',
+  cueNumber: '',
+  duration: 0,
+  elapsed: 0,
+  remaining: 0,
+  isPaused: false,
+  phase: TimerPhase.None,
+};
+
 export const countdownStatePlaceholder: RuntimeStore['countdown'] = {
   source: 'qlab',
   ...qlabStatePlaceholder,
@@ -96,6 +108,7 @@ export const runtimeStorePlaceholder: Readonly<RuntimeStore> = {
   },
   qlab: qlabStatePlaceholder,
   mitti: mittiStatePlaceholder,
+  ableton: abletonStatePlaceholder,
   countdown: countdownStatePlaceholder,
   rundownSources: rundownSourcesPlaceholder,
   ping: -1,

@@ -17,6 +17,7 @@ export const CLIENT_LIST = ['clientList'];
 export const REPORT = ['report'];
 export const QLAB = ['qlab'];
 export const MITTI = ['mitti'];
+export const ABLETON = ['ableton'];
 export const SERVICE_PROFILES = ['serviceProfiles'];
 
 // API URLs

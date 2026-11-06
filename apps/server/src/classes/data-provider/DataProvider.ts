@@ -6,6 +6,7 @@ import {
   Settings,
   CustomFields,
   URLPreset,
+  AbletonSettings,
   AutomationSettings,
   MittiSettings,
   QlabSettings,
@@ -60,6 +61,8 @@ export function getDataProvider() {
     setQlab,
     getMitti,
     setMitti,
+    getAbleton,
+    setAbleton,
     getServiceProfiles,
     setServiceProfiles,
     getRundown,
@@ -157,6 +160,16 @@ async function setMitti(newData: MittiSettings): ReadonlyPromise<MittiSettings> 
   return db.data.mitti;
 }
 
+function getAbleton(): Readonly<AbletonSettings> {
+  return db.data.ableton;
+}
+
+async function setAbleton(newData: AbletonSettings): ReadonlyPromise<AbletonSettings> {
+  db.data.ableton = { ...newData };
+  await persist();
+  return db.data.ableton;
+}
+
 function getServiceProfiles(): Readonly<ServiceProfiles> {
   return db.data.serviceProfiles ?? { boundaryBlockId: null, services: [] };
 }
@@ -182,6 +195,7 @@ async function mergeIntoData(newData: Partial<DatabaseModel>): ReadonlyPromise<D
   db.data.rundown = mergedData.rundown;
   db.data.qlab = mergedData.qlab;
   db.data.mitti = mergedData.mitti;
+  db.data.ableton = mergedData.ableton;
   db.data.serviceProfiles = mergedData.serviceProfiles;
 
   await persist();

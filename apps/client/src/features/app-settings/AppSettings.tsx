@@ -2,6 +2,7 @@ import { ErrorBoundary } from '@sentry/react';
 
 import { useKeyDown } from '../../common/hooks/useKeyDown';
 
+import AbletonPanel from './panel/ableton-panel/AbletonPanel';
 import AboutPanel from './panel/about-panel/AboutPanel';
 import AutomationPanel from './panel/automations-panel/AutomationPanel';
 import FeatureSettingsPanel from './panel/feature-settings-panel/FeatureSettingsPanel';
@@ -35,6 +36,7 @@ export default function AppSettings() {
           {panel === 'automation' && <AutomationPanel location={location} />}
           {panel === 'qlab' && <QlabPanel />}
           {panel === 'mitti' && <MittiPanel />}
+          {panel === 'ableton' && <AbletonPanel />}
           {panel === 'service_profiles' && <ServiceProfilesPanel />}
           {panel === 'network' && <NetworkLogPanel location={location} />}
           {panel === 'about' && <AboutPanel />}

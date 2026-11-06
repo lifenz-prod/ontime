@@ -1,4 +1,5 @@
 import type {
+  AbletonSettings,
   AutomationSettings,
   CustomFields,
   MittiSettings,
@@ -21,5 +22,6 @@ export type DatabaseModel = {
   automation: AutomationSettings;
   qlab: QlabSettings;
   mitti: MittiSettings;
+  ableton: AbletonSettings;
   serviceProfiles: ServiceProfiles;
 };

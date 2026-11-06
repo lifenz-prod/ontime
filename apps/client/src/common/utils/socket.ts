@@ -215,6 +215,11 @@ export const connectSocket = () => {
           updateDevTools({ mitti: payload });
           break;
         }
+        case 'ontime-ableton': {
+          addToBatchUpdates('ableton', payload);
+          updateDevTools({ ableton: payload });
+          break;
+        }
         case 'ontime-countdown': {
           addToBatchUpdates('countdown', payload);
           updateDevTools({ countdown: payload });

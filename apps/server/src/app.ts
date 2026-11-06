@@ -1,4 +1,5 @@
 import {
+  abletonStatePlaceholder,
   countdownStatePlaceholder,
   LogOrigin,
   mittiStatePlaceholder,
@@ -51,6 +52,7 @@ import { getShowWelcomeDialog } from './services/app-state-service/AppStateServi
 import { oscServer } from './adapters/OscAdapter.js';
 import { qlabService } from './services/qlab-service/QlabService.js';
 import { mittiService } from './services/mitti-service/MittiService.js';
+import { abletonService } from './services/ableton-service/AbletonService.js';
 import { countdownService } from './services/countdown-service/CountdownService.js';
 import { init as initSheetService } from './services/sheet-service/SheetService.js';
 import { init as initRundownSources } from './services/rundown-source-service/RundownSourceService.js';
@@ -212,6 +214,7 @@ export const startServer = async (
     },
     qlab: qlabStatePlaceholder,
     mitti: mittiStatePlaceholder,
+    ableton: abletonStatePlaceholder,
     countdown: countdownStatePlaceholder,
     rundownSources: rundownSourcesPlaceholder,
     ping: -1,
@@ -270,6 +273,9 @@ export const startIntegrations = async () => {
 
   const mittiSettings = getDataProvider().getMitti();
   mittiService.init(mittiSettings);
+
+  const abletonSettings = getDataProvider().getAbleton();
+  abletonService.init(abletonSettings);
 };
 
 /**
@@ -293,6 +299,7 @@ export const shutdown = async (exitCode = 0) => {
   runtimeService.shutdown();
   qlabService.shutdown();
   mittiService.shutdown();
+  abletonService.shutdown();
   logger.shutdown();
   oscServer.shutdown();
   socket.shutdown();

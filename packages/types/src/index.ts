@@ -42,8 +42,19 @@ export type { ProjectData } from './definitions/core/ProjectData.type.js';
 export type { Settings } from './definitions/core/Settings.type.js';
 
 // ---> Countdown sources
-export type { CountdownSource, CountdownSourceState, CountdownState } from './definitions/core/Countdown.type.js';
+export type {
+  CountdownProvider,
+  CountdownSource,
+  CountdownSourceState,
+  CountdownState,
+} from './definitions/core/Countdown.type.js';
 export type { MittiState, MittiSettings, MittiRelay } from './definitions/core/Mitti.type.js';
+export type {
+  AbletonClipPosition,
+  AbletonSettings,
+  AbletonState,
+  AbletonTimer,
+} from './definitions/core/Ableton.type.js';
 
 // ---> QLab
 export type { QlabState, QlabSettings } from './definitions/core/Qlab.type.js';
@@ -104,6 +115,7 @@ export { OffsetMode } from './definitions/runtime/Runtime.type.js';
 export type { RuntimeStore } from './definitions/runtime/RuntimeStore.type.js';
 export {
   runtimeStorePlaceholder,
+  abletonStatePlaceholder,
   countdownStatePlaceholder,
   mittiStatePlaceholder,
   qlabStatePlaceholder,

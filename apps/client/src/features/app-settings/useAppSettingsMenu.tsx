@@ -69,6 +69,13 @@ const staticOptions = [
     ],
   },
   {
+    id: 'ableton',
+    label: 'Ableton',
+    secondary: [
+      { id: 'ableton__settings', label: 'Ableton settings' },
+    ],
+  },
+  {
     id: 'service_profiles',
     label: 'Service Profiles',
     secondary: [

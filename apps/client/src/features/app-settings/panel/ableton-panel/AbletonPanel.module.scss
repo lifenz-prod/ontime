@@ -1,0 +1,33 @@
+.numberCell {
+  width: 5rem;
+}
+
+.timeCell {
+  width: 6.5rem;
+}
+
+.actionsCell {
+  width: 5.5rem;
+  white-space: nowrap;
+
+  > * + * {
+    margin-left: 0.25rem;
+  }
+}
+
+.empty {
+  color: $gray-500;
+  text-align: center;
+}
+
+.note {
+  margin-top: 0.25rem;
+  font-size: calc(1rem - 3px);
+  color: $gray-500;
+}
+
+.noteError {
+  margin-top: 0.25rem;
+  font-size: calc(1rem - 3px);
+  color: $red-500;
+}

@@ -1,3 +1,4 @@
+import type { AbletonState } from '../core/Ableton.type.js';
 import type { CountdownState } from '../core/Countdown.type.js';
 import type { MittiState } from '../core/Mitti.type.js';
 import type { OntimeEvent } from '../core/OntimeEvent.type.js';
@@ -32,6 +33,7 @@ export type RuntimeStore = {
   // external integrations
   qlab: QlabState;
   mitti: MittiState;
+  ableton: AbletonState;
 
   // the countdown views read this: whichever integration is the selected source
   countdown: CountdownState;

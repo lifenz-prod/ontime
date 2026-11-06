@@ -13,6 +13,7 @@ import { router as sessionRouter } from './session/session.router.js';
 import { router as viewSettingsRouter } from './view-settings/viewSettings.router.js';
 import { router as reportRouter } from './report/report.router.js';
 import { router as assetsRouter } from './assets/assets.router.js';
+import { router as abletonRouter } from './ableton/ableton.router.js';
 import { router as mittiRouter } from './mitti/mitti.router.js';
 import { router as qlabRouter } from './qlab/qlab.router.js';
 import { router as serviceProfilesRouter } from './service-profiles/serviceProfiles.router.js';
@@ -34,6 +35,7 @@ appRouter.use('/report', reportRouter);
 appRouter.use('/assets', assetsRouter);
 appRouter.use('/qlab', qlabRouter);
 appRouter.use('/mitti', mittiRouter);
+appRouter.use('/ableton', abletonRouter);
 appRouter.use('/service-profiles', serviceProfilesRouter);
 
 //we don't want to redirect to react index when using api routes

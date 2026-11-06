@@ -66,6 +66,16 @@ describe('safeMerge', () => {
       timeout: 5000,
       relays: [],
     },
+    ableton: {
+      enabled: false,
+      host: '127.0.0.1',
+      port: 11000,
+      listenPort: 11001,
+      warningThreshold: 30000,
+      dangerThreshold: 10000,
+      timeout: 5000,
+      timers: [],
+    },
     serviceProfiles: { boundaryBlockId: null, services: [] },
   } as DatabaseModel;
 
