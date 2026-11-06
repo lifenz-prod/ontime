@@ -58,7 +58,10 @@
         }
       ],
       "category": "public.app-category.productivity",
-      "icon": "icon.icns"
+      "icon": "icon.icns",
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Ontime reads incoming timecode from an audio input, such as a Dante Virtual Soundcard channel."
+      }
     },
     "win": {
       "target": "nsis"

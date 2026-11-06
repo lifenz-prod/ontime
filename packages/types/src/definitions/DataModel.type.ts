@@ -1,6 +1,7 @@
 import type {
   AbletonSettings,
   AutomationSettings,
+  TimecodeSettings,
   CustomFields,
   MittiSettings,
   OntimeRundown,
@@ -23,5 +24,6 @@ export type DatabaseModel = {
   qlab: QlabSettings;
   mitti: MittiSettings;
   ableton: AbletonSettings;
+  timecode: TimecodeSettings;
   serviceProfiles: ServiceProfiles;
 };

@@ -27,6 +27,7 @@ import {
 import { parseAutomationSettings } from '../api-data/automation/automation.parser.js';
 import { parseAbletonSettings } from '../api-data/ableton/ableton.parser.js';
 import { parseMittiSettings } from '../api-data/mitti/mitti.parser.js';
+import { parseTimecodeSettings } from '../api-data/timecode/timecode.parser.js';
 import { parseQlabSettings } from '../api-data/qlab/qlab.parser.js';
 import { logger } from '../classes/Logger.js';
 import { event as eventDef } from '../models/eventsDefinition.js';
@@ -421,6 +422,7 @@ export function parseDatabaseModel(jsonData: Partial<DatabaseModel>): { data: Da
     qlab: parseQlabSettings(jsonData),
     mitti: parseMittiSettings(jsonData),
     ableton: parseAbletonSettings(jsonData),
+    timecode: parseTimecodeSettings(jsonData),
     serviceProfiles: parseServiceProfiles(jsonData),
   };
 

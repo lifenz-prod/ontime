@@ -36,6 +36,8 @@ let isQuitting = false;
 // initialise
 let win;
 let splash;
+/** hidden window running the timecode reader page, see startTimecodeReader */
+let readerWin = null;
 let tray = null;
 
 /**
@@ -205,6 +207,45 @@ if (!lock) {
 }
 
 /**
+ * Opens the timecode reader page in a hidden window.
+ *
+ * The page records the timecode input chosen in settings and sends each frame to the server. It
+ * does nothing until timecode is turned on, so a machine that never uses it never asks for the
+ * microphone. If the page crashes it is reopened, since nobody would see it was gone.
+ * @param {string} clientUrl
+ */
+function startTimecodeReader(clientUrl) {
+  if (readerWin) return;
+
+  readerWin = new BrowserWindow({
+    width: 480,
+    height: 320,
+    show: false,
+    skipTaskbar: true,
+    webPreferences: {
+      // it runs hidden for the life of the app: it must not be slowed down for being out of sight
+      backgroundThrottling: false,
+      autoplayPolicy: 'no-user-gesture-required',
+    },
+  });
+
+  const load = () => {
+    readerWin?.loadURL(`${clientUrl}/timecode-reader`).catch((error) => {
+      console.log('ERROR: timecode reader failed to load', error);
+    });
+  };
+
+  readerWin.webContents.on('render-process-gone', () => {
+    setTimeout(load, 2000);
+  });
+  readerWin.on('closed', () => {
+    readerWin = null;
+  });
+
+  load();
+}
+
+/**
  * Coordinates creation of electron windows (splash and main)
  */
 function createWindow() {
@@ -263,6 +304,8 @@ app.whenReady().then(() => {
         win.webContents.downloadURL(url),
       );
       Menu.setApplicationMenu(menu);
+
+      startTimecodeReader(clientUrl);
 
       win
         .loadURL(`${clientUrl}/editor`)

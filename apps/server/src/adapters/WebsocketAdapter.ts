@@ -26,6 +26,7 @@ import { logger } from '../classes/Logger.js';
 import { dispatchFromAdapter } from '../api-integration/integration.controller.js';
 import { generateId } from 'ontime-utils';
 import { authenticateSocket } from '../middleware/authenticate.js';
+import { timecodeService } from '../services/timecode-service/TimecodeService.js';
 
 let instance: SocketServer | null = null;
 
@@ -177,6 +178,17 @@ export class SocketServer implements IAdapter {
               );
             }
             this.sendClientList();
+            return;
+          }
+
+          // a timecode reader page sends every frame it decodes, and how it is getting on
+          if (type === 'timecode-frame') {
+            timecodeService.receiveFrame(payload);
+            return;
+          }
+
+          if (type === 'timecode-reader') {
+            timecodeService.receiveReaderStatus(payload);
             return;
           }
 

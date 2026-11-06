@@ -76,6 +76,15 @@ describe('safeMerge', () => {
       timeout: 5000,
       timers: [],
     },
+    timecode: {
+      enabled: false,
+      deviceLabel: '',
+      channel: 1,
+      warningThreshold: 30000,
+      dangerThreshold: 10000,
+      timeout: 500,
+      timers: [],
+    },
     serviceProfiles: { boundaryBlockId: null, services: [] },
   } as DatabaseModel;
 

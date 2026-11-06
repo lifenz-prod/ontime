@@ -220,6 +220,11 @@ export const connectSocket = () => {
           updateDevTools({ ableton: payload });
           break;
         }
+        case 'ontime-timecode': {
+          addToBatchUpdates('timecode', payload);
+          updateDevTools({ timecode: payload });
+          break;
+        }
         case 'ontime-countdown': {
           addToBatchUpdates('countdown', payload);
           updateDevTools({ countdown: payload });

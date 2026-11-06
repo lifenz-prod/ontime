@@ -6,6 +6,7 @@ import {
   Playback,
   qlabStatePlaceholder,
   rundownSourcesPlaceholder,
+  timecodeStatePlaceholder,
   runtimeStorePlaceholder,
   SimpleDirection,
   SimplePlayback,
@@ -53,6 +54,7 @@ import { oscServer } from './adapters/OscAdapter.js';
 import { qlabService } from './services/qlab-service/QlabService.js';
 import { mittiService } from './services/mitti-service/MittiService.js';
 import { abletonService } from './services/ableton-service/AbletonService.js';
+import { timecodeService } from './services/timecode-service/TimecodeService.js';
 import { countdownService } from './services/countdown-service/CountdownService.js';
 import { init as initSheetService } from './services/sheet-service/SheetService.js';
 import { init as initRundownSources } from './services/rundown-source-service/RundownSourceService.js';
@@ -215,6 +217,7 @@ export const startServer = async (
     qlab: qlabStatePlaceholder,
     mitti: mittiStatePlaceholder,
     ableton: abletonStatePlaceholder,
+    timecode: timecodeStatePlaceholder,
     countdown: countdownStatePlaceholder,
     rundownSources: rundownSourcesPlaceholder,
     ping: -1,
@@ -276,6 +279,9 @@ export const startIntegrations = async () => {
 
   const abletonSettings = getDataProvider().getAbleton();
   abletonService.init(abletonSettings);
+
+  const timecodeSettings = getDataProvider().getTimecode();
+  timecodeService.init(timecodeSettings);
 };
 
 /**
@@ -300,6 +306,7 @@ export const shutdown = async (exitCode = 0) => {
   qlabService.shutdown();
   mittiService.shutdown();
   abletonService.shutdown();
+  timecodeService.shutdown();
   logger.shutdown();
   oscServer.shutdown();
   socket.shutdown();

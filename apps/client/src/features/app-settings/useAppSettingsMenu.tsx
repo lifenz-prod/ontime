@@ -76,6 +76,13 @@ const staticOptions = [
     ],
   },
   {
+    id: 'timecode',
+    label: 'Timecode',
+    secondary: [
+      { id: 'timecode__settings', label: 'Timecode settings' },
+    ],
+  },
+  {
     id: 'service_profiles',
     label: 'Service Profiles',
     secondary: [

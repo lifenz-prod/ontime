@@ -14,6 +14,7 @@ import QlabPanel from './panel/qlab-panel/QlabPanel';
 import ServiceProfilesPanel from './panel/service-profiles-panel/ServiceProfilesPanel';
 import ShutdownPanel from './panel/shutdown-panel/ShutdownPanel';
 import SourcesPanel from './panel/sources-panel/SourcesPanel';
+import TimecodePanel from './panel/timecode-panel/TimecodePanel';
 import PanelContent from './panel-content/PanelContent';
 import PanelList from './panel-list/PanelList';
 import useAppSettingsNavigation from './useAppSettingsNavigation';
@@ -37,6 +38,7 @@ export default function AppSettings() {
           {panel === 'qlab' && <QlabPanel />}
           {panel === 'mitti' && <MittiPanel />}
           {panel === 'ableton' && <AbletonPanel />}
+          {panel === 'timecode' && <TimecodePanel />}
           {panel === 'service_profiles' && <ServiceProfilesPanel />}
           {panel === 'network' && <NetworkLogPanel location={location} />}
           {panel === 'about' && <AboutPanel />}

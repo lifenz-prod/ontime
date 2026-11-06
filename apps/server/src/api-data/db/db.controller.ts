@@ -29,6 +29,7 @@ export async function patchPartialProjectFile(req: Request, res: Response<Databa
       qlab,
       mitti,
       ableton,
+      timecode,
       serviceProfiles,
     } = req.body;
     const patchDb: DatabaseModel = {
@@ -42,6 +43,7 @@ export async function patchPartialProjectFile(req: Request, res: Response<Databa
       qlab,
       mitti,
       ableton,
+      timecode,
       serviceProfiles,
     };
 

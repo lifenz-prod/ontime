@@ -55,6 +55,13 @@ export type {
   AbletonState,
   AbletonTimer,
 } from './definitions/core/Ableton.type.js';
+export type {
+  TimecodeFrame,
+  TimecodeReaderStatus,
+  TimecodeSettings,
+  TimecodeState,
+  TimecodeTimer,
+} from './definitions/core/Timecode.type.js';
 
 // ---> QLab
 export type { QlabState, QlabSettings } from './definitions/core/Qlab.type.js';
@@ -116,6 +123,7 @@ export type { RuntimeStore } from './definitions/runtime/RuntimeStore.type.js';
 export {
   runtimeStorePlaceholder,
   abletonStatePlaceholder,
+  timecodeStatePlaceholder,
   countdownStatePlaceholder,
   mittiStatePlaceholder,
   qlabStatePlaceholder,

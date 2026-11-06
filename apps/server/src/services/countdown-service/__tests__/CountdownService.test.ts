@@ -65,4 +65,19 @@ describe('CountdownService', () => {
     countdownService.update('ableton', { ...running('Way Maker', 45000), connected: false });
     expect(countdownService.getState().source).toBe('qlab');
   });
+
+  it('puts Ableton ahead of timecode when both are running, and timecode ahead of the selected source', async () => {
+    const { countdownService } = await import('../CountdownService.js');
+    countdownService.setSource('qlab');
+    countdownService.update('timecode', running('From timecode', 20000));
+    expect(countdownService.getState()).toMatchObject({ source: 'timecode', cueName: 'From timecode' });
+
+    countdownService.update('ableton', running('From Ableton', 40000));
+    expect(countdownService.getState()).toMatchObject({ source: 'ableton', cueName: 'From Ableton' });
+
+    countdownService.update('ableton', idle);
+    expect(countdownService.getState().source).toBe('timecode');
+    countdownService.update('timecode', idle);
+    expect(countdownService.getState().source).toBe('qlab');
+  });
 });

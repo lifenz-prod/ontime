@@ -4,10 +4,10 @@ import type { TimerPhase } from '../runtime/TimerState.type.js';
 export type CountdownSource = 'qlab' | 'mitti';
 
 /**
- * Everything that can be on the countdown: the selected source, or Ableton, which takes over
- * by itself while one of its timers is running and hands back when it is done
+ * Everything that can be on the countdown: the selected source, or Ableton or timecode, which take
+ * over by themselves while one of their timers is running and hand back when it is done
  */
-export type CountdownProvider = CountdownSource | 'ableton';
+export type CountdownProvider = CountdownSource | 'ableton' | 'timecode';
 
 /**
  * The shape every countdown provider resolves to.

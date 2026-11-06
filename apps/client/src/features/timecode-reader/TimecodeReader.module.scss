@@ -1,0 +1,60 @@
+.reader {
+  min-height: 100vh;
+  background: $gray-1350;
+  color: $gray-50;
+  font-family: var(--font-family-override, 'Open Sans', sans-serif);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+.title {
+  color: $gray-500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.85rem;
+}
+
+.timecode {
+  font-size: clamp(2.5rem, 10vw, 6rem);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.meter {
+  width: min(24rem, 90vw);
+  height: 0.5rem;
+  background: $gray-1100;
+  border-radius: 0.25rem;
+  overflow: hidden;
+}
+
+.meterFill {
+  height: 100%;
+  background: $green-500;
+  transition: width 0.2s;
+}
+
+.detail {
+  color: $gray-400;
+  text-align: center;
+}
+
+.error {
+  color: $red-500;
+  text-align: center;
+  max-width: 36rem;
+}
+
+.start {
+  padding: 0.5rem 1rem;
+  border-radius: 0.25rem;
+  background: $blue-500;
+  color: $gray-50;
+  border: none;
+  cursor: pointer;
+}

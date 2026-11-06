@@ -5,4 +5,5 @@ export const countdownSourceLabels: Record<CountdownProvider, string> = {
   qlab: 'QLab',
   mitti: 'Mitti',
   ableton: 'Ableton',
+  timecode: 'Timecode',
 };

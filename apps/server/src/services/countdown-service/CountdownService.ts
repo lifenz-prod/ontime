@@ -6,6 +6,7 @@ import {
   CountdownState,
   mittiStatePlaceholder,
   qlabStatePlaceholder,
+  timecodeStatePlaceholder,
 } from 'ontime-types';
 
 import { eventStore } from '../../stores/EventStore.js';
@@ -17,9 +18,9 @@ import { eventStore } from '../../stores/EventStore.js';
  * service free of imports back into QlabService / MittiService, and means the views
  * only ever read a single resolved key.
  *
- * QLab and Mitti are chosen in view settings. Ableton is not chosen: it takes over by itself
- * while one of its timers is running (its duration is only ever non-zero then), and the
- * selected source comes back as soon as it lets go.
+ * QLab and Mitti are chosen in view settings. Ableton and timecode are not chosen: each takes
+ * over by itself while one of its timers is running (its duration is only ever non-zero then),
+ * Ableton first if both are, and the selected source comes back as soon as they let go.
  */
 class CountdownService {
   private source: CountdownSource = 'qlab';
@@ -27,6 +28,7 @@ class CountdownService {
     qlab: { ...qlabStatePlaceholder },
     mitti: { ...mittiStatePlaceholder },
     ableton: { ...abletonStatePlaceholder },
+    timecode: { ...timecodeStatePlaceholder },
   };
   private lastProvider: CountdownProvider = 'qlab';
 
@@ -52,15 +54,21 @@ class CountdownService {
 
   /** Which provider the views should be showing right now */
   getProvider(): CountdownProvider {
-    if (isAbletonRunning(this.states.ableton)) {
+    if (isTimerRunning(this.states.ableton)) {
       return 'ableton';
+    }
+    if (isTimerRunning(this.states.timecode)) {
+      return 'timecode';
     }
     return this.source;
   }
 
   getState(): CountdownState {
     const provider = this.getProvider();
-    return { source: provider, ...this.states[provider] };
+    const { enabled, connected, cueName, cueNumber, duration, elapsed, remaining, isPaused, phase } =
+      this.states[provider];
+    // only the shared fields: timecode carries more, which the countdown views have no use for
+    return { source: provider, enabled, connected, cueName, cueNumber, duration, elapsed, remaining, isPaused, phase };
   }
 
   private broadcastState() {
@@ -70,7 +78,7 @@ class CountdownService {
   }
 }
 
-function isAbletonRunning(state: CountdownSourceState): boolean {
+function isTimerRunning(state: CountdownSourceState): boolean {
   return state.enabled && state.connected && state.duration > 0 && state.remaining > 0;
 }
 

@@ -15,6 +15,7 @@ export function safeMerge(existing: DatabaseModel, newData: Partial<DatabaseMode
     qlab = existing.qlab,
     mitti = existing.mitti,
     ableton = existing.ableton,
+    timecode = existing.timecode,
     serviceProfiles = existing.serviceProfiles,
   } = newData;
 
@@ -30,6 +31,7 @@ export function safeMerge(existing: DatabaseModel, newData: Partial<DatabaseMode
     qlab: { ...existing.qlab, ...qlab },
     mitti: { ...existing.mitti, ...mitti },
     ableton: { ...existing.ableton, ...ableton },
+    timecode: { ...existing.timecode, ...timecode },
     serviceProfiles: serviceProfiles ?? existing.serviceProfiles,
   };
 }

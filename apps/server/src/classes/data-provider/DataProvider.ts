@@ -11,6 +11,7 @@ import {
   MittiSettings,
   QlabSettings,
   ServiceProfiles,
+  TimecodeSettings,
 } from 'ontime-types';
 
 import type { Low } from 'lowdb';
@@ -63,6 +64,8 @@ export function getDataProvider() {
     setMitti,
     getAbleton,
     setAbleton,
+    getTimecode,
+    setTimecode,
     getServiceProfiles,
     setServiceProfiles,
     getRundown,
@@ -170,6 +173,16 @@ async function setAbleton(newData: AbletonSettings): ReadonlyPromise<AbletonSett
   return db.data.ableton;
 }
 
+function getTimecode(): Readonly<TimecodeSettings> {
+  return db.data.timecode;
+}
+
+async function setTimecode(newData: TimecodeSettings): ReadonlyPromise<TimecodeSettings> {
+  db.data.timecode = { ...newData };
+  await persist();
+  return db.data.timecode;
+}
+
 function getServiceProfiles(): Readonly<ServiceProfiles> {
   return db.data.serviceProfiles ?? { boundaryBlockId: null, services: [] };
 }
@@ -196,6 +209,7 @@ async function mergeIntoData(newData: Partial<DatabaseModel>): ReadonlyPromise<D
   db.data.qlab = mergedData.qlab;
   db.data.mitti = mergedData.mitti;
   db.data.ableton = mergedData.ableton;
+  db.data.timecode = mergedData.timecode;
   db.data.serviceProfiles = mergedData.serviceProfiles;
 
   await persist();

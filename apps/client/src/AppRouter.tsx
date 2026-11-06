@@ -40,6 +40,7 @@ const StudioClock = React.lazy(() => import('./features/viewers/studio/StudioClo
 const ProjectInfo = React.lazy(() => import('./views/project-info/ProjectInfo'));
 const QlabTimerView = React.lazy(() => import('./views/qlab/QlabTimer'));
 const QlabCountdownView = React.lazy(() => import('./views/qlabcountdown/QlabCountdownView'));
+const TimecodeReader = React.lazy(() => import('./features/timecode-reader/TimecodeReader'));
 const QuickStartGuide = React.lazy(() => import('./features/quick-start/QuickStartGuide'));
 
 const STimer = withPreset(withData(TimerView));
@@ -211,6 +212,8 @@ export default function AppRouter() {
             </ViewLoader>
           }
         />
+        {/* reads incoming timecode for the server: the desktop app keeps one open in a hidden window */}
+        <Route path='/timecode-reader' element={<TimecodeReader />} />
 
         {/*/!* Protected Routes *!/*/}
         <Route path='/quick-start' element={<QuickStartGuide />} />

@@ -1,0 +1,48 @@
+.timeCell {
+  width: 11rem;
+}
+
+.timeWithButton {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.actionsCell {
+  width: 3rem;
+}
+
+.empty {
+  color: $gray-500;
+  text-align: center;
+}
+
+.noteError {
+  margin-top: 0.25rem;
+  font-size: calc(1rem - 3px);
+  color: $red-500;
+}
+
+.live {
+  font-variant-numeric: tabular-nums;
+  color: $green-500;
+}
+
+.idle {
+  font-variant-numeric: tabular-nums;
+  color: $gray-500;
+}
+
+.meter {
+  width: 8rem;
+  height: 0.5rem;
+  background: $gray-1100;
+  border-radius: 0.25rem;
+  overflow: hidden;
+}
+
+.meterFill {
+  height: 100%;
+  background: $green-500;
+  transition: width 0.2s;
+}
