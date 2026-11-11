@@ -3,6 +3,7 @@ import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import { IoAdd, IoLocate, IoTrash } from 'react-icons/io5';
 import { Button, IconButton, Input, Switch, Tooltip } from '@chakra-ui/react';
 import type { AbletonSettings } from 'ontime-types';
+import { generateId } from 'ontime-utils';
 
 import { readAbletonClipPosition } from '../../../../common/api/ableton';
 import { maybeAxiosError } from '../../../../common/api/utils';
@@ -63,7 +64,7 @@ export default function AbletonPanel() {
 
   const addTimer = () => {
     const last = getValues('timers').at(-1);
-    append({ id: crypto.randomUUID(), name: '', track: last?.track ?? 1, clip: (last?.clip ?? 0) + 1, target: 0 });
+    append({ id: generateId(), name: '', track: last?.track ?? 1, clip: (last?.clip ?? 0) + 1, target: 0 });
   };
 
   const captureCurrentPosition = async (index: number) => {

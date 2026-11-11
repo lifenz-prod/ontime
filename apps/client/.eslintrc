@@ -19,6 +19,14 @@
     "@tanstack/query"
   ],
   "rules": {
+    "no-restricted-properties": [
+      "error",
+      {
+        "object": "crypto",
+        "property": "randomUUID",
+        "message": "crypto.randomUUID only exists on https or localhost, so it breaks Ontime opened by IP on the network. Use generateId from ontime-utils"
+      }
+    ],
     "react/jsx-no-bind": [
       "error",
       {

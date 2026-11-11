@@ -3,7 +3,7 @@ import { Controller, useFieldArray, useForm } from 'react-hook-form';
 import { IoAdd, IoLocate, IoTrash } from 'react-icons/io5';
 import { Button, IconButton, Input, Select, Switch, Tooltip } from '@chakra-ui/react';
 import type { TimecodeSettings } from 'ontime-types';
-import { formatTimecode, parseTimecode } from 'ontime-utils';
+import { formatTimecode, generateId, parseTimecode } from 'ontime-utils';
 
 import { getCurrentTimecode } from '../../../../common/api/timecode';
 import { maybeAxiosError } from '../../../../common/api/utils';
@@ -62,7 +62,7 @@ export default function TimecodePanel() {
   const addTimer = () => {
     const last = getValues('timers').at(-1);
     const from = last ? last.zero : timecode.current ?? 3600000;
-    append({ id: crypto.randomUUID(), name: '', from, zero: from + 5 * 60 * 1000 });
+    append({ id: generateId(), name: '', from, zero: from + 5 * 60 * 1000 });
   };
 
   const captureNow = async (index: number, field: 'from' | 'zero') => {

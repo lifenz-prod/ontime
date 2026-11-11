@@ -2,6 +2,7 @@ import { useFieldArray, useForm } from 'react-hook-form';
 import { IoAdd, IoTrash } from 'react-icons/io5';
 import { Button, IconButton, Input, Select } from '@chakra-ui/react';
 import { isOntimeBlock, ServiceProfiles } from 'ontime-types';
+import { generateId } from 'ontime-utils';
 
 import { maybeAxiosError } from '../../../../common/api/utils';
 import useRundown from '../../../../common/hooks-query/useRundown';
@@ -75,7 +76,7 @@ export default function ServiceProfilesPanel() {
 
   const addService = () => {
     // a new service defaults to the common two-hour offset from the master
-    append({ id: crypto.randomUUID(), name: 'New Service', offsetStr: fields.length === 0 ? '00:00' : '02:00' });
+    append({ id: generateId(), name: 'New Service', offsetStr: fields.length === 0 ? '00:00' : '02:00' });
   };
 
   return (
@@ -104,10 +105,10 @@ export default function ServiceProfilesPanel() {
 
       <Panel.Section as='form' id='service-profiles-form' onSubmit={handleSubmit(onSubmit)}>
         <Panel.Description>
-          Configure dual-service mode. The boundary block marks where the master service section begins: entries
-          before it are rehearsal and run once. The first service is the authored master; each additional service is
-          generated after it as a copy of the master, time-shifted by its offset. The iPad and mobile editors show one
-          tab per service (plus PRE for the rehearsal).
+          Configure dual-service mode. The boundary block marks where the master service section begins: entries before
+          it are rehearsal and run once. The first service is the authored master; each additional service is generated
+          after it as a copy of the master, time-shifted by its offset. The iPad and mobile editors show one tab per
+          service (plus PRE for the rehearsal).
         </Panel.Description>
 
         <Panel.ListGroup>
