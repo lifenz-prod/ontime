@@ -45,6 +45,8 @@ export type TimecodeReaderStatus = {
   level: number;
   /** why it is not reading, if it is not */
   error: string;
+  /** how many input channels each of `devices` has, in the same order. Only the desktop app's built-in reader knows */
+  deviceChannels?: number[];
 };
 
 export type TimecodeState = CountdownSourceState & {

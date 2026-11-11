@@ -40,9 +40,17 @@ export function isValidFrame(frame: unknown): frame is TimecodeFrame {
 
 export function parseReaderStatus(status: unknown): TimecodeReaderStatus | null {
   if (!status || typeof status !== 'object') return null;
-  const { devices, deviceLabel, channel, level, error } = status as Record<string, unknown>;
+  const { devices, deviceLabel, channel, level, error, deviceChannels } = status as Record<string, unknown>;
+  const names = Array.isArray(devices) ? devices.filter((d): d is string => typeof d === 'string').slice(0, 64) : [];
+  const counts =
+    Array.isArray(deviceChannels) &&
+    deviceChannels.length === names.length &&
+    deviceChannels.every((count) => Number.isInteger(count) && count >= 0)
+      ? (deviceChannels as number[])
+      : undefined;
   return {
-    devices: Array.isArray(devices) ? devices.filter((d): d is string => typeof d === 'string').slice(0, 64) : [],
+    devices: names,
+    ...(counts ? { deviceChannels: counts } : {}),
     deviceLabel: typeof deviceLabel === 'string' ? deviceLabel : '',
     channel: typeof channel === 'number' ? channel : 1,
     level: typeof level === 'number' && Number.isFinite(level) ? Math.min(1, Math.max(0, level)) : 0,

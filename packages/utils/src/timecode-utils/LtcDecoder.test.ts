@@ -1,7 +1,7 @@
 import type { TimecodeFrame } from 'ontime-types';
 
-import { LtcDecoder } from '../LtcDecoder';
-import { LtcEncoder } from '../LtcEncoder';
+import { LtcDecoder } from './LtcDecoder';
+import { LtcEncoder } from './LtcEncoder';
 
 const start = (fps: number, overrides: Partial<TimecodeFrame> = {}): TimecodeFrame => ({
   hours: 1,

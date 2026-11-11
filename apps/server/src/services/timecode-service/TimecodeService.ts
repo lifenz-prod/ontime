@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+
 import {
   LogOrigin,
   TimecodeReaderStatus,
@@ -20,6 +22,7 @@ import {
   parseReaderStatus,
   readerTimeout,
 } from './timecodeUtils.js';
+import { CaptureHelper, NativeTimecodeReader } from './NativeTimecodeReader.js';
 
 const defaultTimecodeSettings: TimecodeSettings = {
   enabled: false,
@@ -46,9 +49,11 @@ type LastFrame = {
 /**
  * Follows incoming timecode (LTC) and runs countdowns against it.
  *
- * The audio is not read here: a timecode reader page (hidden inside the desktop app, or open in
- * any browser on a machine with the signal) decodes it and sends us each frame over the websocket.
- * That keeps sound card access out of the server, which then works the same on the CLI and Docker.
+ * Frames come from a reader. In the macOS desktop app that is NativeTimecodeReader, which records
+ * any channel of any input through a small CoreAudio helper (the app points ONTIME_LTC_CAPTURE at
+ * it). Everywhere else a timecode reader page (hidden inside the desktop app, or open in any
+ * browser on a machine with the signal) decodes the audio and sends us each frame over the
+ * websocket, which keeps sound card access out of the server on the CLI and Docker.
  *
  * Each timer covers a range of timecode and counts down to its zero point. While the timecode is
  * in that range it takes over the playback countdown, and it hands back once the timecode passes
@@ -61,17 +66,30 @@ class TimecodeService {
   private reader: (TimecodeReaderStatus & { receivedAt: number }) | null = null;
   private hadSignal = false;
   private currentState: TimecodeState = { ...timecodeStatePlaceholder };
+  private nativeReader: NativeTimecodeReader | null = null;
 
-  init(settings: TimecodeSettings) {
+  init(settings: TimecodeSettings, helper: CaptureHelper | null = findCaptureHelper()) {
     this.applySettings(settings);
+    this.nativeReader?.stop();
+    this.nativeReader = null;
+    if (helper) {
+      this.nativeReader = new NativeTimecodeReader(helper, {
+        frame: (frame) => this.receiveFrame(frame),
+        status: (status) => this.receiveReaderStatus(status),
+      });
+      this.nativeReader.start(this.settings);
+    }
   }
 
   updateSettings(settings: TimecodeSettings) {
     this.applySettings(settings);
+    this.nativeReader?.apply(this.settings);
   }
 
   shutdown() {
     this.stopTicking();
+    this.nativeReader?.stop();
+    this.nativeReader = null;
   }
 
   getState(): TimecodeState {
@@ -168,6 +186,7 @@ class TimecodeService {
         ? null
         : {
             devices: this.reader.devices,
+            ...(this.reader.deviceChannels ? { deviceChannels: this.reader.deviceChannels } : {}),
             deviceLabel: this.reader.deviceLabel,
             channel: this.reader.channel,
             level: this.reader.level,
@@ -202,6 +221,12 @@ class TimecodeService {
     eventStore.set('timecode', this.currentState);
     countdownService.update('timecode', this.currentState);
   }
+}
+
+/** The desktop app on macOS ships ltc-capture and tells us where it is */
+function findCaptureHelper(): CaptureHelper | null {
+  const path = process.env.ONTIME_LTC_CAPTURE;
+  return path && existsSync(path) ? { command: path } : null;
 }
 
 export const timecodeService = new TimecodeService();

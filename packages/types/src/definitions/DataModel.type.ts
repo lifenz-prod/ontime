@@ -1,7 +1,6 @@
 import type {
   AbletonSettings,
   AutomationSettings,
-  TimecodeSettings,
   CustomFields,
   MittiSettings,
   OntimeRundown,
@@ -9,6 +8,7 @@ import type {
   QlabSettings,
   ServiceProfiles,
   Settings,
+  TimecodeSettings,
   URLPreset,
   ViewSettings,
 } from '../index.js';

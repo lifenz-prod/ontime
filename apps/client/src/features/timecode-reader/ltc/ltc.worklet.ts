@@ -6,9 +6,7 @@
  * - ltc-generator plays generated LTC, the reader's built-in test signal
  */
 import type { TimecodeFrame } from 'ontime-types';
-
-import { LtcDecoder } from './LtcDecoder';
-import { LtcEncoder } from './LtcEncoder';
+import { LtcDecoder, LtcEncoder } from 'ontime-utils';
 
 // the worklet scope is not in the DOM typings: just what we use of it
 declare const sampleRate: number;

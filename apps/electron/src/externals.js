@@ -27,6 +27,14 @@ const nodePath = isProduction
   : path.join(__dirname, '../../server/dist/index.cjs');
 
 /**
+ * The macOS helper that records a single channel of any input for the timecode reader,
+ * see native/ltc-capture. Built into the app by native/build.sh, absent on other platforms
+ */
+const ltcCapturePath = isProduction
+  ? path.join(__dirname, '../../extraResources/native/ltc-capture')
+  : path.join(__dirname, '../native/bin/ltc-capture');
+
+/**
  * Resolves correct URL for client
  * @param {number | undefined} port - the port at which the server is running
  * @returns {string}
@@ -85,6 +93,7 @@ module.exports = {
   isWindows,
   releaseTag,
   nodePath,
+  ltcCapturePath,
   getClientUrl,
   getServerUrl,
   projectsPath,

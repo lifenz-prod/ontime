@@ -32,6 +32,7 @@ export default function TimecodePanel() {
     setError,
     setValue,
     getValues,
+    watch,
     formState: { errors, isSubmitting, isDirty, isValid },
   } = useForm<TimecodeSettings>({
     mode: 'onChange',
@@ -81,6 +82,15 @@ export default function TimecodePanel() {
   const reader = timecode.reader;
   // the inputs the reader can see, plus the saved one in case the reader is not running right now
   const deviceOptions = [...new Set([...(reader?.devices ?? []), ...(data.deviceLabel ? [data.deviceLabel] : [])])];
+  // the desktop app on macOS reads any channel and knows how many each input has; a browser reader reads two at most
+  const canReadAnyChannel = Boolean(reader?.deviceChannels);
+  const channelCount = (label: string) => {
+    const index = reader?.devices.indexOf(label) ?? -1;
+    return index >= 0 ? reader?.deviceChannels?.[index] : undefined;
+  };
+  const selectedDevice = watch('deviceLabel');
+  const selectedChannels = selectedDevice ? channelCount(selectedDevice) : undefined;
+  const maxChannel = selectedChannels ?? 64;
 
   const canSubmit = !isSubmitting && isDirty && isValid;
   const isOnCountdown = countdown.source === 'timecode';
@@ -163,11 +173,14 @@ export default function TimecodePanel() {
             <Panel.Field
               title='Reader'
               description={
-                reader?.connected
-                  ? reader.error || `Recording ${reader.deviceLabel || 'the default input'}, channel ${reader.channel}`
-                  : 'No reader running. The desktop app starts one; elsewhere, open /timecode-reader'
+                !timecode.enabled
+                  ? 'Starts when timecode is turned on, and stops when it is off'
+                  : reader?.connected
+                    ? reader.error ||
+                      `Recording ${reader.deviceLabel || 'the default input'}, channel ${reader.channel}`
+                    : 'No reader running. The desktop app starts one; elsewhere, open /timecode-reader'
               }
-              error={reader?.connected && reader.error ? reader.error : undefined}
+              error={timecode.enabled && reader?.connected && reader.error ? reader.error : undefined}
             />
             <div className={style.meter} title='Level on the timecode channel'>
               <div
@@ -177,34 +190,70 @@ export default function TimecodePanel() {
             </div>
           </Panel.ListItem>
           <Panel.ListItem>
-            <Panel.Field title='Sound card' description='The input the timecode arrives on' />
+            <Panel.Field
+              title='Sound card'
+              description={
+                timecode.enabled ? 'The input the timecode arrives on' : 'Turn timecode on and save to list the inputs'
+              }
+            />
             <Select size='sm' width='16rem' variant='ontime' {...register('deviceLabel')}>
               <option value=''>Default input</option>
-              {deviceOptions.map((label) => (
-                <option key={label} value={label}>
-                  {label}
-                </option>
-              ))}
+              {deviceOptions.map((label) => {
+                const count = channelCount(label);
+                return (
+                  <option key={label} value={label}>
+                    {count ? `${label} (${count} ch)` : label}
+                  </option>
+                );
+              })}
             </Select>
           </Panel.ListItem>
           <Panel.ListItem>
             <Panel.Field
               title='Channel'
-              description='Input channel carrying the timecode. Channels 1 and 2 work everywhere'
+              description={
+                selectedChannels
+                  ? `The channel of ${selectedDevice} carrying the timecode, 1 to ${selectedChannels}`
+                  : canReadAnyChannel
+                    ? 'Input channel carrying the timecode'
+                    : 'Input channel carrying the timecode. A browser can only read channels 1 and 2'
+              }
               error={errors.channel?.message}
             />
-            <Input
-              width='5rem'
-              size='sm'
-              textAlign='right'
-              variant='ontime-filled'
-              type='number'
-              autoComplete='off'
-              {...register('channel', {
-                valueAsNumber: true,
-                validate: (value) => (Number.isInteger(value) && value >= 1 && value <= 64) || 'Channel 1 to 64',
-              })}
-            />
+            {selectedChannels ? (
+              <Select
+                size='sm'
+                width='8rem'
+                variant='ontime'
+                data-testid='timecode-channel'
+                {...register('channel', {
+                  valueAsNumber: true,
+                  validate: (value) =>
+                    (Number.isInteger(value) && value >= 1 && value <= maxChannel) || `Channel 1 to ${maxChannel}`,
+                })}
+              >
+                {Array.from({ length: selectedChannels }, (_, i) => i + 1).map((channel) => (
+                  <option key={channel} value={channel}>
+                    Channel {channel}
+                  </option>
+                ))}
+              </Select>
+            ) : (
+              <Input
+                width='5rem'
+                size='sm'
+                textAlign='right'
+                variant='ontime-filled'
+                type='number'
+                autoComplete='off'
+                data-testid='timecode-channel'
+                {...register('channel', {
+                  valueAsNumber: true,
+                  validate: (value) =>
+                    (Number.isInteger(value) && value >= 1 && value <= maxChannel) || `Channel 1 to ${maxChannel}`,
+                })}
+              />
+            )}
           </Panel.ListItem>
           <Panel.ListItem>
             <Panel.Field

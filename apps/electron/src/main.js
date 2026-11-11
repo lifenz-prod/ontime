@@ -10,8 +10,10 @@ const electronConfig = require('./electron.config.js');
 const {
   env,
   isProduction,
+  isMac,
   isWindows,
   nodePath,
+  ltcCapturePath,
   getClientUrl,
   trayIcon,
   appIcon,
@@ -38,6 +40,15 @@ let win;
 let splash;
 /** hidden window running the timecode reader page, see startTimecodeReader */
 let readerWin = null;
+
+/**
+ * On macOS the server reads timecode itself through ltc-capture, which can take any channel of an
+ * input. The reader page cannot: Chromium gives it two channels at most
+ */
+const hasNativeTimecode = isMac && fs.existsSync(ltcCapturePath);
+if (hasNativeTimecode) {
+  process.env.ONTIME_LTC_CAPTURE = ltcCapturePath;
+}
 let tray = null;
 
 /**
@@ -305,7 +316,9 @@ app.whenReady().then(() => {
       );
       Menu.setApplicationMenu(menu);
 
-      startTimecodeReader(clientUrl);
+      if (!hasNativeTimecode) {
+        startTimecodeReader(clientUrl);
+      }
 
       win
         .loadURL(`${clientUrl}/editor`)

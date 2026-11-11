@@ -57,3 +57,6 @@ ontime-data/
 
 # per-worktree server data dir (ONTIME_DATA), see CLAUDE.md working conventions
 .ontime-data/
+
+# native helpers, built by apps/electron/native/build.sh
+apps/electron/native/bin/

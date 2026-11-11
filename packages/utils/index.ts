@@ -109,3 +109,5 @@ export { type GoogleSheetReference, parseGoogleSheetInput } from './src/feature/
 export { isPlaybackActive } from './src/playback-utils/playbackstate.js';
 
 export { formatTimecode, parseTimecode, timecodeToMs } from './src/timecode-utils/timecode.js';
+export { LtcDecoder } from './src/timecode-utils/LtcDecoder.js';
+export { frameToBits, LtcEncoder, nextFrame } from './src/timecode-utils/LtcEncoder.js';
