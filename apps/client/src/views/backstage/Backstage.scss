@@ -74,19 +74,22 @@
     grid-area: card;
     display: flex;
     flex-direction: column;
-    gap: $view-element-gap;
+    gap: clamp(16px, 5vh, 64px);
   }
 
   /* =================== NOW CARD ===================*/
+
+  // NOW label and title sizes, shared with the NEXT card so they match
+  $now-label-size: calc(#{$title-font-size} * 1.2);
+  $now-title-size: calc(#{$title-font-size} * 1.1 * 1.2);
 
   .now-card {
     background-color: var(--card-background-color-override, $viewer-card-bg-color);
     padding: $view-card-padding;
     border-radius: $element-border-radius;
     display: flex;
-    flex-direction: column;
-    margin-top: 1.5em;
-    margin-bottom: 1em;
+    align-items: baseline;
+    gap: 1em;
 
     &.blink {
       animation-name: blink;
@@ -97,21 +100,59 @@
   }
 
   .now-card__label {
-    font-size: $title-font-size;
+    font-size: $now-label-size;
     font-weight: 600;
     text-transform: uppercase;
-    color: var(--accent-color-override, $accent-color);
+    color: var(--secondary-color-override, $viewer-secondary-color);
+    flex-shrink: 0;
+
+    &--overtime {
+      color: var(--accent-color-override, $accent-color);
+    }
   }
 
   .now-card__title {
-    font-size: calc(#{$title-font-size} * 1.1);
+    font-size: $now-title-size;
     font-weight: 600;
     color: var(--color-override, $viewer-color);
     line-height: 1.2em;
   }
 
-  .now-card__timer {
-    font-size: clamp(100px, 15vw, 220px);
+  /* =================== NEXT CARD (NEXT TITLE + MAIN TIMER) ===================*/
+
+  .next-card {
+    background-color: var(--card-background-color-override, $viewer-card-bg-color);
+    padding: $view-card-padding;
+    border-radius: $element-border-radius;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .next-card__heading {
+    display: flex;
+    align-items: baseline;
+    gap: 1em;
+  }
+
+  .next-card__label {
+    font-size: $now-label-size;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--secondary-color-override, $viewer-secondary-color);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .next-card__title {
+    font-size: $now-title-size;
+    font-weight: 600;
+    color: var(--color-override, $viewer-color);
+    line-height: 1.2em;
+  }
+
+  .next-card__timer {
+    /* sized for 1920x1080 (≈280px), limited by height as well as width */
+    font-size: clamp(100px, min(15vw, 26vh), 320px);
     font-weight: 600;
     font-family: var(--font-family-bold-override, $timer-bold-font-family);
     color: var(--timer-color-override, $timer-color);
@@ -125,7 +166,7 @@
     }
   }
 
-  .now-card__progress {
+  .next-card__progress {
     width: 100%;
     margin-top: 0.5em;
   }
@@ -269,7 +310,11 @@
       height: min(50px, 10vh);
     }
 
-    .now-card__timer {
+    .card-container {
+      gap: 24px;
+    }
+
+    .next-card__timer {
       font-size: clamp(48px, 12vw, 120px);
     }
 

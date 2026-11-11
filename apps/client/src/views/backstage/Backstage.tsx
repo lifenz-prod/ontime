@@ -79,10 +79,7 @@ export default function Backstage(props: BackstageProps) {
   );
 
   // find the event after next ("followed by")
-  const eventFollowedBy = useMemo(
-    () => getFollowedByEvent(backstageEvents, eventNext),
-    [backstageEvents, eventNext],
-  );
+  const eventFollowedBy = useMemo(() => getFollowedByEvent(backstageEvents, eventNext), [backstageEvents, eventNext]);
 
   // gather timer data
   const clock = formatTime(time.clock);
@@ -142,12 +139,10 @@ export default function Backstage(props: BackstageProps) {
       <div className='card-container'>
         {showNow && (
           <div className={cx(['now-card', blinkClass && 'blink'])}>
-            <span className='now-card__label'>{getLocalizedString('common.now')}</span>
+            <span className={cx(['now-card__label', overtime && 'now-card__label--overtime'])}>
+              {getLocalizedString('common.now')}
+            </span>
             <span className='now-card__title'>{nowMain}</span>
-            <div className={cx(['now-card__timer', overtime && 'now-card__timer--negative'])}>
-              {displayTimer}
-            </div>
-            {showProgress && <ProgressBar className='now-card__progress' current={time.current} duration={time.duration} />}
           </div>
         )}
 
@@ -169,7 +164,22 @@ export default function Backstage(props: BackstageProps) {
           </div>
         )}
 
-        {showNext && hasEvents && (
+        {showNow && (
+          <div className='next-card'>
+            {showNext && (
+              <div className='next-card__heading'>
+                <span className='next-card__label'>{getLocalizedString('common.next')}</span>
+                <span className='next-card__title'>{nextMain}</span>
+              </div>
+            )}
+            <div className={cx(['next-card__timer', overtime && 'next-card__timer--negative'])}>{displayTimer}</div>
+            {showProgress && (
+              <ProgressBar className='next-card__progress' current={time.current} duration={time.duration} />
+            )}
+          </div>
+        )}
+
+        {!showNow && showNext && hasEvents && (
           <div className='upcoming-card'>
             <span className='upcoming-card__label'>{getLocalizedString('common.next')}</span>
             <span className='upcoming-card__title'>{nextMain}</span>
@@ -177,7 +187,7 @@ export default function Backstage(props: BackstageProps) {
         )}
 
         {eventFollowedBy && showNow && (
-          <div className='upcoming-card'>
+          <div className='upcoming-card upcoming-card--then'>
             <span className='upcoming-card__label'>Then</span>
             <span className='upcoming-card__title'>{followedByMain}</span>
           </div>
