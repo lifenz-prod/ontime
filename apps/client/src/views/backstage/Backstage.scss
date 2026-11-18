@@ -118,6 +118,25 @@
     line-height: 1.2em;
   }
 
+  /* =================== CARD TEXT (TITLE + NOTES) ===================*/
+
+  .card-text {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .card-text__secondary {
+    font-size: $base-font-size;
+    font-weight: 400;
+    color: var(--secondary-color-override, $viewer-secondary-color);
+    line-height: 1.25em;
+    margin-top: 0.25em;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
   /* =================== NEXT CARD (NEXT TITLE + MAIN TIMER) ===================*/
 
   .next-card {

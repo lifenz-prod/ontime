@@ -39,19 +39,35 @@ type ScheduleOptions = {
   showProjected: boolean;
 };
 
-function getScheduleOptionsFromParams(searchParams: URLSearchParams): ScheduleOptions {
+/** Backstage shows the schedule without cycling unless the view settings say otherwise */
+export const BACKSTAGE_STOP_CYCLE_DEFAULT = true;
+
+/** Reads a boolean param, falling back to the default when the param is absent */
+function getBooleanParam(searchParams: URLSearchParams, id: string, defaultValue: boolean): boolean {
+  const value = searchParams.get(id);
+  return value === null ? defaultValue : isStringBoolean(value);
+}
+
+export function getScheduleOptionsFromParams(
+  searchParams: URLSearchParams,
+  stopCycleDefault = false,
+): ScheduleOptions {
   return {
     cycleInterval: Number(searchParams.get('cycleInterval')) || 10,
-    stopCycle: isStringBoolean(searchParams.get('stopCycle')),
+    stopCycle: getBooleanParam(searchParams, 'stopCycle', stopCycleDefault),
     showProjected: isStringBoolean(searchParams.get('showProjected')),
   };
 }
 
 /**
  * Hook exposes the schedule component options
+ * @param stopCycleDefault - used when the URL has no stopCycle param (Backstage defaults to not cycling)
  */
-export function useScheduleOptions() {
+export function useScheduleOptions(stopCycleDefault = false) {
   const [searchParams] = useSearchParams();
-  const options = useMemo(() => getScheduleOptionsFromParams(searchParams), [searchParams]);
+  const options = useMemo(
+    () => getScheduleOptionsFromParams(searchParams, stopCycleDefault),
+    [searchParams, stopCycleDefault],
+  );
   return options;
 }

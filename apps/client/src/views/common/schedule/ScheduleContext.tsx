@@ -12,7 +12,7 @@ import { isOntimeEvent, OntimeEvent, OntimeRundownEntry } from 'ontime-types';
 
 import { usePartialRundown } from '../../../common/hooks-query/useRundown';
 
-import { useScheduleOptions } from './schedule.options';
+import { BACKSTAGE_STOP_CYCLE_DEFAULT, useScheduleOptions } from './schedule.options';
 
 interface ScheduleContextState {
   events: OntimeEvent[];
@@ -35,7 +35,7 @@ export const ScheduleProvider = ({
   selectedEventId,
   isBackstage = false,
 }: PropsWithChildren<ScheduleProviderProps>) => {
-  const { cycleInterval, stopCycle } = useScheduleOptions();
+  const { cycleInterval, stopCycle } = useScheduleOptions(isBackstage && BACKSTAGE_STOP_CYCLE_DEFAULT);
   const { data: events } = usePartialRundown((event: OntimeRundownEntry) => {
     if (isBackstage) {
       return isOntimeEvent(event);

@@ -14,6 +14,7 @@ import { ViewExtendedTimer } from '../../common/models/TimeManager.type';
 import { cx, timerPlaceholderMin } from '../../common/utils/styleUtils';
 import { formatTime, getDefaultFormat } from '../../common/utils/time';
 import SuperscriptTime from '../../features/viewers/common/superscript-time/SuperscriptTime';
+import { getPropertyValue } from '../../features/viewers/common/viewUtils';
 import { useTranslation } from '../../translation/TranslationProvider';
 import ScheduleExport from '../common/schedule/ScheduleExport';
 
@@ -70,7 +71,7 @@ export default function Backstage(props: BackstageProps) {
 
   // gather card data
   const hasEvents = backstageEvents.length > 0;
-  const { showNow, nowMain, showNext, nextMain } = getCardData(
+  const { showNow, nowMain, nowSecondary, showNext, nextMain, nextSecondary } = getCardData(
     eventNow,
     eventNext,
     'title',
@@ -121,6 +122,7 @@ export default function Backstage(props: BackstageProps) {
   const backstageOptions = getBackstageOptions(defaultFormat, customFields);
 
   const followedByMain = eventFollowedBy?.title;
+  const followedBySecondary = getPropertyValue(eventFollowedBy, secondarySource);
 
   return (
     <div className={`backstage ${isMirrored ? 'mirror' : ''}`} data-testid='backstage-view'>
@@ -142,7 +144,7 @@ export default function Backstage(props: BackstageProps) {
             <span className={cx(['now-card__label', overtime && 'now-card__label--overtime'])}>
               {getLocalizedString('common.now')}
             </span>
-            <span className='now-card__title'>{nowMain}</span>
+            <CardText title={nowMain} secondary={nowSecondary} className='now-card__title' />
           </div>
         )}
 
@@ -169,7 +171,7 @@ export default function Backstage(props: BackstageProps) {
             {showNext && (
               <div className='next-card__heading'>
                 <span className='next-card__label'>{getLocalizedString('common.next')}</span>
-                <span className='next-card__title'>{nextMain}</span>
+                <CardText title={nextMain} secondary={nextSecondary} className='next-card__title' />
               </div>
             )}
             <div className={cx(['next-card__timer', overtime && 'next-card__timer--negative'])}>{displayTimer}</div>
@@ -182,14 +184,14 @@ export default function Backstage(props: BackstageProps) {
         {!showNow && showNext && hasEvents && (
           <div className='upcoming-card'>
             <span className='upcoming-card__label'>{getLocalizedString('common.next')}</span>
-            <span className='upcoming-card__title'>{nextMain}</span>
+            <CardText title={nextMain} secondary={nextSecondary} className='upcoming-card__title' />
           </div>
         )}
 
         {eventFollowedBy && showNow && (
           <div className='upcoming-card upcoming-card--then'>
             <span className='upcoming-card__label'>Then</span>
-            <span className='upcoming-card__title'>{followedByMain}</span>
+            <CardText title={followedByMain} secondary={followedBySecondary} className='upcoming-card__title' />
           </div>
         )}
 
@@ -207,6 +209,22 @@ export default function Backstage(props: BackstageProps) {
         {general.backstageUrl && <QRCode value={general.backstageUrl} size={qrSize} level='L' className='qr' />}
         {general.backstageInfo && <div className='info__message'>{general.backstageInfo}</div>}
       </div>
+    </div>
+  );
+}
+
+interface CardTextProps {
+  title?: string;
+  secondary?: string;
+  className: string;
+}
+
+/** An event title with its secondary text (notes by default) underneath */
+function CardText({ title, secondary, className }: CardTextProps) {
+  return (
+    <div className='card-text'>
+      <span className={className}>{title}</span>
+      {secondary && <span className='card-text__secondary'>{secondary}</span>}
     </div>
   );
 }

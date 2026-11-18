@@ -35,7 +35,7 @@ function sanitiseColour(colour: string) {
 /**
  * Makes a new URLSearchParams object from the given params object
  */
-const getURLSearchParamsFromObj = (paramsObj: ViewParamsObj, paramFields: ViewOption[]) => {
+export const getURLSearchParamsFromObj = (paramsObj: ViewParamsObj, paramFields: ViewOption[]) => {
   const newSearchParams = new URLSearchParams();
 
   // Convert paramFields to an object that contains default values
@@ -61,6 +61,16 @@ const getURLSearchParamsFromObj = (paramsObj: ViewParamsObj, paramFields: ViewOp
         handleValueString(id, valueWithoutHash);
       }
     }
+  });
+
+  // an unchecked switch is not part of the form data
+  // so a switch that defaults to on needs an explicit 'false' to be turned off
+  paramFields.forEach((section) => {
+    section.options.forEach((option) => {
+      if (option.type === 'boolean' && option.defaultValue === true && !(option.id in paramsObj)) {
+        newSearchParams.set(option.id, 'false');
+      }
+    });
   });
 
   /** Utility function contains logic to add a value into the searchParams object */
