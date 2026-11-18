@@ -95,7 +95,7 @@ Betas never move `latest`/`:latest`, so existing stable users are unaffected; te
 
 `build.yml`'s `verify_version` job fails the build if the tag doesn't match the package versions, or if `release-notes/<tag>.md` is missing or empty — so if you forget step 1 or 2, nothing ships.
 
-**If `verify_version` fails:** nothing was built or released, so fix it and move the tag. Commit the fix (e.g. the missing notes) on the branch, then `git tag -f <tag> && git push origin beta-releases && git push -f origin <tag>`. The re-pushed tag starts a fresh run.
+**If `verify_version` fails:** nothing was built or released. Don't move the pushed tag (that needs a force-push); cut the next number instead. Commit the fix (e.g. the missing notes), run `pnpm set-version` with the next `-beta.N`, rename the notes file to match, then commit, tag and push that new tag. The failed tag stays on origin without a release; that's harmless (e.g. `v4.0.3-beta.5`).
 
 **Checking a release:** only the "Ontime build" run tells you whether it shipped. The CLI and Docker runs finish green even when they publish nothing (see below).
 
