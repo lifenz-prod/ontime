@@ -76,7 +76,7 @@ Generated 9am/11am replica service sections so playback runs continuously across
 
 ## Releases (beta + stable)
 
-Releases are driven entirely by the **git tag**. Pushing a tag triggers `build.yml`, which builds the desktop binaries and creates a GitHub Release; that Release's `published` event then triggers `build_cli.yml` (npm) and `build_docker.yml` (Docker Hub).
+Releases are driven entirely by the **git tag**. Pushing a tag triggers all three release workflows at once: `build.yml` builds the desktop binaries and creates the GitHub Release, and `build_cli.yml` (npm) and `build_docker.yml` (Docker Hub) run alongside it.
 
 The tag string decides the channel: a tag containing `-` (e.g. `v3.19.0-beta.0`) is a **prerelease/beta**; a clean tag (`v3.19.0`) is **stable**.
 
@@ -91,15 +91,19 @@ Betas never move `latest`/`:latest`, so existing stable users are unaffected; te
 1. `pnpm set-version 3.19.0-beta.0` — stamps the version into root + `apps/cli` + `apps/electron` (+ client/server) package.jsons. The root version also feeds the in-app version via the `addversion` hook → `ONTIME_VERSION.js` (generated, gitignored). `apps/cli` drives the npm version; `apps/electron` drives the desktop build.
 2. **Write the release notes** in `release-notes/v3.19.0-beta.0.md` — every release, betas included. They become the GitHub Release body and are what the in-app updater (About → Updates) shows before anyone installs. Write them for the volunteers and operators who will read them: what changed for them, grouped under short headings, not a commit log. See `release-notes/README.md`.
 3. `git add release-notes && git commit -am "release: v3.19.0-beta.0" && git tag v3.19.0-beta.0`
-4. `git push && git push --tags`
+4. `git push && git push origin v3.19.0-beta.0` — push **only the new tag**, never `git push --tags`. The local clone carries ~185 upstream (`cpvalente/ontime`) tags that origin doesn't have, and every workflow runs on any tag, so `--tags` would set off a build for each of them.
 
 `build.yml`'s `verify_version` job fails the build if the tag doesn't match the package versions, or if `release-notes/<tag>.md` is missing or empty — so if you forget step 1 or 2, nothing ships.
+
+**If `verify_version` fails:** nothing was built or released, so fix it and move the tag. Commit the fix (e.g. the missing notes) on the branch, then `git tag -f <tag> && git push origin beta-releases && git push -f origin <tag>`. The re-pushed tag starts a fresh run.
+
+**Checking a release:** only the "Ontime build" run tells you whether it shipped. The CLI and Docker runs finish green even when they publish nothing (see below).
 
 **In-app updates:** About → Updates checks GitHub Releases for the newest stable release (or newest beta, with "Opt in to beta releases" on), shows its notes, and in the desktop app installs it in one click (`apps/electron/src/updater.js`). It downloads the release's own assets — `ontime-macOS-<arch>.zip`, `ontime-win64.exe`, `ontime-linux.AppImage` — so those names must not change. Only CI builds (signed) can update; the macOS swap refuses a bundle that fails `codesign --verify`.
 
 **Branching workflow:** active development happens on **`beta-releases`** (cut `-beta.N` tags from there for test builds). `master` is the stable line — merge `beta-releases` into it (or PR) only once a beta is proven, then cut a clean tag from `master` to promote to stable. A tag push triggers the build from whichever branch it points at; build.yml builds desktop binaries on any tag.
 
-Note: only `build.yml` (desktop binaries + GitHub Release) is wired up and verified. `build_cli.yml` (npm) and `build_docker.yml` (Docker) listen for `release: published` but never auto-fire, because the release is created by `GITHUB_TOKEN` — see the release-channels memory if you need to enable CLI/Docker publishing.
+Note: only `build.yml` (desktop binaries + GitHub Release) actually ships anything today. `build_cli.yml` (npm) and `build_docker.yml` (Docker) run on every tag push, but each starts with a `check_secrets` job and skips publishing unless its secrets are set: `NPM_TOKEN` for npm, `DOCKERHUB_USERNAME` + `DOCKERHUB_TOKEN` for Docker. None of these are set on `lifenz-prod/ontime`, so both runs end green having published nothing. Add those repo secrets to turn on CLI/Docker publishing.
 
 ## Working conventions
 
