@@ -35,6 +35,10 @@ export default function QlabCountdownView() {
       const timer = timerRef.current;
       if (!container || !timer) return;
 
+      // Measure at bold weight even though the timer renders lighter, so it keeps
+      // the size it had when the countdown was bold rather than growing to fill.
+      timer.style.fontWeight = 'bold';
+
       // Binary search for the largest font size that fits both width and height
       let lo = 10;
       let hi = 3000;
@@ -48,6 +52,7 @@ export default function QlabCountdownView() {
         }
       }
       timer.style.fontSize = `${lo}px`;
+      timer.style.fontWeight = '';
     }
 
     fitText();
