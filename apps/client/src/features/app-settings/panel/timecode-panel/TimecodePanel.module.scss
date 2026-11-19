@@ -9,7 +9,20 @@
 }
 
 .actionsCell {
-  width: 3rem;
+  width: 8rem;
+  white-space: nowrap;
+
+  // space the move and delete buttons apart
+  > * + * {
+    margin-left: 0.25rem;
+  }
+}
+
+.timerActions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.5rem;
 }
 
 .empty {

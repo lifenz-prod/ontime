@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Controller, useFieldArray, useForm } from 'react-hook-form';
-import { IoAdd, IoLocate, IoTrash } from 'react-icons/io5';
+import { IoAdd, IoArrowDown, IoArrowUp, IoLocate, IoTrash } from 'react-icons/io5';
 import { Button, IconButton, Input, Select, Switch, Tooltip } from '@chakra-ui/react';
 import type { TimecodeSettings } from 'ontime-types';
 import { formatTimecode, generateId, parseTimecode } from 'ontime-utils';
@@ -43,7 +43,7 @@ export default function TimecodePanel() {
     },
   });
 
-  const { fields, append, remove } = useFieldArray({ control, name: 'timers', keyName: 'fieldKey' });
+  const { fields, append, remove, move } = useFieldArray({ control, name: 'timers', keyName: 'fieldKey' });
   const [captureError, setCaptureError] = useState('');
 
   const onSubmit = async (formData: TimecodeSettings) => {
@@ -97,25 +97,7 @@ export default function TimecodePanel() {
 
   return (
     <Panel.Card>
-      <Panel.SubHeader>
-        Timecode
-        <Panel.InlineElements>
-          <Button variant='ontime-ghosted' size='sm' onClick={onReset} isDisabled={!canSubmit}>
-            Revert to saved
-          </Button>
-          <Button
-            variant='ontime-filled'
-            size='sm'
-            type='submit'
-            form='timecode-settings-form'
-            isDisabled={!canSubmit}
-            isLoading={isSubmitting}
-          >
-            Save
-          </Button>
-        </Panel.InlineElements>
-      </Panel.SubHeader>
-      {errors?.root && <Panel.Error>{errors.root.message}</Panel.Error>}
+      <Panel.SubHeader>Timecode</Panel.SubHeader>
 
       <Panel.Divider />
 
@@ -279,7 +261,8 @@ export default function TimecodePanel() {
 
         <Panel.Title>Timers</Panel.Title>
         <Panel.Description>
-          Times are hh:mm:ss:ff. To set one, play the timecode to that point and press its target button.
+          Times are hh:mm:ss:ff. To set one, play the timecode to that point and press its target button. Where
+          timers overlap, the one higher in the list wins; use the arrows to change the order.
         </Panel.Description>
         {captureError && <Panel.Error>{captureError}</Panel.Error>}
         <Panel.Table>
@@ -350,6 +333,22 @@ export default function TimecodePanel() {
                   ))}
                   <td className={style.actionsCell}>
                     <IconButton
+                      aria-label='Move timer up'
+                      icon={<IoArrowUp />}
+                      size='sm'
+                      variant='ontime-subtle'
+                      isDisabled={index === 0}
+                      onClick={() => move(index, index - 1)}
+                    />
+                    <IconButton
+                      aria-label='Move timer down'
+                      icon={<IoArrowDown />}
+                      size='sm'
+                      variant='ontime-subtle'
+                      isDisabled={index === fields.length - 1}
+                      onClick={() => move(index, index + 1)}
+                    />
+                    <IconButton
                       aria-label='Delete timer'
                       icon={<IoTrash />}
                       size='sm'
@@ -363,16 +362,20 @@ export default function TimecodePanel() {
             })}
           </tbody>
         </Panel.Table>
-        <Button
-          leftIcon={<IoAdd />}
-          variant='ontime-subtle'
-          size='sm'
-          onClick={addTimer}
-          marginTop={2}
-          alignSelf='flex-start'
-        >
-          Add timer
-        </Button>
+        <div className={style.timerActions}>
+          <Button leftIcon={<IoAdd />} variant='ontime-subtle' size='sm' onClick={addTimer}>
+            Add timer
+          </Button>
+          <Panel.InlineElements>
+            <Button variant='ontime-ghosted' size='sm' onClick={onReset} isDisabled={!canSubmit}>
+              Revert to saved
+            </Button>
+            <Button variant='ontime-filled' size='sm' type='submit' isDisabled={!canSubmit} isLoading={isSubmitting}>
+              Save
+            </Button>
+          </Panel.InlineElements>
+        </div>
+        {errors?.root && <Panel.Error>{errors.root.message}</Panel.Error>}
 
         <Panel.Title>Phase Thresholds</Panel.Title>
         <Panel.ListGroup>
