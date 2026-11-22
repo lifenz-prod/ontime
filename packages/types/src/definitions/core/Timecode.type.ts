@@ -24,6 +24,18 @@ export type TimecodeSettings = {
   timers: TimecodeTimer[];
 };
 
+/**
+ * A named list of timecode timers, kept in a library shared by every project,
+ * so a show's timers can be saved once and recalled into any project.
+ */
+export type TimecodeSetup = {
+  id: string;
+  name: string;
+  timers: TimecodeTimer[];
+  /** when it was last saved, as milliseconds since the epoch */
+  savedAt: number;
+};
+
 /** One decoded timecode frame, as a reader sends it to the server */
 export type TimecodeFrame = {
   hours: number;

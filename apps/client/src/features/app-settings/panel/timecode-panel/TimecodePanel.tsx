@@ -9,6 +9,7 @@ import { getCurrentTimecode } from '../../../../common/api/timecode';
 import { maybeAxiosError } from '../../../../common/api/utils';
 import Info from '../../../../common/components/info/Info';
 import useTimecodeSettings, { useTimecodeSettingsMutation } from '../../../../common/hooks-query/useTimecodeSettings';
+import useTimecodeSetups, { useTimecodeSetupsMutation } from '../../../../common/hooks-query/useTimecodeSetups';
 import { useRuntimeStore } from '../../../../common/stores/runtime';
 import { preventEscape } from '../../../../common/utils/keyEvent';
 import { tooltipDelayMid } from '../../../../ontimeConfig';
@@ -43,8 +44,56 @@ export default function TimecodePanel() {
     },
   });
 
-  const { fields, append, remove, move } = useFieldArray({ control, name: 'timers', keyName: 'fieldKey' });
+  const { fields, append, remove, move, replace } = useFieldArray({ control, name: 'timers', keyName: 'fieldKey' });
   const [captureError, setCaptureError] = useState('');
+
+  // saved setups: a library of timer lists shared by every project
+  const { setups } = useTimecodeSetups();
+  const { saveSetup, deleteSetup, isPending: isSetupPending } = useTimecodeSetupsMutation();
+  const [selectedSetupId, setSelectedSetupId] = useState('');
+  const [setupName, setSetupName] = useState('');
+  const [setupMessage, setSetupMessage] = useState('');
+  const [setupError, setSetupError] = useState('');
+  const selectedSetup = setups.find((setup) => setup.id === selectedSetupId);
+
+  const loadSetup = () => {
+    if (!selectedSetup) return;
+    replace(selectedSetup.timers.map((timer) => ({ ...timer })));
+    setSetupName(selectedSetup.name);
+    setSetupError('');
+    setSetupMessage(`Loaded ${selectedSetup.name}. Press Save to use these timers in this project.`);
+  };
+
+  const saveAsSetup = async () => {
+    const name = setupName.trim();
+    if (!name) return;
+    try {
+      const saved = await saveSetup({ name, timers: getValues('timers') });
+      const match = saved.find((setup) => setup.name.toLocaleLowerCase() === name.toLocaleLowerCase());
+      if (match) setSelectedSetupId(match.id);
+      setSetupError('');
+      setSetupMessage(`Saved these timers as ${name}.`);
+    } catch (error) {
+      setSetupMessage('');
+      setSetupError(maybeAxiosError(error));
+    }
+  };
+
+  const deleteSelectedSetup = async () => {
+    if (!selectedSetup) return;
+    if (!window.confirm(`Delete the saved setup ${selectedSetup.name}? The timers in this project are not affected.`)) {
+      return;
+    }
+    try {
+      await deleteSetup(selectedSetup.id);
+      setSelectedSetupId('');
+      setSetupError('');
+      setSetupMessage(`Deleted ${selectedSetup.name}.`);
+    } catch (error) {
+      setSetupMessage('');
+      setSetupError(maybeAxiosError(error));
+    }
+  };
 
   const onSubmit = async (formData: TimecodeSettings) => {
     try {
@@ -264,6 +313,75 @@ export default function TimecodePanel() {
           Times are hh:mm:ss:ff. To set one, play the timecode to that point and press its target button. Where
           timers overlap, the one higher in the list wins; use the arrows to change the order.
         </Panel.Description>
+        <div className={style.setups}>
+          <div className={style.setupGroup}>
+            <Select
+              size='sm'
+              width='14rem'
+              variant='ontime'
+              placeholder={setups.length ? 'Saved setups' : 'No saved setups yet'}
+              value={selectedSetupId}
+              onChange={(event) => setSelectedSetupId(event.target.value)}
+              isDisabled={setups.length === 0}
+              aria-label='Saved setups'
+            >
+              {setups.map((setup) => (
+                <option key={setup.id} value={setup.id}>
+                  {setup.name} ({setup.timers.length} {setup.timers.length === 1 ? 'timer' : 'timers'})
+                </option>
+              ))}
+            </Select>
+            <Button size='sm' variant='ontime-subtle' onClick={loadSetup} isDisabled={!selectedSetup}>
+              Load
+            </Button>
+            <Tooltip label='Delete saved setup' openDelay={tooltipDelayMid}>
+              <IconButton
+                aria-label='Delete saved setup'
+                icon={<IoTrash />}
+                size='sm'
+                variant='ontime-ghosted'
+                colorScheme='red'
+                onClick={deleteSelectedSetup}
+                isDisabled={!selectedSetup || isSetupPending}
+              />
+            </Tooltip>
+          </div>
+          <div className={style.setupGroup}>
+            <Input
+              size='sm'
+              width='12rem'
+              variant='ontime-filled'
+              placeholder='Setup name'
+              autoComplete='off'
+              aria-label='Setup name'
+              maxLength={60}
+              value={setupName}
+              onChange={(event) => setSetupName(event.target.value)}
+              onKeyDown={(event) => {
+                // Enter would otherwise submit the whole settings form
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  saveAsSetup();
+                }
+              }}
+            />
+            <Button
+              size='sm'
+              variant='ontime-subtle'
+              onClick={saveAsSetup}
+              isDisabled={!setupName.trim() || fields.length === 0}
+              isLoading={isSetupPending}
+            >
+              Save as setup
+            </Button>
+          </div>
+        </div>
+        <Panel.Description>
+          Saved setups are shared by every project. Each project also keeps its own timers, so loading another project
+          brings back the timers saved with it.
+        </Panel.Description>
+        {setupMessage && <Panel.Description>{setupMessage}</Panel.Description>}
+        {setupError && <Panel.Error>{setupError}</Panel.Error>}
         {captureError && <Panel.Error>{captureError}</Panel.Error>}
         <Panel.Table>
           <thead>

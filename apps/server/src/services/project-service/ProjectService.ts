@@ -31,6 +31,7 @@ import {
   setLastLoadedProject,
 } from '../app-state-service/AppStateService.js';
 import { runtimeService } from '../runtime-service/RuntimeService.js';
+import { timecodeService } from '../timecode-service/TimecodeService.js';
 
 import {
   copyCorruptFile,
@@ -180,6 +181,15 @@ export async function loadProjectFile(name: string) {
 
   // apply the rundown
   await initRundown(rundown, customFields);
+  applyProjectTimecode();
+}
+
+/**
+ * Each project keeps its own timecode timers: hand the loaded project's to the running service,
+ * otherwise the previous project's timers keep running until Ontime restarts
+ */
+function applyProjectTimecode() {
+  timecodeService.updateSettings(getDataProvider().getTimecode());
 }
 
 /**
@@ -250,6 +260,7 @@ export async function renameProjectFile(originalFile: string, newFilename: strin
 
     // apply the rundown
     await initRundown(rundown, customFields);
+    applyProjectTimecode();
   }
 }
 
@@ -303,6 +314,9 @@ export async function patchCurrentProject(data: Partial<DatabaseModel>) {
   const { rundown, customFields, ...rest } = data;
   // we can pass some stuff straight to the data provider
   const newData = await getDataProvider().mergeIntoData(rest);
+  if (rest.timecode != null) {
+    applyProjectTimecode();
+  }
 
   // ... but rundown and custom fields need to be checked
   if (rundown != null) {

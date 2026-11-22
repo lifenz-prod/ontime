@@ -1,4 +1,4 @@
-import { ErrorResponse, TimecodeSettings } from 'ontime-types';
+import { ErrorResponse, TimecodeSettings, TimecodeSetup } from 'ontime-types';
 import { getErrorMessage } from 'ontime-utils';
 
 import type { Request, Response } from 'express';
@@ -6,6 +6,11 @@ import type { Request, Response } from 'express';
 import { failEmptyObjects } from '../../utils/routerUtils.js';
 import { getDataProvider } from '../../classes/data-provider/DataProvider.js';
 import { timecodeService } from '../../services/timecode-service/TimecodeService.js';
+import { removeTimecodeSetup, upsertTimecodeSetup } from '../../services/timecode-service/timecodeSetups.js';
+import {
+  loadTimecodeSetups,
+  saveTimecodeSetups,
+} from '../../services/timecode-service/timecodeSetupsFile.js';
 
 import { parseTimecodeTimers } from './timecode.parser.js';
 
@@ -42,4 +47,30 @@ export async function getCurrentTimecode(
   res: Response<{ current: number | null; fps: number | null; signal: boolean }>,
 ) {
   res.status(200).send(timecodeService.getCurrent());
+}
+
+/** The saved timer setups, shared by every project */
+export async function getTimecodeSetups(_req: Request, res: Response<TimecodeSetup[]>) {
+  res.status(200).send(loadTimecodeSetups());
+}
+
+/** Saves timers under a name, replacing a setup of the same name */
+export async function postTimecodeSetup(req: Request, res: Response<TimecodeSetup[] | ErrorResponse>) {
+  try {
+    const { setups } = upsertTimecodeSetup(loadTimecodeSetups(), req.body.name, req.body.timers);
+    saveTimecodeSetups(setups);
+    res.status(200).send(setups);
+  } catch (error) {
+    res.status(400).send({ message: getErrorMessage(error) });
+  }
+}
+
+export async function deleteTimecodeSetup(req: Request, res: Response<TimecodeSetup[] | ErrorResponse>) {
+  try {
+    const setups = removeTimecodeSetup(loadTimecodeSetups(), req.params.id);
+    saveTimecodeSetups(setups);
+    res.status(200).send(setups);
+  } catch (error) {
+    res.status(400).send({ message: getErrorMessage(error) });
+  }
 }

@@ -59,6 +59,7 @@ export type {
   TimecodeFrame,
   TimecodeReaderStatus,
   TimecodeSettings,
+  TimecodeSetup,
   TimecodeState,
   TimecodeTimer,
 } from './definitions/core/Timecode.type.js';

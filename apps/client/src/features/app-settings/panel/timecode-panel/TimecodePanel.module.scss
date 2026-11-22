@@ -59,3 +59,17 @@
   background: $green-500;
   transition: width 0.2s;
 }
+
+.setups {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.setupGroup {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}

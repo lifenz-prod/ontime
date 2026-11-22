@@ -1,5 +1,21 @@
-import { body, validationResult } from 'express-validator';
+import { body, param, validationResult } from 'express-validator';
 import type { Request, Response, NextFunction } from 'express';
+
+function failOnErrors(req: Request, res: Response, next: NextFunction) {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(422).json({ errors: errors.array() });
+  next();
+}
+
+export const validateTimecodeSetup = [
+  body('name').isString().trim().isLength({ min: 1, max: 60 }),
+  body('timers').isArray(),
+  body('timers.*.from').isInt({ min: 0 }).toInt(),
+  body('timers.*.zero').isInt({ min: 0 }).toInt(),
+  failOnErrors,
+];
+
+export const validateTimecodeSetupId = [param('id').isString().notEmpty(), failOnErrors];
 
 export const validateTimecodeSettings = [
   body('enabled').isBoolean(),

@@ -19,6 +19,7 @@ export const QLAB = ['qlab'];
 export const MITTI = ['mitti'];
 export const ABLETON = ['ableton'];
 export const TIMECODE = ['timecode'];
+export const TIMECODE_SETUPS = ['timecode', 'setups'];
 export const SERVICE_PROFILES = ['serviceProfiles'];
 
 // API URLs
